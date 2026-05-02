@@ -1,0 +1,9 @@
+RPi.GPIO
+spidev
+smbus2
+pyserial
+pynmea2
+bme280
+pi-ina219
+adafruit-circuitpython-bno08x
+adafruit-blinka

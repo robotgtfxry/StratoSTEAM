@@ -1,0 +1,13 @@
+[Unit]
+Description=StratoSTEAM air node
+After=multi-user.target
+
+[Service]
+ExecStart=/usr/bin/python3 /home/pi/stratosteam/rpi-air/main.py
+WorkingDirectory=/home/pi/stratosteam/rpi-air
+Restart=always
+RestartSec=5
+User=pi
+
+[Install]
+WantedBy=multi-user.target

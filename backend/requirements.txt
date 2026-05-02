@@ -1,0 +1,9 @@
+fastapi>=0.111
+uvicorn[standard]
+sqlalchemy>=2.0
+aiosqlite
+pydantic>=2
+pydantic-settings
+# For production PostgreSQL:
+# asyncpg
+# psycopg2-binary
