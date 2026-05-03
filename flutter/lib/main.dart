@@ -4,10 +4,14 @@ import 'services/settings_service.dart';
 import 'services/telemetry_service.dart';
 import 'services/hf_service.dart';
 import 'services/command_service.dart';
+import 'services/rpi_power_service.dart';
+import 'services/terminal_service.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/map_screen.dart';
 import 'screens/transmitter_screen.dart';
+import 'screens/plots_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/terminal_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,6 +32,14 @@ void main() async {
         ChangeNotifierProxyProvider<SettingsService, CommandService>(
           create: (ctx) => CommandService(ctx.read<SettingsService>()),
           update: (_, s, prev) => prev ?? CommandService(s),
+        ),
+        ChangeNotifierProxyProvider<SettingsService, RpiPowerService>(
+          create: (ctx) => RpiPowerService(ctx.read<SettingsService>()),
+          update: (_, s, prev) => prev ?? RpiPowerService(s),
+        ),
+        ChangeNotifierProxyProvider<SettingsService, TerminalService>(
+          create: (ctx) => TerminalService(ctx.read<SettingsService>()),
+          update: (_, s, prev) => prev ?? TerminalService(s),
         ),
       ],
       child: const StratoSteamApp(),
@@ -65,7 +77,9 @@ class _ShellState extends State<_Shell> {
   static const _screens = [
     DashboardScreen(),
     MapScreen(),
+    PlotsScreen(),
     TransmitterScreen(),
+    TerminalScreen(),
     SettingsScreen(),
   ];
 
@@ -96,6 +110,11 @@ class _ShellState extends State<_Shell> {
             selectedIcon: const Icon(Icons.map, color: Colors.cyanAccent),
             label: 'Mapa',
           ),
+          const NavigationDestination(
+            icon: Icon(Icons.show_chart_outlined),
+            selectedIcon: Icon(Icons.show_chart, color: Colors.cyanAccent),
+            label: 'Wykresy',
+          ),
           NavigationDestination(
             icon: Badge(
               isLabelVisible: hf.hwActive,
@@ -105,6 +124,11 @@ class _ShellState extends State<_Shell> {
             selectedIcon: const Icon(Icons.broadcast_on_personal,
                 color: Colors.cyanAccent),
             label: 'Nadajnik',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.terminal_outlined),
+            selectedIcon: Icon(Icons.terminal, color: Colors.cyanAccent),
+            label: 'Terminal',
           ),
           const NavigationDestination(
             icon: Icon(Icons.settings_outlined),

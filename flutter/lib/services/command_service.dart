@@ -10,6 +10,7 @@ class CommandService extends ChangeNotifier {
   int ledR = 0;
   int ledG = 0;
   int ledB = 0;
+  double brightness = 1.0;
   bool loading = false;
   bool? lastSendOk;
 
@@ -41,6 +42,21 @@ class CommandService extends ChangeNotifier {
     }
   }
 
-  void setBuzzer(bool v) { buzzer = v; notifyListeners(); }
-  void setColor(int r, int g, int b) { ledR = r; ledG = g; ledB = b; notifyListeners(); }
+  void setBuzzer(bool v) {
+    buzzer = v;
+    notifyListeners();
+  }
+
+  void setColor(int r, int g, int b) {
+    ledR = r;
+    ledG = g;
+    ledB = b;
+    notifyListeners();
+  }
+
+  void setBrightness(double v) {
+    brightness = v;
+    // scale current colour
+    notifyListeners();
+  }
 }

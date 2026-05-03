@@ -27,20 +27,27 @@ BNO085_ADDR = 0x4A
 INA219_ADDR = 0x40
 INA219_SHUNT_OHMS = 0.1
 
-# AD9833 (SPI1) - APRS waveform generator
+# AD9833 (SPI1) - APRS beacon generator (144.800 MHz, odbierany osobnym SDR)
 AD9833_SPI_BUS = 1
-AD9833_SPI_CS = 1
-AD9833_APRS_FREQ = 144800000   # 144.800 MHz APRS (po filtrze i RD06HHF1)
+AD9833_SPI_CS = 2          # CE2 = GPIO16 (pin 36)
+AD9833_APRS_FREQ = 144800000
 APRS_CALLSIGN = "SP0STR-11"    # zmień na swój znak
 
 # Buzzer (passive, GPIO PWM)
-BUZZER_PIN = 18          # BCM GPIO (hardware PWM on RPi 5)
+BUZZER_PIN = 13          # BCM GPIO13 = hardware PWM1, pin 33; GPIO18 was SPI1_CE0
 BUZZER_FREQ_HZ = 2800    # tone frequency
 
 # RGB LED (3 separate GPIO pins)
 LED_R_PIN = 17
 LED_G_PIN = 27
 LED_B_PIN = 22
+
+# ESP32-S3 współpraca
+RPI_ALIVE_PIN    = 26   # OUTPUT — RPi trzyma HIGH póki działa (pin 37 → ESP32 GPIO6)
+ESP32_SHTDN_PIN  = 6    # INPUT  — ESP32 podnosi gdy chce shutdown (pin 31 ← ESP32 GPIO7)
+
+# APRS beacon duration (ile sekund nadajemy nośną)
+APRS_BEACON_DURATION_S = 5
 
 # Uplink RX window — after each TX, balon listens for commands this long
 UPLINK_RX_WINDOW_S = 2.0

@@ -43,11 +43,6 @@ def parse_packet(raw: bytes) -> dict:
 # ── Uplink (ground → air) ────────────────────────────────────────────────────
 
 def parse_command(raw: bytes) -> dict | None:
-    """
-    Parse a command packet from the ground station.
-    Returns dict with subset of keys: buzzer, led_r, led_g, led_b.
-    Returns None if packet is not a valid command.
-    """
     try:
         j = json.loads(raw.decode())
         if "cmd" not in j:
@@ -55,6 +50,16 @@ def parse_command(raw: bytes) -> dict | None:
         return j
     except (json.JSONDecodeError, UnicodeDecodeError):
         return None
+
+
+def build_exec_result(rc: int, out: str, err: str) -> bytes:
+    # Truncate output to fit LoRa packet (~160 chars each)
+    out = out[:160] if len(out) > 160 else out
+    err = err[:80]  if len(err) > 80  else err
+    return json.dumps(
+        {"type": "exec_result", "rc": rc, "out": out, "err": err},
+        separators=(",", ":"),
+    ).encode()
 
 
 def build_command(buzzer: bool, r: int, g: int, b: int) -> bytes:
