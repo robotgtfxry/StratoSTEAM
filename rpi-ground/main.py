@@ -85,33 +85,47 @@ def main():
                 log.info("Exec result rc=%s out=%r", packet.get("rc"), packet.get("out"))
                 continue
 
-            # ── Uplink window: exec > rpi_power > buzzer/led ──────────────────
-            sh = exec_s.pop()
-            if sh is not None:
-                pkt = build_exec_command(sh)
-                ok = lora.send_command(pkt)
-                log.info("Exec sent sh=%r ok=%s", sh, ok)
+            # ── Uplink window (tylko gdy pakiet pochodzi od RPi) ───────────────
+            # ESP32 nie nasłuchuje — komendy tylko do RPi
+            if not from_esp32:
+                sh = exec_s.pop()
+                if sh is not None:
+                    pkt = build_exec_command(sh)
+                    ok = lora.send_command(pkt)
+                    log.info("Exec sent sh=%r ok=%s", sh, ok)
+                else:
+                    # rpi_power "off" → wyślij do RPi żeby sama się zamknęła
+                    pwr_cmd = rpi_power.pop()
+                    if pwr_cmd is False:   # tylko "off" ma sens przez LoRa
+                        pkt = build_rpi_power_command(False)
+                        ok = lora.send_command(pkt)
+                        log.info("RPi shutdown cmd sent ok=%s", ok)
+                    elif pwr_cmd is True:
+                        log.info("RPi power ON requested but RPi already running")
+                    else:
+                        cmd = commands.pop()
+                        if cmd:
+                            pkt = build_command(
+                                buzzer=bool(cmd.get("buzzer", False)),
+                                r=int(cmd.get("led_r", 0)),
+                                g=int(cmd.get("led_g", 0)),
+                                b=int(cmd.get("led_b", 0)),
+                            )
+                            ok = lora.send_command(pkt)
+                            log.info(
+                                "CMD sent ok=%s buzzer=%s led=(%s,%s,%s)",
+                                ok, cmd.get("buzzer"),
+                                cmd.get("led_r"), cmd.get("led_g"), cmd.get("led_b"),
+                            )
             else:
+                # ESP32 beacon — możemy wysłać tylko rpi_power (ESP32 słucha)
                 pwr_cmd = rpi_power.pop()
                 if pwr_cmd is not None:
                     pkt = build_rpi_power_command(pwr_cmd)
                     ok = lora.send_command(pkt)
-                    log.info("RPi power cmd sent on=%s ok=%s", pwr_cmd, ok)
-                else:
-                    cmd = commands.pop()
-                    if cmd:
-                        pkt = build_command(
-                            buzzer=bool(cmd.get("buzzer", False)),
-                            r=int(cmd.get("led_r", 0)),
-                            g=int(cmd.get("led_g", 0)),
-                            b=int(cmd.get("led_b", 0)),
-                        )
-                        ok = lora.send_command(pkt)
-                        log.info(
-                            "CMD sent ok=%s buzzer=%s led=(%s,%s,%s)",
-                            ok, cmd.get("buzzer"),
-                            cmd.get("led_r"), cmd.get("led_g"), cmd.get("led_b"),
-                        )
+                    log.info("RPi power cmd → ESP32 on=%s ok=%s", pwr_cmd, ok)
+                exec_s.pop()      # exec nie dotrze do ESP32 — odrzuć
+                commands.pop()    # buzzer/led też nie — odrzuć
 
     except KeyboardInterrupt:
         log.info("Shutdown")

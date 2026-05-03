@@ -21,7 +21,7 @@ from sensors import (
     NeoM8nGps, Bme280Sensor, Ms5611Sensor, Bno085Sensor, Ina219Sensor,
 )
 from radio import LoRaSX1278, Ad9833Aprs
-from hardware import Buzzer, RgbLed, PowerSignal
+from hardware import PowerSignal
 from packet import build_packet, parse_command, build_exec_result
 
 logging.basicConfig(
@@ -33,22 +33,6 @@ logging.basicConfig(
     ],
 )
 log = logging.getLogger("air")
-
-
-def apply_command(cmd: dict, buzzer: Buzzer, led: RgbLed):
-    if "buzzer" in cmd:
-        if cmd["buzzer"]:
-            buzzer.on()
-        else:
-            buzzer.off()
-        log.info("CMD buzzer → %s", cmd["buzzer"])
-
-    if "led_r" in cmd or "led_g" in cmd or "led_b" in cmd:
-        r = int(cmd.get("led_r", 0))
-        g = int(cmd.get("led_g", 0))
-        b = int(cmd.get("led_b", 0))
-        led.set_color(r, g, b)
-        log.info("CMD led → rgb(%d,%d,%d)", r, g, b)
 
 
 def main():
@@ -63,8 +47,6 @@ def main():
     pwr    = Ina219Sensor(INA219_SHUNT_OHMS, INA219_ADDR)
     lora   = LoRaSX1278()
     aprs   = Ad9833Aprs()
-    buzzer = Buzzer()
-    led    = RgbLed()
 
     seq = 0
     last_telem  = 0.0
@@ -132,7 +114,7 @@ def main():
                             except Exception as e:
                                 exec_result = build_exec_result(-1, "", str(e))
                         else:
-                            apply_command(cmd, buzzer, led)
+                            log.info("CMD ignored (buzzer/LED handled by ESP32): %s", cmd)
 
             # ── APRS: włącz nośną na APRS_BEACON_DURATION_S sekund ───────────
             if not aprs_on and (now - last_aprs >= APRS_BEACON_INTERVAL_S):
@@ -153,8 +135,6 @@ def main():
         log.info("Shutdown by keyboard")
     finally:
         power.set_alive(False)
-        buzzer.close()
-        led.close()
         gps.close()
         lora.close()
         aprs.close()

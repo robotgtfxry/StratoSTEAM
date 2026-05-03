@@ -33,14 +33,7 @@ AD9833_SPI_CS = 2          # CE2 = GPIO16 (pin 36)
 AD9833_APRS_FREQ = 144800000
 APRS_CALLSIGN = "SP0STR-11"    # zmień na swój znak
 
-# Buzzer (passive, GPIO PWM)
-BUZZER_PIN = 13          # BCM GPIO13 = hardware PWM1, pin 33; GPIO18 was SPI1_CE0
-BUZZER_FREQ_HZ = 2800    # tone frequency
-
-# RGB LED (3 separate GPIO pins)
-LED_R_PIN = 17
-LED_G_PIN = 27
-LED_B_PIN = 22
+# Buzzer i RGB LED — obsługiwane przez ESP32-S3 (zawsze zasilony)
 
 # ESP32-S3 współpraca
 RPI_ALIVE_PIN    = 26   # OUTPUT — RPi trzyma HIGH póki działa (pin 37 → ESP32 GPIO6)
