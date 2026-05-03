@@ -87,6 +87,30 @@ class LoRaRX:
             time.sleep(0.005)
         return None, 0, 0
 
+    def send_command(self, data: bytes) -> bool:
+        """
+        Switch briefly to TX, send command packet, return to RX_CONT.
+        Called immediately after receiving a telemetry packet — the balloon
+        is listening for exactly UPLINK_RX_WINDOW_S seconds.
+        """
+        self._set_mode(_MODE_STDBY)
+        self._write_reg(_REG_FIFO_ADDR_PTR, 0x00)
+        self._write_reg(0x0E, 0x00)   # FIFO TX base
+        for b in data:
+            self._write_reg(_REG_FIFO, b)
+        self._write_reg(0x22, len(data))   # payload length
+        self._write_reg(_REG_DIO_MAPPING1, 0x40)
+        self._set_mode(0x03)   # TX mode
+        deadline = time.time() + 5
+        while time.time() < deadline:
+            if self._read_reg(_REG_IRQ_FLAGS) & 0x08:   # TxDone
+                self._write_reg(_REG_IRQ_FLAGS, 0xFF)
+                self._set_mode(_MODE_RX_CONT)            # back to RX
+                return True
+            time.sleep(0.01)
+        self._set_mode(_MODE_RX_CONT)
+        return False
+
     def _set_mode(self, mode: int):
         self._write_reg(_REG_OP_MODE, _MODE_LONG_RANGE | mode)
 

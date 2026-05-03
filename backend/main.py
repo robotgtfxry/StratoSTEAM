@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from database import init_db
-from routers import telemetry, ws
+from routers import telemetry, ws, hf, commands
 
 
 @asynccontextmanager
@@ -22,3 +22,5 @@ app.add_middleware(
 
 app.include_router(telemetry.router, prefix="/api")
 app.include_router(ws.router)
+app.include_router(hf.router)
+app.include_router(commands.router)

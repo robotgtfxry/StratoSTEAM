@@ -33,6 +33,18 @@ AD9833_SPI_CS = 1
 AD9833_APRS_FREQ = 144800000   # 144.800 MHz APRS (po filtrze i RD06HHF1)
 APRS_CALLSIGN = "SP0STR-11"    # zmień na swój znak
 
+# Buzzer (passive, GPIO PWM)
+BUZZER_PIN = 18          # BCM GPIO (hardware PWM on RPi 5)
+BUZZER_FREQ_HZ = 2800    # tone frequency
+
+# RGB LED (3 separate GPIO pins)
+LED_R_PIN = 17
+LED_G_PIN = 27
+LED_B_PIN = 22
+
+# Uplink RX window — after each TX, balon listens for commands this long
+UPLINK_RX_WINDOW_S = 2.0
+
 # Telemetry
 TELEMETRY_INTERVAL_S = 5       # how often to send packet
 APRS_BEACON_INTERVAL_S = 60    # APRS position beacon interval

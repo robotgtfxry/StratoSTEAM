@@ -41,6 +41,8 @@ _MODE_LONG_RANGE = 0x80
 
 _IRQ_TX_DONE = 0x08
 _IRQ_RX_DONE = 0x40
+_IRQ_PAYLOAD_CRC_ERROR = 0x20
+_MODE_RX_CONT = 0x05
 
 
 class LoRaSX1278:
@@ -101,6 +103,36 @@ class LoRaSX1278:
             time.sleep(0.01)
         log.warning("LoRa TX timeout")
         return False
+
+    def listen(self, timeout_s: float) -> bytes | None:
+        """
+        Open an RX window for timeout_s seconds.
+        Returns payload bytes if a packet arrived, None otherwise.
+        Called by the air node after each TX to receive ground commands.
+        """
+        self._write_reg(_REG_FIFO_RX_BASE_ADDR, 0x00)
+        self._write_reg(_REG_FIFO_ADDR_PTR, 0x00)
+        self._write_reg(_REG_DIO_MAPPING1, 0x00)  # DIO0 = RxDone
+        self._set_mode(_MODE_RX_CONT)
+        deadline = time.time() + timeout_s
+        try:
+            while time.time() < deadline:
+                irq = self._read_reg(_REG_IRQ_FLAGS)
+                if irq & _IRQ_RX_DONE:
+                    if irq & _IRQ_PAYLOAD_CRC_ERROR:
+                        self._write_reg(_REG_IRQ_FLAGS, 0xFF)
+                        return None
+                    length = self._read_reg(_REG_RX_NB_BYTES)
+                    self._write_reg(_REG_FIFO_ADDR_PTR,
+                                    self._read_reg(_REG_FIFO_RX_CURRENT_ADDR))
+                    payload = bytes([self._read_reg(_REG_FIFO)
+                                     for _ in range(length)])
+                    self._write_reg(_REG_IRQ_FLAGS, 0xFF)
+                    return payload
+                time.sleep(0.01)
+        finally:
+            self._set_mode(_MODE_STDBY)
+        return None
 
     def _set_mode(self, mode: int):
         self._write_reg(_REG_OP_MODE, _MODE_LONG_RANGE | mode)

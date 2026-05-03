@@ -38,3 +38,28 @@ def build_packet(
 
 def parse_packet(raw: bytes) -> dict:
     return json.loads(raw.decode())
+
+
+# ── Uplink (ground → air) ────────────────────────────────────────────────────
+
+def parse_command(raw: bytes) -> dict | None:
+    """
+    Parse a command packet from the ground station.
+    Returns dict with subset of keys: buzzer, led_r, led_g, led_b.
+    Returns None if packet is not a valid command.
+    """
+    try:
+        j = json.loads(raw.decode())
+        if "cmd" not in j:
+            return None
+        return j
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return None
+
+
+def build_command(buzzer: bool, r: int, g: int, b: int) -> bytes:
+    """Ground station uses this to build the command packet."""
+    return json.dumps(
+        {"cmd": 1, "buzzer": buzzer, "led_r": r, "led_g": g, "led_b": b},
+        separators=(",", ":"),
+    ).encode()

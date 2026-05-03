@@ -4,10 +4,10 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../models/telemetry.dart';
+import 'settings_service.dart';
 
 class TelemetryService extends ChangeNotifier {
-  static const _baseUrl = 'http://localhost:8000'; // change for production
-  static const _wsUrl  = 'ws://localhost:8000/ws/telemetry';
+  final SettingsService _settings;
 
   final List<Telemetry> history = [];
   Telemetry? latest;
@@ -15,15 +15,18 @@ class TelemetryService extends ChangeNotifier {
 
   WebSocketChannel? _ws;
   StreamSubscription? _sub;
+  bool _disposed = false;
 
-  TelemetryService() {
+  TelemetryService(this._settings) {
     _connect();
     _fetchHistory();
   }
 
   Future<void> _fetchHistory() async {
     try {
-      final res = await http.get(Uri.parse('$_baseUrl/api/telemetry?limit=200'));
+      final res = await http.get(
+        Uri.parse('${_settings.serverUrl}/api/telemetry?limit=200'),
+      );
       if (res.statusCode == 200) {
         final list = jsonDecode(res.body) as List;
         history
@@ -36,9 +39,13 @@ class TelemetryService extends ChangeNotifier {
   }
 
   void _connect() {
+    if (_disposed) return;
     try {
-      _ws = WebSocketChannel.connect(Uri.parse(_wsUrl));
+      _sub?.cancel();
+      _ws?.sink.close();
+      _ws = WebSocketChannel.connect(Uri.parse(_settings.wsUrl));
       connected = true;
+      notifyListeners();
       _sub = _ws!.stream.listen(
         (raw) {
           final j = jsonDecode(raw as String) as Map<String, dynamic>;
@@ -52,22 +59,32 @@ class TelemetryService extends ChangeNotifier {
         onDone: () {
           connected = false;
           notifyListeners();
-          Future.delayed(const Duration(seconds: 5), _connect);
+          if (!_disposed) Future.delayed(const Duration(seconds: 5), _connect);
         },
         onError: (_) {
           connected = false;
           notifyListeners();
-          Future.delayed(const Duration(seconds: 5), _connect);
+          if (!_disposed) Future.delayed(const Duration(seconds: 5), _connect);
         },
       );
     } catch (_) {
       connected = false;
-      Future.delayed(const Duration(seconds: 5), _connect);
+      notifyListeners();
+      if (!_disposed) Future.delayed(const Duration(seconds: 5), _connect);
     }
+  }
+
+  /// Called after settings change — reconnects and reloads history.
+  void reconnect() {
+    history.clear();
+    latest = null;
+    _connect();
+    _fetchHistory();
   }
 
   @override
   void dispose() {
+    _disposed = true;
     _sub?.cancel();
     _ws?.sink.close();
     super.dispose();
