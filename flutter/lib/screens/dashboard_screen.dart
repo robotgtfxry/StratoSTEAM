@@ -6,6 +6,7 @@ import '../widgets/info_card.dart';
 import '../widgets/altitude_chart.dart';
 import '../widgets/map_view.dart';
 import '../widgets/attitude_indicator.dart';
+import '../widgets/heading_indicator.dart';
 import '../widgets/control_panel.dart';
 
 class DashboardScreen extends StatelessWidget {
@@ -47,24 +48,39 @@ class DashboardScreen extends StatelessWidget {
                   _StatusBar(t: t),
                   const SizedBox(height: 12),
 
-                  // mapa + sztuczny horyzont obok siebie
+                  // mapa + sztuczny horyzont + kompas
                   LayoutBuilder(builder: (ctx, bc) {
                     final roll  = t?.roll  ?? 0.0;
                     final pitch = t?.pitch ?? 0.0;
+                    final yaw   = t?.yaw   ?? 0.0;
                     final wide  = bc.maxWidth > 700;
                     final map = SizedBox(height: 300, child: MapView(history: svc.history));
                     final att = SizedBox(
                       height: 300,
                       child: AttitudeIndicator(roll: roll, pitch: pitch),
                     );
+                    final hdg = SizedBox(
+                      height: 300,
+                      child: HeadingIndicator(yaw: yaw, roll: roll, pitch: pitch),
+                    );
                     if (wide) {
                       return Row(children: [
                         Expanded(child: map),
                         const SizedBox(width: 12),
-                        SizedBox(width: 300, child: att),
+                        SizedBox(width: 260, child: att),
+                        const SizedBox(width: 12),
+                        SizedBox(width: 260, child: hdg),
                       ]);
                     }
-                    return Column(children: [att, const SizedBox(height: 12), map]);
+                    return Column(children: [
+                      Row(children: [
+                        Expanded(child: att),
+                        const SizedBox(width: 12),
+                        Expanded(child: hdg),
+                      ]),
+                      const SizedBox(height: 12),
+                      map,
+                    ]);
                   }),
                   const SizedBox(height: 12),
 
@@ -79,6 +95,30 @@ class DashboardScreen extends StatelessWidget {
                         icon: Icons.arrow_upward,
                         color: Colors.cyanAccent,
                       ),
+                      // ── Prędkość wznoszenia ─────────────────────
+                      Builder(builder: (_) {
+                        final cr = svc.climbRate;
+                        final crStr = cr != null
+                            ? '${cr >= 0 ? '+' : ''}${cr.toStringAsFixed(1)} m/s'
+                            : '-- m/s';
+                        final crColor = cr == null
+                            ? Colors.white38
+                            : cr > 0.5
+                                ? Colors.greenAccent
+                                : cr < -0.5
+                                    ? Colors.redAccent
+                                    : Colors.white70;
+                        return InfoCard(
+                          label: 'Wznoszenie',
+                          value: crStr,
+                          icon: cr == null
+                              ? Icons.swap_vert
+                              : cr >= 0
+                                  ? Icons.trending_up
+                                  : Icons.trending_down,
+                          color: crColor,
+                        );
+                      }),
                       InfoCard(
                         label: 'Altitude baro',
                         value: t != null ? '${t.msAlt.toStringAsFixed(0)} m' : '-- m',

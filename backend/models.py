@@ -4,6 +4,25 @@ from database import Base
 import datetime
 
 
+class WaypointRecord(Base):
+    """5-minute snapshot of balloon position + key parameters, shown as map markers."""
+    __tablename__ = "waypoints"
+
+    id:          Mapped[int]   = mapped_column(Integer, primary_key=True, index=True)
+    ts:          Mapped[int]   = mapped_column(Integer)
+    recorded_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    lat:         Mapped[float | None] = mapped_column(Float, nullable=True)
+    lon:         Mapped[float | None] = mapped_column(Float, nullable=True)
+    alt:         Mapped[float | None] = mapped_column(Float, nullable=True)
+    bme_temp:    Mapped[float]        = mapped_column(Float, default=0.0)
+    bme_pres:    Mapped[float]        = mapped_column(Float, default=0.0)
+    voltage:     Mapped[float]        = mapped_column(Float, default=0.0)
+    rssi:        Mapped[int]          = mapped_column(Integer, default=0)
+    seq:         Mapped[int]          = mapped_column(Integer, default=0)
+
+
 class TelemetryRecord(Base):
     __tablename__ = "telemetry"
 

@@ -74,6 +74,18 @@ class TelemetryService extends ChangeNotifier {
     }
   }
 
+  /// Vertical speed in m/s (positive = ascending, negative = descending).
+  /// Computed from the last two history entries with valid altitude.
+  double? get climbRate {
+    if (history.length < 2) return null;
+    final a = history[history.length - 2];
+    final b = history[history.length - 1];
+    if (a.alt == null || b.alt == null) return null;
+    final dt = (b.ts - a.ts).toDouble();
+    if (dt <= 0) return null;
+    return (b.alt! - a.alt!) / dt;
+  }
+
   /// Called after settings change — reconnects and reloads history.
   void reconnect() {
     history.clear();

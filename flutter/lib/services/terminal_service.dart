@@ -42,7 +42,7 @@ class TerminalService extends ChangeNotifier {
       case 'rpi':
         await _cmdRpi(parts);
       case 'aprs':
-        await _cmdAprs(parts);
+        _sys('APRS działa autonomicznie na balonie (timer co ${60}s, 5s carrier) — nie wymaga komendy.');
       default:
         // Wszystko inne → wykonaj na RPi przez LoRa
         await _cmdExec(input);
@@ -99,19 +99,6 @@ class TerminalService extends ChangeNotifier {
     final on = p[1] == 'on';
     final ok = await _post('/api/rpi_power/set', {'on': on});
     ok ? _ok('RPi ${on ? "ON" : "OFF"} — komenda wysłana do ESP32') : _err('Błąd wysyłania');
-  }
-
-  Future<void> _cmdAprs(List<String> p) async {
-    if (p.length < 2 || (p[1] != 'on' && p[1] != 'off')) {
-      _err('Użycie: aprs on|off');
-      return;
-    }
-    final on = p[1] == 'on';
-    final ok = await _post('/api/commands/send', {
-      'buzzer': false, 'led_r': 0, 'led_g': 0, 'led_b': 0,
-      'aprs': on,
-    });
-    ok ? _ok('APRS ${on ? "ON" : "OFF"} — w kolejce') : _err('Błąd wysyłania');
   }
 
   Future<void> _cmdExec(String sh) async {
@@ -189,7 +176,6 @@ class TerminalService extends ChangeNotifier {
       '  led <r> <g> <b>        — LED RGB (0-255)',
       '  led #rrggbb            — LED kolor hex',
       '  rpi on|off             — zasilanie RPi (przez ESP32)',
-      '  aprs on|off            — nośna APRS 144.800 MHz',
       '  clear / help',
       '',
       'Dowolna inna komenda → wykonywana na RPi przez bash:',

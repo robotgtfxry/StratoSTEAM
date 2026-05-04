@@ -3,7 +3,7 @@ import RPi.GPIO as GPIO
 import time
 import logging
 from config import (
-    LORA_FREQ, LORA_SF, LORA_BW, LORA_CR,
+    LORA_FREQ, LORA_SF, LORA_BW, LORA_CR, LORA_TX_POWER,
     LORA_SPI_BUS, LORA_SPI_CS, LORA_DIO0_PIN,
 )
 
@@ -57,9 +57,10 @@ class LoRaRX:
         bw_map = {125000: 7, 250000: 8, 500000: 9}
         bw_bits = bw_map.get(LORA_BW, 7) << 4
         cr_bits = (LORA_CR - 4) << 1
-        self._write_reg(_REG_MODEM_CONFIG1, bw_bits | cr_bits | 0x01)  # implicit CRC
+        self._write_reg(_REG_MODEM_CONFIG1, bw_bits | cr_bits)  # explicit header (musi zgadzać się z rpi-air)
         self._write_reg(_REG_MODEM_CONFIG2, (LORA_SF << 4) | 0x04)
         self._write_reg(_REG_MODEM_CONFIG3, 0x04)
+        self._write_reg(0x09, 0x80 | (LORA_TX_POWER - 2))  # PA_BOOST, moc TX uplink
         self._write_reg(_REG_SYNC_WORD, 0x12)
         self._write_reg(_REG_FIFO_RX_BASE_ADDR, 0x00)
         self._write_reg(_REG_DIO_MAPPING1, 0x00)  # DIO0 = RxDone

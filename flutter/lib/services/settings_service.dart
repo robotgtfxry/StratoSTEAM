@@ -10,7 +10,7 @@ class SettingsService extends ChangeNotifier {
   static const _keyLoraFreq    = 'lora_freq';
   static const _keyLoraSf      = 'lora_sf';
 
-  String serverUrl  = 'http://localhost:8000';
+  String serverUrl  = 'http://frog02.mikr.us:21124';
   String apiKey     = 'change-me-in-production';
   String callsign   = 'SP0STR-11';
   double minVoltage = 3.5;
@@ -57,7 +57,7 @@ class SettingsService extends ChangeNotifier {
   Future<void> reset() async {
     final p = await SharedPreferences.getInstance();
     await p.clear();
-    serverUrl  = 'http://localhost:8000';
+    serverUrl  = 'http://frog02.mikr.us:21124';
     apiKey     = 'change-me-in-production';
     callsign   = 'SP0STR-11';
     minVoltage = 3.5;

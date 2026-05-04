@@ -1,2 +1,2 @@
 from .lora import LoRaSX1278
-from .aprs import Ad9833Aprs
+from .aprs import AprsBeacon as Ad9833Aprs

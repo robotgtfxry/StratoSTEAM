@@ -5,6 +5,7 @@ LORA_FREQ = 433.0
 LORA_SF = 10
 LORA_BW = 125000
 LORA_CR = 5
+LORA_TX_POWER = 17     # dBm — moc uplink do balonu
 LORA_SPI_BUS = 0
 LORA_SPI_CS = 0
 LORA_DIO0_PIN = 25

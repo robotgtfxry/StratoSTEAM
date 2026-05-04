@@ -56,7 +56,20 @@ def main():
 
             # Determine source: ESP32 beacon or full RPi telemetry
             from_esp32 = packet.get("src") == "esp32"
-            rpi_running = not from_esp32
+            is_exec_result = packet.get("type") == "exec_result"
+
+            # ── Jeśli to wynik exec od rpi-air — przekaż do backendu ─────────
+            # (sprawdzamy PRZED uplink.send aby nie wysyłać exec_result jako telemetrii)
+            if is_exec_result:
+                exec_s.post_result(
+                    rc=int(packet.get("rc", -1)),
+                    out=packet.get("out", ""),
+                    err=packet.get("err", ""),
+                )
+                log.info("Exec result rc=%s out=%r", packet.get("rc"), packet.get("out"))
+                # NIE robimy continue — otwieramy okno uplink normalnie poniżej
+
+            rpi_running = not from_esp32 and not is_exec_result
             rpi_power.report_status(rpi_running)
 
             if from_esp32:
@@ -65,25 +78,14 @@ def main():
                     packet.get("seq"), packet.get("lat"),
                     packet.get("lon"), packet.get("vbat"), rssi,
                 )
-                # Forward ESP32 beacon as minimal telemetry so Flutter sees GPS
                 uplink.send(packet, rssi, snr)
-            else:
+            elif not is_exec_result:
                 log.info(
                     "RPi telemetry seq=%s RSSI=%d dBm SNR=%.1f dB alt=%.0fm",
                     packet.get("seq"), rssi, snr,
                     (packet.get("gps") or {}).get("alt") or 0,
                 )
                 uplink.send(packet, rssi, snr)
-
-            # ── Jeśli to wynik exec od rpi-air — przekaż do backendu ─────────
-            if packet.get("type") == "exec_result":
-                exec_s.post_result(
-                    rc=int(packet.get("rc", -1)),
-                    out=packet.get("out", ""),
-                    err=packet.get("err", ""),
-                )
-                log.info("Exec result rc=%s out=%r", packet.get("rc"), packet.get("out"))
-                continue
 
             # ── Uplink window (tylko gdy pakiet pochodzi od RPi) ───────────────
             # ESP32 nie nasłuchuje — komendy tylko do RPi

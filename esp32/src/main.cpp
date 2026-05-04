@@ -63,6 +63,11 @@
 #define BATT_DIV_RATIO        2.0f
 #define BATT_VREF             3.3f
 
+// ── Forward declarations ──────────────────────────────────────────────────────
+void rpiPowerOn();
+void rpiRequestShutdown();
+void rpiCutPower();
+
 // ── Globals ───────────────────────────────────────────────────────────────────
 HardwareSerial  gpsSerial(1);
 TinyGPSPlus     gps;
@@ -74,8 +79,10 @@ bool inaOk = false;
 bool     rpiPowered    = false;
 bool     shutdownReq   = false;
 bool     aliveDropped  = false;
+bool     firstBoot     = true;   // true dopóki RPi nie da ALIVE=HIGH po raz pierwszy
 uint32_t shutdownAt    = 0;
 uint32_t aliveDropAt   = 0;
+uint32_t shutdownConfirmAt = 0;  // zastępuje delay(2000) w shutdown
 uint32_t lastBeacon    = 0;
 uint32_t beaconSeq     = 0;
 
@@ -257,11 +264,21 @@ void loop() {
     bool     rpiAlive = (digitalRead(RPI_ALIVE_PIN) == HIGH);
     uint32_t now      = millis();
 
+    // ── firstBoot: zeruj gdy RPi po raz pierwszy daje ALIVE ──────────────────
+    if (firstBoot && rpiAlive) {
+        firstBoot = false;
+    }
+
     // ── 1. Obsługa shutdown ───────────────────────────────────────────────────
     if (shutdownReq) {
+        handleIncoming();   // nasłuchuj nawet podczas shutdown (anulowanie)
         if (!rpiAlive) {
-            delay(2000);
-            rpiCutPower();
+            // czekaj 2s bez blokowania pętli
+            if (shutdownConfirmAt == 0) shutdownConfirmAt = now;
+            if (now - shutdownConfirmAt >= 2000) {
+                shutdownConfirmAt = 0;
+                rpiCutPower();
+            }
         } else if (now - shutdownAt > SHUTDOWN_WAIT_MS) {
             Serial.println("[ESP32] Shutdown timeout — cutting power");
             rpiCutPower();
@@ -286,13 +303,16 @@ void loop() {
     }
 
     // ── 4. RPi wyłączona — praca ESP32 ───────────────────────────────────────
-    if (!rpiPowered && aliveDropped && (now - aliveDropAt >= LORA_TAKEOVER_DELAY_MS)) {
+    // firstBoot: nie nadajemy beaconów dopóki RPi nie dała ALIVE choć raz
+    if (!rpiPowered && aliveDropped && !firstBoot &&
+        (now - aliveDropAt >= LORA_TAKEOVER_DELAY_MS)) {
 
         // Zawsze nasłuchuj — handleIncoming() sprawdza czy coś przyszło
         handleIncoming();
 
-        // Beacon GPS co BEACON_INTERVAL_MS
+        // Beacon GPS co BEACON_INTERVAL_MS (z jitter aby unikać kolizji)
         if (now - lastBeacon >= BEACON_INTERVAL_MS) {
+            delay(random(0, 300));   // jitter 0-300ms
             sendBeacon();
             lastBeacon = now;
         }
