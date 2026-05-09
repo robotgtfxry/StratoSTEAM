@@ -31,17 +31,21 @@
 | LED B    | GPIO20 | status (PWM) |
 | ADC baterii | GPIO1 | napięcie baterii |
 
-## SPI
+## SPI — LoRa SX1278
 
-| Moduł       | Podłączony do | Opis |
-|-------------|---------------|------|
-| LoRa SX1278 | ESP32 GPIO8–13 | telemetria 433 MHz (backup) |
-| LoRa SX1278 | RPi5 SPI Bus 0 | telemetria 433 MHz (główny) |
-| AD9833      | RPi5 SPI Bus 1 | beacon APRS 144.800 MHz |
+| Pin LoRa | RPi5 BCM | RPi5 pin fizyczny | ESP32 GPIO |
+|----------|----------|-------------------|------------|
+| SCK      | GPIO11   | pin 23            | GPIO12     |
+| MOSI     | GPIO10   | pin 19            | GPIO11     |
+| MISO     | GPIO9    | pin 21            | GPIO13     |
+| NSS/CS   | GPIO8 (CE0) | pin 24         | GPIO10     |
+| DIO0     | GPIO25   | pin 22            | GPIO9      |
+| RST      | —        | niepodpięty       | GPIO8      |
 
-## LoRa SX1278 — piny RST i DIO0
+> RPi5 nie używa RST — soft reset przez SPI. DIO0 zdefiniowany w config, ale kod używa pollingu (pin fizycznie nieużywany).
 
-| Pin LoRa | ESP32        | RPi5              | Uwaga |
-|----------|--------------|-------------------|-------|
-| RST      | GPIO8        | niepodpięty       | RPi5 robi soft reset przez SPI (rejestr sleep) |
-| DIO0     | GPIO9        | BCM GPIO25 (pin 22) | zdefiniowany w config, ale kod używa pollingu — pin fizycznie nieużywany |
+## SPI — pozostałe
+
+| Moduł  | Podłączony do | Opis |
+|--------|---------------|------|
+| AD9833 | RPi5 SPI Bus 1, CE2 (GPIO16, pin 36) | beacon APRS 144.800 MHz |
