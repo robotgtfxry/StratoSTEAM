@@ -38,3 +38,10 @@
 | LoRa SX1278 | ESP32 GPIO8–13 | telemetria 433 MHz (backup) |
 | LoRa SX1278 | RPi5 SPI Bus 0 | telemetria 433 MHz (główny) |
 | AD9833      | RPi5 SPI Bus 1 | beacon APRS 144.800 MHz |
+
+## LoRa SX1278 — piny RST i DIO0
+
+| Pin LoRa | ESP32        | RPi5              | Uwaga |
+|----------|--------------|-------------------|-------|
+| RST      | GPIO8        | niepodpięty       | RPi5 robi soft reset przez SPI (rejestr sleep) |
+| DIO0     | GPIO9        | BCM GPIO25 (pin 22) | zdefiniowany w config, ale kod używa pollingu — pin fizycznie nieużywany |
