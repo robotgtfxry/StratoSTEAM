@@ -378,6 +378,16 @@
 	)
 	(wire
 		(pts
+			(xy 109.22 80.01) (xy 119.38 80.01)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "d316e140-6ead-4e61-ac10-f18bbeffd237")
+	)
+	(wire
+		(pts
 			(xy 109.22 54.61) (xy 119.38 54.61)
 		)
 		(stroke
@@ -543,6 +553,30 @@
 		(uuid "bf46580e-2316-4670-8afb-d77cf77e07aa")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
 			(at 132.4648 77.47 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+	)
+	(global_label "LORA_RST"
+		(shape input)
+		(at 119.38 80.01 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "c72d71ab-aa6e-4f36-a4d7-d38ef1ebfab6")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 131.4971 80.01 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
