@@ -2,7 +2,7 @@
 
 > **Architektura systemu:**
 > - **ESP32-S3 (balon)** — węzeł radiowy: GPS (NEO-M8N) + LoRa (SX1278), retransmisja danych z RPi5
-> - **Raspberry Pi 5 (balon)** — węzeł pomiarowy: czujniki atmosferyczne, IMU, kamera, RTL-SDR (odbiór HF)
+> - **Raspberry Pi 5 (balon)** — węzeł pomiarowy: czujniki atmosferyczne, IMU, kamera, RTL-SDR (odbiór sygnału HF z ziemi)
 > - **Raspberry Pi 5 (ziemia)** — stacja naziemna: LoRa RX/TX, nadajnik HF (AD9833 + RD06HHF1)
 > - Limit wagowy ładunku: **1 kg** (większa pojemność baterii)
 
@@ -112,22 +112,6 @@
 > Biblioteka: `pyrtlsdr`. Tune offset: −100 kHz poniżej docelowej częstotliwości (unikanie DC spike).  
 > FFT z oknem Blackmana → power w ±15 binach wokół nośnej → wynik w dBFS.  
 > Pomiar co 10 s, wysyłany do ESP32 jako pole `hfdb` w JSON przez UART → LoRa → backend → Flutter (wykres dBFS vs wysokość).
-
----
-
-## AD9833 — nośna 144.800 MHz (SPI1, RPi5 balon)
-
-| Pin AD9833 | RPi5 BCM              |
-|------------|-----------------------|
-| SCLK       | GPIO21 (pin 40)       |
-| MOSI       | GPIO20 (pin 38)       |
-| FSYNC/CS   | GPIO16 (CE2, pin 36)  |
-| PTT        | GPIO24 (pin 18)       |
-| VCC        | 3.3V (pin 1)          |
-| GND        | GND (pin 6)           |
-
-> RPi5 (balon). Czysta nośna sinusoidalna na 144.800 MHz — brak modulacji, brak pakietów AX.25.  
-> PTT steruje wyjściem RF — HIGH = nadawanie. Eksperyment jonosferyczny (beacon do obserwacji).
 
 ---
 

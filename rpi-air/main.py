@@ -13,13 +13,11 @@ from config import (
     BME280_ADDR, MS5611_ADDR, BNO085_ADDR,
     INA219_ADDR, INA219_SHUNT_OHMS,
     ESP_UART_PORT, ESP_UART_BAUD, ESP_SEND_INTERVAL_S,
-    CARRIER_INTERVAL_S, CARRIER_DURATION_S,
     CAM_RECORD_DIR, CAM_PHOTO_W, CAM_PHOTO_H, CAM_PHOTO_QUALITY, CAM_CHUNK_INTERVAL_S,
     SDR_ENABLED, SDR_TARGET_FREQ, SDR_SAMPLE_RATE, SDR_GAIN,
     SDR_FREQ_CORRECTION, SDR_MEASURE_INTERVAL_S, SDR_NUM_SAMPLES, SDR_BIN_WINDOW,
 )
 from sensors import Bme280Sensor, Ms5611Sensor, Bno085Sensor, Ina219Sensor
-from radio import Ad9833Carrier
 from hardware import PowerSignal, EspUartSender, CameraModule, SdrReceiver
 
 logging.basicConfig(
@@ -43,7 +41,6 @@ def main():
     imu  = Bno085Sensor()
     pwr  = Ina219Sensor(INA219_SHUNT_OHMS, INA219_ADDR)
     esp  = EspUartSender(ESP_UART_PORT, ESP_UART_BAUD)
-    carrier = Ad9833Carrier()
     cam  = CameraModule(CAM_RECORD_DIR, CAM_PHOTO_W, CAM_PHOTO_H, CAM_PHOTO_QUALITY)
     sdr  = SdrReceiver(
         target_freq_hz  = SDR_TARGET_FREQ,
@@ -59,9 +56,6 @@ def main():
         cam.start_recording()
 
     last_send       = 0.0
-    last_carrier    = 0.0
-    carrier_on      = False
-    carrier_on_at   = 0.0
     pending_chunks: list[tuple[int, int, int, str]] = []
     last_chunk_sent = 0.0
     last_sdr        = 0.0
@@ -130,19 +124,6 @@ def main():
                 )
                 last_send = now
 
-            # ── Nośna 144.800 MHz (eksperyment jonosferyczny) ─────────────────
-            if not carrier_on and (now - last_carrier >= CARRIER_INTERVAL_S):
-                carrier.start()
-                carrier_on    = True
-                carrier_on_at = now
-                log.info("Carrier ON (144.800 MHz)")
-
-            if carrier_on and (now - carrier_on_at >= CARRIER_DURATION_S):
-                carrier.stop()
-                carrier_on    = False
-                last_carrier  = now
-                log.info("Carrier OFF")
-
             time.sleep(0.05)
 
     except KeyboardInterrupt:
@@ -153,7 +134,6 @@ def main():
         if sdr:
             sdr.close()
         esp.close()
-        carrier.close()
         power.close()
 
 
