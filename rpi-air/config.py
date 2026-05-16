@@ -19,22 +19,11 @@ BNO085_ADDR = 0x4A
 INA219_ADDR = 0x40
 INA219_SHUNT_OHMS = 0.1
 
-# AD9833 (SPI1) — generator nośnej 144.800 MHz (eksperyment jonosferyczny)
-# Czysta sinusoida, brak modulacji, brak kodowania pakietowego
-# SDR na ziemi odbiera sygnał i mierzy opóźnienie odbicia
-AD9833_SPI_BUS = 1
-AD9833_SPI_CS = 2          # CE2 = GPIO16 (pin 36)
-AD9833_CARRIER_FREQ = 144800000  # 144.800 MHz
-
 # Buzzer i RGB LED — obsługiwane przez ESP32-S3 (zawsze zasilony)
 
 # ESP32-S3 współpraca
 RPI_ALIVE_PIN    = 26   # OUTPUT — RPi trzyma HIGH póki działa (pin 37 → ESP32 GPIO6)
 ESP32_SHTDN_PIN  = 6    # INPUT  — ESP32 podnosi gdy chce shutdown (pin 31 ← ESP32 GPIO7)
-
-# Nośna 144.800 MHz — czas trwania i interwał (eksperyment jonosferyczny)
-CARRIER_DURATION_S = 5    # ile sekund nadajemy nośną
-CARRIER_INTERVAL_S = 60   # co ile sekund włączamy nośną
 
 # RTL-SDR odbiornik HF (eksperyment jonosferyczny)
 SDR_ENABLED          = True

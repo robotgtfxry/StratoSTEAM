@@ -4,18 +4,12 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="0789ed74-7e87-4383-a6c9-e483a33e2b02" name="Changes" comment="11">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+    <list default="true" id="0789ed74-7e87-4383-a6c9-e483a33e2b02" name="Changes" comment="12">
       <change beforePath="$PROJECT_DIR$/HARDWARE.md" beforeDir="false" afterPath="$PROJECT_DIR$/HARDWARE.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/routers/hf.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/routers/hf.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/esp32/src/main.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/esp32/src/main.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/flutter/lib/screens/transmitter_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/flutter/lib/screens/transmitter_screen.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/flutter/lib/services/hf_service.dart" beforeDir="false" afterPath="$PROJECT_DIR$/flutter/lib/services/hf_service.dart" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/rpi-air/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/rpi-air/config.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/rpi-air/hardware/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/rpi-air/hardware/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/rpi-air/hardware/esp_uart.py" beforeDir="false" afterPath="$PROJECT_DIR$/rpi-air/hardware/esp_uart.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/rpi-air/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/rpi-air/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/rpi-ground/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/rpi-ground/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rpi-air/radio/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/rpi-air/radio/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rpi-air/radio/carrier.py" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -241,7 +235,15 @@
       <option name="project" value="LOCAL" />
       <updated>1778964952450</updated>
     </task>
-    <option name="localTasksCounter" value="20" />
+    <task id="LOCAL-00020" summary="12">
+      <option name="closed" value="true" />
+      <created>1778966080963</created>
+      <option name="number" value="00020" />
+      <option name="presentableId" value="LOCAL-00020" />
+      <option name="project" value="LOCAL" />
+      <updated>1778966080963</updated>
+    </task>
+    <option name="localTasksCounter" value="21" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -268,6 +270,7 @@
     <MESSAGE value="9" />
     <MESSAGE value="10" />
     <MESSAGE value="11" />
-    <option name="LAST_COMMIT_MESSAGE" value="11" />
+    <MESSAGE value="12" />
+    <option name="LAST_COMMIT_MESSAGE" value="12" />
   </component>
 </project>
