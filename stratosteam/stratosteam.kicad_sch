@@ -2612,6 +2612,16 @@
 	)
 	(wire
 		(pts
+			(xy 119.38 67.31) (xy 119.38 92.71)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "283f7078-15ed-43b3-81f4-d0254d7901b7")
+	)
+	(wire
+		(pts
 			(xy 76.2 62.23) (xy 80.01 62.23)
 		)
 		(stroke
@@ -2852,6 +2862,16 @@
 	)
 	(wire
 		(pts
+			(xy 119.38 92.71) (xy 148.59 92.71)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "8b051749-de4d-49b9-a675-09fb7224eb36")
+	)
+	(wire
+		(pts
 			(xy 212.09 59.69) (xy 212.09 106.68)
 		)
 		(stroke
@@ -2862,17 +2882,7 @@
 	)
 	(wire
 		(pts
-			(xy 143.51 97.79) (xy 148.59 97.79)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "91ce682f-d85b-4883-8a2d-f3bad18bf33b")
-	)
-	(wire
-		(pts
-			(xy 92.71 67.31) (xy 95.25 67.31)
+			(xy 92.71 67.31) (xy 119.38 67.31)
 		)
 		(stroke
 			(width 0)
@@ -2882,7 +2892,7 @@
 	)
 	(wire
 		(pts
-			(xy 92.71 64.77) (xy 95.25 64.77)
+			(xy 92.71 64.77) (xy 148.59 64.77)
 		)
 		(stroke
 			(width 0)
@@ -2972,16 +2982,6 @@
 	)
 	(wire
 		(pts
-			(xy 143.51 95.25) (xy 148.59 95.25)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "c080fbf6-18be-4f1b-a061-45bdc4c0e0da")
-	)
-	(wire
-		(pts
 			(xy 123.19 72.39) (xy 148.59 72.39)
 		)
 		(stroke
@@ -3050,30 +3050,6 @@
 		)
 		(uuid "f9742c1e-57de-4720-bafe-a5c87c0ff86d")
 	)
-	(global_label "SPI_CS_SX1278"
-		(shape input)
-		(at 95.25 85.09 0)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left)
-		)
-		(uuid "0169ff5c-90fa-4058-bccd-504608174d9a")
-		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 112.9912 85.09 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-	)
 	(global_label "LORA_RST"
 		(shape input)
 		(at 143.51 77.47 180)
@@ -3135,54 +3111,6 @@
 		(uuid "307f3720-8119-4730-8b1f-3c4ece18b63e")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
 			(at 130.4252 80.01 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-			)
-		)
-	)
-	(global_label "LORA_DIO0"
-		(shape input)
-		(at 95.25 82.55 0)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left)
-		)
-		(uuid "3b02676e-2268-46ee-bcdc-04bea0477fe7")
-		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 108.3348 82.55 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-	)
-	(global_label "I2C_CLK"
-		(shape input)
-		(at 143.51 97.79 180)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right)
-		)
-		(uuid "418b812d-7e1f-4da7-bc52-3f0d1f0294c8")
-		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 132.9048 97.79 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -3506,57 +3434,9 @@
 			)
 		)
 	)
-	(global_label "UART_TX"
+	(global_label "???"
 		(shape input)
-		(at 95.25 64.77 0)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left)
-		)
-		(uuid "e1397969-1e25-4c46-96f7-48b8ef2e1aec")
-		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 106.0366 64.77 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-	)
-	(global_label "UART_RX"
-		(shape input)
-		(at 95.25 67.31 0)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left)
-		)
-		(uuid "e58ae09d-0624-4e96-a338-536dafaf4a62")
-		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 106.339 67.31 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-	)
-	(global_label "I2C_DATA"
-		(shape input)
-		(at 143.51 95.25 180)
+		(at 143.51 59.69 180)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -3564,9 +3444,9 @@
 			)
 			(justify right)
 		)
-		(uuid "fba084db-ddf6-47a9-8951-536ca591aab6")
+		(uuid "fc8b600d-64b8-49e8-bfca-8fa8a08817f8")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 132.0581 95.25 0)
+			(at 137.259 59.69 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)

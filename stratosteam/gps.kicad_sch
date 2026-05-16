@@ -227,30 +227,6 @@
 			)
 		)
 	)
-	(global_label "UART_TX"
-		(shape input)
-		(at 163.83 53.34 0)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left)
-		)
-		(uuid "13ea80cf-7cf3-4631-a6ef-c1d315513670")
-		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 174.6166 53.34 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-	)
 	(global_label "GND"
 		(shape input)
 		(at 163.83 64.77 0)
