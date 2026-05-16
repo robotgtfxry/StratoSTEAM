@@ -94,6 +94,13 @@ def main():
                     packet.get("lon"), packet.get("vbat"), rssi,
                 )
                 uplink.send(packet, rssi, snr)
+
+                # Disk info z beacona → backend
+                if packet.get("dsku") is not None:
+                    camera_s.post_storage(
+                        used_gb=float(packet["dsku"]),
+                        free_gb=float(packet["dskf"]),
+                    )
             elif not is_exec_result:
                 log.info(
                     "RPi telemetry seq=%s RSSI=%d dBm SNR=%.1f dB alt=%.0fm",

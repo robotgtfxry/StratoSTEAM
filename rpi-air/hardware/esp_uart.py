@@ -15,7 +15,8 @@ class EspUartSender:
 
     # ── TX ────────────────────────────────────────────────────────────────────
 
-    def send(self, bme: Bme280Data, ms: Ms5611Data, imu: Bno085Data, pwr: Ina219Data) -> None:
+    def send(self, bme: Bme280Data, ms: Ms5611Data, imu: Bno085Data, pwr: Ina219Data,
+             disk_used_gb: float = 0.0, disk_free_gb: float = 0.0) -> None:
         payload = {
             "temp": bme.temperature_c,
             "hum":  bme.humidity_pct,
@@ -30,6 +31,8 @@ class EspUartSender:
             "az":   imu.accel_z,
             "vbat": pwr.voltage_v,
             "imA":  pwr.current_ma,
+            "dsku": disk_used_gb,
+            "dskf": disk_free_gb,
         }
         line = json.dumps(payload, separators=(",", ":")) + "\n"
         self._ser.write(line.encode())

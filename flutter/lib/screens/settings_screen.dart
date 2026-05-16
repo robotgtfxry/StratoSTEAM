@@ -213,9 +213,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 16),
 
-          // ── APRS ────────────────────────────────────────────────
+          // ── Nośna 144 MHz ───────────────────────────────────────
           _Section(
-            title: 'APRS',
+            title: 'Nośna 144.800 MHz',
             icon: Icons.broadcast_on_personal,
             color: Colors.orangeAccent,
             children: [
@@ -225,7 +225,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 controller: _callsignCtrl,
                 icon: Icons.badge,
               ),
-              _HintText('Format: ZNAK-SSID, np. SP0STR-11  (SSID 11 = balon)'),
+              _HintText('Używany do logowania eksperymentu jonosferycznego'),
             ],
           ),
           const SizedBox(height: 16),

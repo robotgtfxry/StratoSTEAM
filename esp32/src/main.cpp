@@ -80,12 +80,18 @@ struct RpiData {
     float roll, pit, yaw;     // BNO085
     float ax, ay, az;
     float vbat, imA;          // INA219
+    float dsku = 0.0f;        // disk used GB
+    float dskf = 0.0f;        // disk free GB
     bool  fresh = false;
 } rpi;
 
 uint32_t rpiLastRx   = 0;
 String   rpiLineBuf  = "";
-uint32_t lastImgChunk = 0;   // timestamp ostatnio wysłanego chunk obrazu
+
+// Kolejka chunków obrazu — max 1 oczekujący (RPi wysyła co 3s, więc 1 wystarczy)
+String   pendingImgLine  = "";
+bool     imgChunkReady   = false;
+uint32_t lastImgChunk    = 0;
 
 bool     rpiPowered      = false;
 bool     shutdownReq     = false;
@@ -114,34 +120,16 @@ void setLed(int r, int g, int b) {
     ledcWrite(CH_B, b);
 }
 
-// ── Retransmisja chunk obrazu przez LoRa ──────────────────────────────────────
-void forwardImgChunk(const String& line) {
-    uint32_t now = millis();
-    // wymuszamy minimalny odstęp między chunkami
-    if (now - lastImgChunk < IMG_CHUNK_DELAY_MS) {
-        delay(IMG_CHUNK_DELAY_MS - (now - lastImgChunk));
-    }
-    LoRa.beginPacket();
-    LoRa.print(line);
-    LoRa.endPacket();
-    LoRa.receive();
-    lastImgChunk = millis();
-
-    JsonDocument dbg;
-    deserializeJson(dbg, line);
-    Serial.printf("[LoRa] img id=%d seq=%d/%d\n",
-                  (int)(dbg["id"] | 0), (int)(dbg["seq"] | 0), (int)(dbg["tot"] | 0));
-}
-
 // ── Parser danych z RPi5 (line-delimited JSON) ────────────────────────────────
 void parseRpiLine(const String& line) {
     if (line.length() < 5) return;
     JsonDocument doc;
     if (deserializeJson(doc, line) != DeserializationError::Ok) return;
 
-    // chunk obrazu — retransmituj przez LoRa bez parsowania
+    // chunk obrazu — odłóż do głównej pętli, nie blokuj tutaj
     if (strcmp(doc["type"] | "", "img") == 0) {
-        forwardImgChunk(line);
+        pendingImgLine  = line;
+        imgChunkReady   = true;
         return;
     }
 
@@ -158,6 +146,8 @@ void parseRpiLine(const String& line) {
     rpi.az   = doc["az"]   | 0.0f;
     rpi.vbat = doc["vbat"] | 0.0f;
     rpi.imA  = doc["imA"]  | 0.0f;
+    rpi.dsku = doc["dsku"] | 0.0f;
+    rpi.dskf = doc["dskf"] | 0.0f;
     rpi.fresh = true;
     rpiLastRx = millis();
 
@@ -220,6 +210,8 @@ void sendBeacon() {
         doc["ax"]   = rpi.ax;
         doc["ay"]   = rpi.ay;
         doc["az"]   = rpi.az;
+        doc["dsku"] = rpi.dsku;
+        doc["dskf"] = rpi.dskf;
     } else {
         // RPi5 nieosiągalna — tylko napięcie z ADC
         doc["vbat"] = readBattAdc();
@@ -392,11 +384,40 @@ void loop() {
         rpiPowerOn();
     }
 
-    // ── Beacon LoRa (zawsze aktywny) ──────────────────────────────────────────
+    // ── Beacon LoRa ───────────────────────────────────────────────────────────
     handleIncoming();
     if (!firstBoot && (now - lastBeacon >= BEACON_INTERVAL_MS)) {
-        delay(random(0, 100));
-        sendBeacon();
-        lastBeacon = now;
+        // chunk obrazu ma pierwszeństwo jeśli jest gotowy i minął min. odstęp
+        if (imgChunkReady && (now - lastImgChunk >= IMG_CHUNK_DELAY_MS)) {
+            JsonDocument dbg;
+            deserializeJson(dbg, pendingImgLine);
+            Serial.printf("[LoRa] img id=%d seq=%d/%d\n",
+                          (int)(dbg["id"] | 0), (int)(dbg["seq"] | 0),
+                          (int)(dbg["tot"] | 0));
+            LoRa.beginPacket();
+            LoRa.print(pendingImgLine);
+            LoRa.endPacket();
+            LoRa.receive();
+            lastImgChunk  = millis();
+            imgChunkReady = false;
+            // nie aktualizuj lastBeacon — beacon wyśle się przy następnej iteracji
+        } else {
+            delay(random(0, 100));
+            sendBeacon();
+            lastBeacon = now;
+        }
+    } else if (imgChunkReady && (now - lastImgChunk >= IMG_CHUNK_DELAY_MS)) {
+        // Chunk gotowy, a beacon jeszcze nie — wyślij chunk między beaconami
+        JsonDocument dbg;
+        deserializeJson(dbg, pendingImgLine);
+        Serial.printf("[LoRa] img id=%d seq=%d/%d\n",
+                      (int)(dbg["id"] | 0), (int)(dbg["seq"] | 0),
+                      (int)(dbg["tot"] | 0));
+        LoRa.beginPacket();
+        LoRa.print(pendingImgLine);
+        LoRa.endPacket();
+        LoRa.receive();
+        lastImgChunk  = millis();
+        imgChunkReady = false;
     }
 }

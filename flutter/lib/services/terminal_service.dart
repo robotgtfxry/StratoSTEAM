@@ -41,8 +41,8 @@ class TerminalService extends ChangeNotifier {
         await _cmdLed(parts, raw.trim());
       case 'rpi':
         await _cmdRpi(parts);
-      case 'aprs':
-        _sys('APRS działa autonomicznie na balonie (timer co ${60}s, 5s carrier) — nie wymaga komendy.');
+      case 'carrier':
+        _sys('Nośna 144.800 MHz działa autonomicznie na balonie (co 60s przez 5s) — nie wymaga komendy.');
       default:
         // Wszystko inne → wykonaj na RPi przez LoRa
         await _cmdExec(input);

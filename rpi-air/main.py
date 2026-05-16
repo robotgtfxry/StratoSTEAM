@@ -13,11 +13,11 @@ from config import (
     BME280_ADDR, MS5611_ADDR, BNO085_ADDR,
     INA219_ADDR, INA219_SHUNT_OHMS,
     ESP_UART_PORT, ESP_UART_BAUD, ESP_SEND_INTERVAL_S,
-    APRS_BEACON_INTERVAL_S, APRS_BEACON_DURATION_S,
+    CARRIER_INTERVAL_S, CARRIER_DURATION_S,
     CAM_RECORD_DIR, CAM_PHOTO_W, CAM_PHOTO_H, CAM_PHOTO_QUALITY, CAM_CHUNK_INTERVAL_S,
 )
 from sensors import Bme280Sensor, Ms5611Sensor, Bno085Sensor, Ina219Sensor
-from radio import Ad9833Aprs
+from radio import Ad9833Carrier
 from hardware import PowerSignal, EspUartSender, CameraModule
 
 logging.basicConfig(
@@ -41,7 +41,7 @@ def main():
     imu  = Bno085Sensor()
     pwr  = Ina219Sensor(INA219_SHUNT_OHMS, INA219_ADDR)
     esp  = EspUartSender(ESP_UART_PORT, ESP_UART_BAUD)
-    aprs = Ad9833Aprs()
+    carrier = Ad9833Carrier()
     cam  = CameraModule(CAM_RECORD_DIR, CAM_PHOTO_W, CAM_PHOTO_H, CAM_PHOTO_QUALITY)
 
     # Start recording immediately on boot if camera is available
@@ -49,9 +49,9 @@ def main():
         cam.start_recording()
 
     last_send      = 0.0
-    last_aprs      = 0.0
-    aprs_on        = False
-    aprs_on_at     = 0.0
+    last_carrier   = 0.0
+    carrier_on     = False
+    carrier_on_at  = 0.0
     pending_chunks: list[tuple[int, int, int, str]] = []
     last_chunk_sent = 0.0
 
@@ -99,26 +99,28 @@ def main():
                 imu_d = imu.read()
                 pwr_d = pwr.read()
 
-                esp.send(bme_d, ms_d, imu_d, pwr_d)
+                disk_used, disk_free = cam.disk_usage(CAM_RECORD_DIR)
+                esp.send(bme_d, ms_d, imu_d, pwr_d,
+                         disk_used_gb=disk_used, disk_free_gb=disk_free)
                 log.info(
-                    "→ESP32 temp=%.1f°C pres=%.1fhPa alt2=%.0fm vbat=%.2fV",
+                    "→ESP32 temp=%.1f°C pres=%.1fhPa alt2=%.0fm vbat=%.2fV disk=%.1f/%.1fGB",
                     bme_d.temperature_c, bme_d.pressure_hpa,
-                    ms_d.altitude_m, pwr_d.voltage_v,
+                    ms_d.altitude_m, pwr_d.voltage_v, disk_used, disk_free,
                 )
                 last_send = now
 
-            # ── APRS: włącz nośną na APRS_BEACON_DURATION_S sekund ───────────
-            if not aprs_on and (now - last_aprs >= APRS_BEACON_INTERVAL_S):
-                aprs.start()
-                aprs_on    = True
-                aprs_on_at = now
-                log.info("APRS carrier ON (%.0f MHz)", 144.8)
+            # ── Nośna 144.800 MHz (eksperyment jonosferyczny) ─────────────────
+            if not carrier_on and (now - last_carrier >= CARRIER_INTERVAL_S):
+                carrier.start()
+                carrier_on    = True
+                carrier_on_at = now
+                log.info("Carrier ON (144.800 MHz)")
 
-            if aprs_on and (now - aprs_on_at >= APRS_BEACON_DURATION_S):
-                aprs.stop()
-                aprs_on   = False
-                last_aprs = now
-                log.info("APRS carrier OFF")
+            if carrier_on and (now - carrier_on_at >= CARRIER_DURATION_S):
+                carrier.stop()
+                carrier_on    = False
+                last_carrier  = now
+                log.info("Carrier OFF")
 
             time.sleep(0.05)
 
@@ -128,7 +130,7 @@ def main():
         power.set_alive(False)
         cam.close()
         esp.close()
-        aprs.close()
+        carrier.close()
         power.close()
 
 
