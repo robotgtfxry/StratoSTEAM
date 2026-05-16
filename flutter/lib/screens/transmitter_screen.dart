@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:fl_chart/fl_chart.dart';
 import '../services/hf_service.dart';
 
 class TransmitterScreen extends StatefulWidget {
@@ -189,6 +190,10 @@ class _TransmitterScreenState extends State<TransmitterScreen> {
               ],
             ),
           ),
+          const SizedBox(height: 16),
+
+          // ── Wykres dBFS vs wysokość ───────────────────────────
+          _MeasurementsChart(measurements: hf.measurements),
         ],
       ),
     );
@@ -197,6 +202,200 @@ class _TransmitterScreenState extends State<TransmitterScreen> {
 
 
 // ── Widgety pomocnicze ────────────────────────────────────────────────────────
+
+class _MeasurementsChart extends StatelessWidget {
+  final List<HfMeasurement> measurements;
+  const _MeasurementsChart({required this.measurements});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF161B22),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.purpleAccent.withOpacity(0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            const Icon(Icons.show_chart, color: Colors.purpleAccent, size: 18),
+            const SizedBox(width: 8),
+            const Text('Pomiary SDR — dBFS vs wysokość',
+                style: TextStyle(
+                    color: Colors.purpleAccent,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14)),
+            const Spacer(),
+            Text('${measurements.length} pkt',
+                style: const TextStyle(color: Colors.white38, fontSize: 11)),
+          ]),
+          const SizedBox(height: 14),
+          const Divider(color: Colors.white12, height: 1),
+          const SizedBox(height: 14),
+
+          if (measurements.isEmpty)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 32),
+                child: Text('Brak pomiarów',
+                    style: TextStyle(color: Colors.white38, fontSize: 13)),
+              ),
+            )
+          else ...[
+            // Last measurement summary
+            _LastMeasurement(m: measurements.last),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 220,
+              child: _Chart(measurements: measurements),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+
+class _LastMeasurement extends StatelessWidget {
+  final HfMeasurement m;
+  const _LastMeasurement({required this.m});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(children: [
+      _Stat(label: 'dBFS', value: m.dbfs.toStringAsFixed(1),
+          color: Colors.purpleAccent),
+      const SizedBox(width: 24),
+      _Stat(label: 'Wysokość', value: '${m.alt.toStringAsFixed(0)} m',
+          color: Colors.cyanAccent),
+    ]);
+  }
+}
+
+
+class _Stat extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+  const _Stat({required this.label, required this.value, required this.color});
+
+  @override
+  Widget build(BuildContext context) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label,
+              style: const TextStyle(color: Colors.white38, fontSize: 11)),
+          Text(value,
+              style: TextStyle(
+                  color: color, fontSize: 22, fontWeight: FontWeight.bold)),
+        ],
+      );
+}
+
+
+class _Chart extends StatelessWidget {
+  final List<HfMeasurement> measurements;
+  const _Chart({required this.measurements});
+
+  @override
+  Widget build(BuildContext context) {
+    final spots = measurements
+        .map((m) => FlSpot(m.alt, m.dbfs))
+        .toList()
+      ..sort((a, b) => a.x.compareTo(b.x));
+
+    final minAlt  = spots.map((s) => s.x).reduce((a, b) => a < b ? a : b);
+    final maxAlt  = spots.map((s) => s.x).reduce((a, b) => a > b ? a : b);
+    final minDbfs = spots.map((s) => s.y).reduce((a, b) => a < b ? a : b);
+    final maxDbfs = spots.map((s) => s.y).reduce((a, b) => a > b ? a : b);
+    final altRange  = (maxAlt  - minAlt).clamp(1.0, double.infinity);
+    final dbfsRange = (maxDbfs - minDbfs).clamp(1.0, double.infinity);
+
+    return LineChart(
+      LineChartData(
+        backgroundColor: const Color(0xFF0D1117),
+        gridData: FlGridData(
+          show: true,
+          getDrawingHorizontalLine: (_) =>
+              const FlLine(color: Colors.white12, strokeWidth: 0.5),
+          getDrawingVerticalLine: (_) =>
+              const FlLine(color: Colors.white12, strokeWidth: 0.5),
+        ),
+        borderData: FlBorderData(
+          show: true,
+          border: Border.all(color: Colors.white12),
+        ),
+        titlesData: FlTitlesData(
+          leftTitles: AxisTitles(
+            axisNameWidget: const Text('dBFS',
+                style: TextStyle(color: Colors.white38, fontSize: 10)),
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 42,
+              getTitlesWidget: (v, _) => Text(
+                v.toStringAsFixed(0),
+                style: const TextStyle(color: Colors.white38, fontSize: 9),
+              ),
+            ),
+          ),
+          bottomTitles: AxisTitles(
+            axisNameWidget: const Text('Wysokość (m)',
+                style: TextStyle(color: Colors.white38, fontSize: 10)),
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 28,
+              getTitlesWidget: (v, _) => Text(
+                '${v.toInt()}',
+                style: const TextStyle(color: Colors.white38, fontSize: 9),
+              ),
+            ),
+          ),
+          rightTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false)),
+          topTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false)),
+        ),
+        minX: minAlt  - altRange  * 0.05,
+        maxX: maxAlt  + altRange  * 0.05,
+        minY: minDbfs - dbfsRange * 0.1,
+        maxY: maxDbfs + dbfsRange * 0.1,
+        lineBarsData: [
+          LineChartBarData(
+            spots: spots,
+            isCurved: false,
+            color: Colors.purpleAccent,
+            barWidth: 2,
+            dotData: FlDotData(
+              show: true,
+              getDotPainter: (_, __, ___, ____) => FlDotCirclePainter(
+                radius: 3,
+                color: Colors.purpleAccent,
+                strokeWidth: 0,
+              ),
+            ),
+            belowBarData: BarAreaData(
+              show: true,
+              color: Colors.purpleAccent.withOpacity(0.07),
+            ),
+          ),
+        ],
+        lineTouchData: LineTouchData(
+          touchTooltipData: LineTouchTooltipData(
+            getTooltipColor: (_) => const Color(0xFF21262D),
+            getTooltipItems: (spots) => spots.map((s) => LineTooltipItem(
+              '${s.y.toStringAsFixed(1)} dBFS\n${s.x.toStringAsFixed(0)} m',
+              const TextStyle(color: Colors.purpleAccent, fontSize: 11),
+            )).toList(),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 
 class _HwBadge extends StatelessWidget {
   final bool active;

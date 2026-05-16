@@ -9,6 +9,9 @@ import logging
 import sys
 import time
 
+import threading
+import requests
+
 from radio import LoRaRX
 from uplink import Uplink
 from hf_controller import HfController
@@ -20,6 +23,23 @@ from packet import (
     build_command, build_rpi_power_command, build_exec_command,
     build_photo_command, build_cam_rec_command,
 )
+from config import BACKEND_URL, BACKEND_API_KEY
+
+_HF_HEADERS = {"X-API-Key": BACKEND_API_KEY}
+
+
+def _post_hf_measurement(alt: float, dbfs: float) -> None:
+    def _send():
+        try:
+            requests.post(
+                f"{BACKEND_URL}/api/hf/measurement",
+                json={"alt": alt, "dbfs": dbfs},
+                headers=_HF_HEADERS,
+                timeout=5,
+            )
+        except requests.RequestException as e:
+            log.debug("HF measurement upload error: %s", e)
+    threading.Thread(target=_send, daemon=True).start()
 
 logging.basicConfig(
     level=logging.INFO,
@@ -101,6 +121,13 @@ def main():
                         used_gb=float(packet["dsku"]),
                         free_gb=float(packet["dskf"]),
                     )
+
+                # HF SDR measurement z beacona → backend
+                hfdb = packet.get("hfdb")
+                if hfdb is not None and hfdb > -999.0:
+                    alt = float(packet.get("alt2") or packet.get("alt") or 0.0)
+                    _post_hf_measurement(alt=alt, dbfs=float(hfdb))
+                    log.info("HF measurement: %.1f dBFS @ %.0f m", hfdb, alt)
             elif not is_exec_result:
                 log.info(
                     "RPi telemetry seq=%s RSSI=%d dBm SNR=%.1f dB alt=%.0fm",

@@ -16,7 +16,8 @@ class EspUartSender:
     # ── TX ────────────────────────────────────────────────────────────────────
 
     def send(self, bme: Bme280Data, ms: Ms5611Data, imu: Bno085Data, pwr: Ina219Data,
-             disk_used_gb: float = 0.0, disk_free_gb: float = 0.0) -> None:
+             disk_used_gb: float = 0.0, disk_free_gb: float = 0.0,
+             hf_dbfs: float | None = None) -> None:
         payload = {
             "temp": bme.temperature_c,
             "hum":  bme.humidity_pct,
@@ -34,6 +35,8 @@ class EspUartSender:
             "dsku": disk_used_gb,
             "dskf": disk_free_gb,
         }
+        if hf_dbfs is not None:
+            payload["hfdb"] = hf_dbfs
         line = json.dumps(payload, separators=(",", ":")) + "\n"
         self._ser.write(line.encode())
 

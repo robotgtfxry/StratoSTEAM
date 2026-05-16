@@ -82,6 +82,7 @@ struct RpiData {
     float vbat, imA;          // INA219
     float dsku = 0.0f;        // disk used GB
     float dskf = 0.0f;        // disk free GB
+    float hfdb = -999.0f;     // SDR pomiar dBFS (-999 = brak pomiaru)
     bool  fresh = false;
 } rpi;
 
@@ -148,6 +149,7 @@ void parseRpiLine(const String& line) {
     rpi.imA  = doc["imA"]  | 0.0f;
     rpi.dsku = doc["dsku"] | 0.0f;
     rpi.dskf = doc["dskf"] | 0.0f;
+    rpi.hfdb = doc["hfdb"] | -999.0f;
     rpi.fresh = true;
     rpiLastRx = millis();
 
@@ -212,6 +214,7 @@ void sendBeacon() {
         doc["az"]   = rpi.az;
         doc["dsku"] = rpi.dsku;
         doc["dskf"] = rpi.dskf;
+        if (rpi.hfdb > -999.0f) doc["hfdb"] = rpi.hfdb;
     } else {
         // RPi5 nieosiągalna — tylko napięcie z ADC
         doc["vbat"] = readBattAdc();

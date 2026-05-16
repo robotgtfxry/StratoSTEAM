@@ -1,8 +1,9 @@
 # Hardware — mapa czujników
 
 > **Architektura systemu:**
-> - **ESP32-S3** — węzeł radiowy: wyłącznie GPS (NEO-M8N) i LoRa (SX1278)
-> - **Raspberry Pi 5** — węzeł pomiarowy: wszystkie czujniki atmosferyczne, IMU, kamera, APRS
+> - **ESP32-S3 (balon)** — węzeł radiowy: GPS (NEO-M8N) + LoRa (SX1278), retransmisja danych z RPi5
+> - **Raspberry Pi 5 (balon)** — węzeł pomiarowy: czujniki atmosferyczne, IMU, kamera, RTL-SDR (odbiór HF)
+> - **Raspberry Pi 5 (ziemia)** — stacja naziemna: LoRa RX/TX, nadajnik HF (AD9833 + RD06HHF1)
 > - Limit wagowy ładunku: **1 kg** (większa pojemność baterii)
 
 ---
@@ -88,7 +89,33 @@
 
 ---
 
-## AD9833 — beacon APRS 144.800 MHz (SPI1)
+## Kamera — RPi Camera Module (CSI cam0, RPi5 balon)
+
+| Złącze | RPi5               |
+|--------|--------------------|
+| CSI    | CAM0 (15-pin, pin 1)|
+
+> RPi5 (balon). Ciągłe nagrywanie H.264 na dysk (`/home/pi/cam/`).  
+> Na żądanie z Flutter: zdjęcie 160×120 JPEG, chunki po 140 bajtów (base64), przesyłane przez UART → LoRa → backend.  
+> Dysk monitorowany: `shutil.disk_usage()`, dane `dsku`/`dskf` w beaconie ESP32.
+
+---
+
+## RTL-SDR — odbiornik HF jonosferyczny (USB, RPi5 balon)
+
+| Złącze    | RPi5               |
+|-----------|--------------------|
+| USB       | dowolny port USB   |
+| Antena    | wejście SMA dongle |
+
+> RPi5 (balon). Odbiera sygnał HF z nadajnika naziemnego (AD9833 + RD06HHF1).  
+> Biblioteka: `pyrtlsdr`. Tune offset: −100 kHz poniżej docelowej częstotliwości (unikanie DC spike).  
+> FFT z oknem Blackmana → power w ±15 binach wokół nośnej → wynik w dBFS.  
+> Pomiar co 10 s, wysyłany do ESP32 jako pole `hfdb` w JSON przez UART → LoRa → backend → Flutter (wykres dBFS vs wysokość).
+
+---
+
+## AD9833 — nośna 144.800 MHz (SPI1, RPi5 balon)
 
 | Pin AD9833 | RPi5 BCM              |
 |------------|-----------------------|
@@ -99,18 +126,38 @@
 | VCC        | 3.3V (pin 1)          |
 | GND        | GND (pin 6)           |
 
-> Tylko RPi5. PTT steruje wyjściem RF — HIGH = nadawanie.
+> RPi5 (balon). Czysta nośna sinusoidalna na 144.800 MHz — brak modulacji, brak pakietów AX.25.  
+> PTT steruje wyjściem RF — HIGH = nadawanie. Eksperyment jonosferyczny (beacon do obserwacji).
 
 ---
 
-## UART RPi5 → ESP32 (dane czujników)
+## AD9833 + RD06HHF1 — nadajnik HF jonosferyczny (SPI1, RPi5 ziemia)
 
-| Sygnał       | RPi5 BCM           | ESP32 GPIO | Kierunek       | Port RPi5      |
-|--------------|--------------------|------------|----------------|----------------|
-| TX czujników | GPIO14 (TXD, pin 8)| GPIO3 (RX) | RPi5 → ESP32   | /dev/ttyAMA0   |
+| Pin AD9833 | RPi5 BCM              |
+|------------|-----------------------|
+| SCLK       | SPI1 CLK              |
+| MOSI       | SPI1 MOSI             |
+| FSYNC/CS   | SPI1 CS1              |
+| PTT        | GPIO24 (pin 18)       |
+| VCC        | 3.3V                  |
+| GND        | GND                   |
+
+> RPi5 (ziemia). Generuje sygnał HF (domyślnie 7.1 MHz / pasmo 40m), wzmacniany przez RD06HHF1.  
+> Komenda start/stop/set_freq pochodzi z backendu (Flutter → backend → rpi-ground).  
+> RTL-SDR na balonie mierzy siłę tego sygnału (dBFS) i odsyła przez LoRa — eksperyment jonosferyczny.
+
+---
+
+## UART RPi5 ↔ ESP32 (dwukierunkowy)
+
+| Sygnał           | RPi5 BCM            | ESP32 GPIO | Kierunek       | Port RPi5      |
+|------------------|---------------------|------------|----------------|----------------|
+| TX czujników     | GPIO14 (TXD, pin 8) | GPIO3 (RX) | RPi5 → ESP32   | /dev/ttyAMA0   |
+| RX komend        | GPIO15 (RXD, pin 10)| GPIO14 (TX)| ESP32 → RPi5   | /dev/ttyAMA0   |
 
 > Prędkość: 115200 baud, 8N1. RPi5 wysyła line-delimited JSON co 5 s.  
-> Dane: temp, hum, pres (BME280), p2, alt2 (MS5611), roll, pit, yaw, ax, ay, az (BNO085), vbat, imA (INA219).
+> Dane TX: temp, hum, pres (BME280), p2, alt2 (MS5611), roll, pit, yaw, ax, ay, az (BNO085), vbat, imA (INA219), dsku, dskf (dysk), hfdb (SDR dBFS, opcjonalne).  
+> Dane RX: komendy JSON od ESP32 — `{"cmd":"photo"}`, `{"cmd":"cam_rec","on":true/false}`, shutdown request.
 
 ---
 

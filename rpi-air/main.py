@@ -15,10 +15,12 @@ from config import (
     ESP_UART_PORT, ESP_UART_BAUD, ESP_SEND_INTERVAL_S,
     CARRIER_INTERVAL_S, CARRIER_DURATION_S,
     CAM_RECORD_DIR, CAM_PHOTO_W, CAM_PHOTO_H, CAM_PHOTO_QUALITY, CAM_CHUNK_INTERVAL_S,
+    SDR_ENABLED, SDR_TARGET_FREQ, SDR_SAMPLE_RATE, SDR_GAIN,
+    SDR_FREQ_CORRECTION, SDR_MEASURE_INTERVAL_S, SDR_NUM_SAMPLES, SDR_BIN_WINDOW,
 )
 from sensors import Bme280Sensor, Ms5611Sensor, Bno085Sensor, Ina219Sensor
 from radio import Ad9833Carrier
-from hardware import PowerSignal, EspUartSender, CameraModule
+from hardware import PowerSignal, EspUartSender, CameraModule, SdrReceiver
 
 logging.basicConfig(
     level=logging.INFO,
@@ -43,17 +45,27 @@ def main():
     esp  = EspUartSender(ESP_UART_PORT, ESP_UART_BAUD)
     carrier = Ad9833Carrier()
     cam  = CameraModule(CAM_RECORD_DIR, CAM_PHOTO_W, CAM_PHOTO_H, CAM_PHOTO_QUALITY)
+    sdr  = SdrReceiver(
+        target_freq_hz  = SDR_TARGET_FREQ,
+        sample_rate     = SDR_SAMPLE_RATE,
+        gain            = SDR_GAIN,
+        freq_correction = SDR_FREQ_CORRECTION,
+        num_samples     = SDR_NUM_SAMPLES,
+        bin_window      = SDR_BIN_WINDOW,
+    ) if SDR_ENABLED else None
 
     # Start recording immediately on boot if camera is available
     if cam.available:
         cam.start_recording()
 
-    last_send      = 0.0
-    last_carrier   = 0.0
-    carrier_on     = False
-    carrier_on_at  = 0.0
+    last_send       = 0.0
+    last_carrier    = 0.0
+    carrier_on      = False
+    carrier_on_at   = 0.0
     pending_chunks: list[tuple[int, int, int, str]] = []
     last_chunk_sent = 0.0
+    last_sdr        = 0.0
+    last_hf_dbfs: float | None = None
 
     log.info("Starting main loop")
     try:
@@ -92,6 +104,14 @@ def main():
                 last_chunk_sent = now
                 log.info("→ESP32 img chunk %d/%d (id=%d)", seq + 1, total, img_id)
 
+            # ── Pomiar SDR (nie blokuje — sprawdź timer) ─────────────────────
+            if sdr and sdr.available and (now - last_sdr >= SDR_MEASURE_INTERVAL_S):
+                dbfs = sdr.measure()
+                if dbfs != -999.0:
+                    last_hf_dbfs = dbfs
+                    log.info("SDR: %.1f dBFS @ %.3f MHz", dbfs, SDR_TARGET_FREQ / 1e6)
+                last_sdr = now
+
             # ── Wyślij dane czujników do ESP32 przez UART ─────────────────────
             if now - last_send >= ESP_SEND_INTERVAL_S:
                 bme_d = bme.read()
@@ -101,7 +121,8 @@ def main():
 
                 disk_used, disk_free = cam.disk_usage(CAM_RECORD_DIR)
                 esp.send(bme_d, ms_d, imu_d, pwr_d,
-                         disk_used_gb=disk_used, disk_free_gb=disk_free)
+                         disk_used_gb=disk_used, disk_free_gb=disk_free,
+                         hf_dbfs=last_hf_dbfs)
                 log.info(
                     "→ESP32 temp=%.1f°C pres=%.1fhPa alt2=%.0fm vbat=%.2fV disk=%.1f/%.1fGB",
                     bme_d.temperature_c, bme_d.pressure_hpa,
@@ -129,6 +150,8 @@ def main():
     finally:
         power.set_alive(False)
         cam.close()
+        if sdr:
+            sdr.close()
         esp.close()
         carrier.close()
         power.close()

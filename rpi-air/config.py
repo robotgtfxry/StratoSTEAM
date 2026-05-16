@@ -36,6 +36,16 @@ ESP32_SHTDN_PIN  = 6    # INPUT  — ESP32 podnosi gdy chce shutdown (pin 31 ←
 CARRIER_DURATION_S = 5    # ile sekund nadajemy nośną
 CARRIER_INTERVAL_S = 60   # co ile sekund włączamy nośną
 
+# RTL-SDR odbiornik HF (eksperyment jonosferyczny)
+SDR_ENABLED          = True
+SDR_TARGET_FREQ      = 7_100_000   # Hz — musi zgadzać się z nadajnikiem naziemnym
+SDR_SAMPLE_RATE      = 250_000     # Hz
+SDR_GAIN             = "auto"      # lub np. 40 (dB)
+SDR_FREQ_CORRECTION  = 0           # PPM korekcja kwarcu RTL-SDR
+SDR_MEASURE_INTERVAL_S = 10        # co ile sekund mierzymy
+SDR_NUM_SAMPLES      = 256 * 1024  # próbki na pomiar (~1 s)
+SDR_BIN_WINDOW       = 15          # ±bin wokół nośnej w FFT
+
 # Camera (RPi cam0)
 CAM_RECORD_DIR     = "/home/pi/stratosteam-video"
 CAM_PHOTO_W        = 160    # szerokość zdjęcia wysyłanego przez LoRa

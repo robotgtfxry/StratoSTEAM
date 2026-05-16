@@ -1,7 +1,10 @@
 """
-HF transmitter control.
+HF transmitter control + pomiary SDR z balonu.
 Flutter sends commands here → rpi-ground polls and executes them.
+rpi-ground uploads SDR measurements → Flutter plots dBFS vs altitude.
 """
+import time
+from collections import deque
 from fastapi import APIRouter, Depends, HTTPException, Header, status
 from pydantic import BaseModel
 from typing import Literal
@@ -12,6 +15,7 @@ router = APIRouter(prefix="/api/hf", tags=["hf"])
 # In-memory state — simple and sufficient
 _command: dict = {"action": "stop", "freq_hz": 7_100_000}
 _hw_status: dict = {"active": False, "freq_hz": 0}
+_measurements: deque = deque(maxlen=500)  # {ts, alt, dbfs}
 
 
 def _verify_key(x_api_key: str = Header(...)):
@@ -32,6 +36,11 @@ class HfStatusIn(BaseModel):
 class HfStateOut(BaseModel):
     command: dict
     hw_status: dict
+
+
+class MeasurementIn(BaseModel):
+    alt: float
+    dbfs: float
 
 
 # Flutter → backend: send a command
@@ -60,3 +69,16 @@ async def report_status(body: HfStatusIn, _: None = Depends(_verify_key)):
 @router.get("/state", response_model=HfStateOut)
 async def get_state():
     return HfStateOut(command=_command, hw_status=_hw_status)
+
+
+# rpi-ground → backend: record one SDR measurement (alt + dBFS)
+@router.post("/measurement")
+async def add_measurement(body: MeasurementIn, _: None = Depends(_verify_key)):
+    _measurements.append({"ts": time.time(), "alt": body.alt, "dbfs": body.dbfs})
+    return {"ok": True}
+
+
+# Flutter → backend: fetch all stored measurements
+@router.get("/measurements")
+async def get_measurements():
+    return list(_measurements)

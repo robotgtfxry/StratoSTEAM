@@ -4,6 +4,13 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'settings_service.dart';
 
+class HfMeasurement {
+  final double ts;
+  final double alt;
+  final double dbfs;
+  const HfMeasurement({required this.ts, required this.alt, required this.dbfs});
+}
+
 class HfService extends ChangeNotifier {
   final SettingsService _settings;
 
@@ -12,6 +19,7 @@ class HfService extends ChangeNotifier {
   String pendingAction = 'stop';
   int pendingFreqHz = 7100000;
   bool _loading = false;
+  List<HfMeasurement> measurements = [];
 
   bool get loading => _loading;
 
@@ -25,7 +33,9 @@ class HfService extends ChangeNotifier {
 
   HfService(this._settings) {
     _pollState();
+    _pollMeasurements();
     Timer.periodic(const Duration(seconds: 2), (_) => _pollState());
+    Timer.periodic(const Duration(seconds: 10), (_) => _pollMeasurements());
   }
 
   Future<void> _pollState() async {
@@ -39,6 +49,23 @@ class HfService extends ChangeNotifier {
         hwFreqHz      = j['hw_status']['freq_hz'] as int;
         pendingAction = j['command']['action'] as String;
         pendingFreqHz = j['command']['freq_hz'] as int;
+        notifyListeners();
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _pollMeasurements() async {
+    try {
+      final r = await http
+          .get(Uri.parse('${_settings.serverUrl}/api/hf/measurements'))
+          .timeout(const Duration(seconds: 5));
+      if (r.statusCode == 200) {
+        final list = jsonDecode(r.body) as List<dynamic>;
+        measurements = list.map((e) => HfMeasurement(
+          ts:   (e['ts']   as num).toDouble(),
+          alt:  (e['alt']  as num).toDouble(),
+          dbfs: (e['dbfs'] as num).toDouble(),
+        )).toList();
         notifyListeners();
       }
     } catch (_) {}
