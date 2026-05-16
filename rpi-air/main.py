@@ -1,28 +1,23 @@
 #!/usr/bin/env python3
 """
 StratoSTEAM — Air node
-Reads all sensors, sends telemetry over LoRa, opens uplink window for commands.
+Reads all sensors, forwards data to ESP32 over UART (ESP32 handles LoRa TX).
 Signals ESP32-S3 that RPi is alive; handles graceful shutdown on ESP32 request.
 """
 import logging
 import time
 import sys
 import os
-import subprocess
 
 from config import (
-    GPS_PORT, GPS_BAUD,
     BME280_ADDR, MS5611_ADDR, BNO085_ADDR,
     INA219_ADDR, INA219_SHUNT_OHMS,
-    TELEMETRY_INTERVAL_S, APRS_BEACON_INTERVAL_S, APRS_BEACON_DURATION_S,
-    UPLINK_RX_WINDOW_S,
+    ESP_UART_PORT, ESP_UART_BAUD, ESP_SEND_INTERVAL_S,
+    APRS_BEACON_INTERVAL_S, APRS_BEACON_DURATION_S,
 )
-from sensors import (
-    NeoM8nGps, Bme280Sensor, Ms5611Sensor, Bno085Sensor, Ina219Sensor,
-)
-from radio import LoRaSX1278, Ad9833Aprs
-from hardware import PowerSignal
-from packet import build_packet, parse_command, build_exec_result
+from sensors import Bme280Sensor, Ms5611Sensor, Bno085Sensor, Ina219Sensor
+from radio import Ad9833Aprs
+from hardware import PowerSignal, EspUartSender
 
 logging.basicConfig(
     level=logging.INFO,
@@ -37,28 +32,24 @@ log = logging.getLogger("air")
 
 def main():
     log.info("Initialising sensors…")
-    power  = PowerSignal()
-    power.set_alive(True)   # informuj ESP32 że RPi działa
+    power = PowerSignal()
+    power.set_alive(True)
 
-    gps    = NeoM8nGps(GPS_PORT, GPS_BAUD)
-    bme    = Bme280Sensor(BME280_ADDR)
-    ms     = Ms5611Sensor(MS5611_ADDR)
-    imu    = Bno085Sensor()
-    pwr    = Ina219Sensor(INA219_SHUNT_OHMS, INA219_ADDR)
-    lora   = LoRaSX1278()
-    aprs   = Ad9833Aprs()
+    bme  = Bme280Sensor(BME280_ADDR)
+    ms   = Ms5611Sensor(MS5611_ADDR)
+    imu  = Bno085Sensor()
+    pwr  = Ina219Sensor(INA219_SHUNT_OHMS, INA219_ADDR)
+    esp  = EspUartSender(ESP_UART_PORT, ESP_UART_BAUD)
+    aprs = Ad9833Aprs()
 
-    seq = 0
-    last_telem  = 0.0
-    last_aprs   = 0.0
-    aprs_on     = False
-    aprs_on_at  = 0.0
-    exec_result: bytes | None = None   # wynik do odesłania w następnym TX
+    last_send = 0.0
+    last_aprs = 0.0
+    aprs_on   = False
+    aprs_on_at = 0.0
 
     log.info("Starting main loop")
     try:
         while True:
-            gps.update()
             now = time.time()
 
             # ── Sprawdź czy ESP32 prosi o shutdown ───────────────────────────
@@ -68,53 +59,20 @@ def main():
                 os.system("sudo shutdown -h now")
                 break
 
-            # ── Telemetria LoRa ───────────────────────────────────────────────
-            if now - last_telem >= TELEMETRY_INTERVAL_S:
-                gps_d = gps.data
+            # ── Wyślij dane czujników do ESP32 przez UART ─────────────────────
+            if now - last_send >= ESP_SEND_INTERVAL_S:
                 bme_d = bme.read()
                 ms_d  = ms.read()
                 imu_d = imu.read()
                 pwr_d = pwr.read()
 
-                packet = build_packet(gps_d, bme_d, ms_d, imu_d, pwr_d, seq)
-                ok = lora.send(packet)
+                esp.send(bme_d, ms_d, imu_d, pwr_d)
                 log.info(
-                    "TX seq=%d ok=%s alt=%.0fm temp=%.1f°C batt=%.2fV",
-                    seq, ok, gps_d.altitude_m or 0,
-                    bme_d.temperature_c, pwr_d.voltage_v,
+                    "→ESP32 temp=%.1f°C pres=%.1fhPa alt2=%.0fm vbat=%.2fV",
+                    bme_d.temperature_c, bme_d.pressure_hpa,
+                    ms_d.altitude_m, pwr_d.voltage_v,
                 )
-                seq += 1
-                last_telem = now
-
-                # Jeśli mamy wynik exec — wyślij go PRZED otwarciem okna RX
-                if exec_result is not None:
-                    lora.send(exec_result)
-                    exec_result = None
-
-                raw_cmd = lora.listen(UPLINK_RX_WINDOW_S)
-                if raw_cmd:
-                    cmd = parse_command(raw_cmd)
-                    if cmd:
-                        if cmd.get("cmd") == "exec":
-                            sh = cmd.get("sh", "")
-                            log.info("EXEC: %s", sh)
-                            try:
-                                proc = subprocess.run(
-                                    ["bash", "-c", sh],
-                                    capture_output=True, text=True, timeout=8,
-                                )
-                                exec_result = build_exec_result(
-                                    proc.returncode,
-                                    proc.stdout.strip(),
-                                    proc.stderr.strip(),
-                                )
-                            except subprocess.TimeoutExpired:
-                                exec_result = build_exec_result(
-                                    -1, "", "timeout (8s)")
-                            except Exception as e:
-                                exec_result = build_exec_result(-1, "", str(e))
-                        else:
-                            log.info("CMD ignored (buzzer/LED handled by ESP32): %s", cmd)
+                last_send = now
 
             # ── APRS: włącz nośną na APRS_BEACON_DURATION_S sekund ───────────
             if not aprs_on and (now - last_aprs >= APRS_BEACON_INTERVAL_S):
@@ -135,8 +93,7 @@ def main():
         log.info("Shutdown by keyboard")
     finally:
         power.set_alive(False)
-        gps.close()
-        lora.close()
+        esp.close()
         aprs.close()
         power.close()
 
