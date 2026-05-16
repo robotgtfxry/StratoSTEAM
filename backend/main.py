@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from sqlalchemy import select, desc
 from database import init_db, SessionLocal
 from models import TelemetryRecord, WaypointRecord
-from routers import telemetry, ws, hf, commands, rpi_power, exec_cmd
+from routers import telemetry, ws, hf, commands, rpi_power, exec_cmd, camera
 from routers import waypoints as waypoints_router
 
 log = logging.getLogger("waypoint_task")
@@ -72,4 +72,5 @@ app.include_router(hf.router)
 app.include_router(commands.router)
 app.include_router(rpi_power.router)
 app.include_router(exec_cmd.router)
+app.include_router(camera.router)
 app.include_router(waypoints_router.router, prefix="/api")

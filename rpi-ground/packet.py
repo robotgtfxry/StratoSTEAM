@@ -24,3 +24,11 @@ def build_exec_command(sh: str) -> bytes:
         {"cmd": "exec", "sh": sh},
         separators=(",", ":"),
     ).encode()
+
+
+def build_photo_command() -> bytes:
+    return json.dumps({"cmd": "photo"}, separators=(",", ":")).encode()
+
+
+def build_cam_rec_command(on: bool) -> bytes:
+    return json.dumps({"cmd": "cam_rec", "on": on}, separators=(",", ":")).encode()

@@ -6,6 +6,7 @@ import 'services/hf_service.dart';
 import 'services/command_service.dart';
 import 'services/rpi_power_service.dart';
 import 'services/terminal_service.dart';
+import 'services/camera_service.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/map_screen.dart';
 import 'screens/transmitter_screen.dart';
@@ -40,6 +41,10 @@ void main() async {
         ChangeNotifierProxyProvider<SettingsService, TerminalService>(
           create: (ctx) => TerminalService(ctx.read<SettingsService>()),
           update: (_, s, prev) => prev ?? TerminalService(s),
+        ),
+        ChangeNotifierProxyProvider<SettingsService, CameraService>(
+          create: (ctx) => CameraService(ctx.read<SettingsService>()),
+          update: (_, s, prev) => prev ?? CameraService(s),
         ),
       ],
       child: const StratoSteamApp(),

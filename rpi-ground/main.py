@@ -15,7 +15,11 @@ from hf_controller import HfController
 from command_store import CommandStore
 from rpi_power_store import RpiPowerStore
 from exec_store import ExecStore
-from packet import build_command, build_rpi_power_command, build_exec_command
+from camera_store import CameraStore
+from packet import (
+    build_command, build_rpi_power_command, build_exec_command,
+    build_photo_command, build_cam_rec_command,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -35,11 +39,13 @@ def main():
     commands  = CommandStore()
     rpi_power = RpiPowerStore()
     exec_s    = ExecStore()
+    camera_s  = CameraStore()
 
     hf.start()
     commands.start()
     rpi_power.start()
     exec_s.start()
+    camera_s.start()
     log.info("Ground station listening…")
 
     try:
@@ -52,6 +58,15 @@ def main():
                 packet = json.loads(raw.decode())
             except (json.JSONDecodeError, UnicodeDecodeError) as e:
                 log.warning("Bad packet: %s", e)
+                continue
+
+            # ── Chunk obrazu z kamery — przekaż do backendu i pomiń resztę ───
+            if packet.get("type") == "img":
+                camera_s.post_chunk(packet)
+                log.info(
+                    "IMG chunk id=%s seq=%s/%s RSSI=%d",
+                    packet.get("id"), packet.get("seq"), packet.get("tot"), rssi,
+                )
                 continue
 
             # Determine source: ESP32 beacon or full RPi telemetry
@@ -119,6 +134,17 @@ def main():
                                 ok, cmd.get("buzzer"),
                                 cmd.get("led_r"), cmd.get("led_g"), cmd.get("led_b"),
                             )
+
+                # ── Komendy kamery (ESP32 zawsze słucha, więc nadaj w każdym oknie) ──
+                if camera_s.pop_photo():
+                    ok = lora.send_command(build_photo_command())
+                    log.info("Camera photo cmd sent ok=%s", ok)
+                else:
+                    rec = camera_s.pop_rec()
+                    if rec is not None:
+                        ok = lora.send_command(build_cam_rec_command(rec))
+                        log.info("Camera rec cmd on=%s sent ok=%s", rec, ok)
+
             else:
                 # ESP32 beacon — możemy wysłać tylko rpi_power (ESP32 słucha)
                 pwr_cmd = rpi_power.pop()
@@ -128,6 +154,16 @@ def main():
                     log.info("RPi power cmd → ESP32 on=%s ok=%s", pwr_cmd, ok)
                 exec_s.pop()      # exec nie dotrze do ESP32 — odrzuć
                 commands.pop()    # buzzer/led też nie — odrzuć
+
+                # ── Komendy kamery przez ESP32 beacon window ──────────────────
+                if camera_s.pop_photo():
+                    ok = lora.send_command(build_photo_command())
+                    log.info("Camera photo cmd → ESP32 ok=%s", ok)
+                else:
+                    rec = camera_s.pop_rec()
+                    if rec is not None:
+                        ok = lora.send_command(build_cam_rec_command(rec))
+                        log.info("Camera rec cmd on=%s → ESP32 ok=%s", rec, ok)
 
     except KeyboardInterrupt:
         log.info("Shutdown")

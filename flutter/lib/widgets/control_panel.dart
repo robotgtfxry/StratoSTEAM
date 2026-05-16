@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/command_service.dart';
 import '../services/rpi_power_service.dart';
+import '../services/camera_service.dart';
 
 // ── Paleta kolorów LED ────────────────────────────────────────────────────────
 const _palette = [
@@ -63,6 +64,7 @@ class _ControlPanelState extends State<ControlPanel>
   Widget build(BuildContext context) {
     final cmd = context.watch<CommandService>();
     final rpi = context.watch<RpiPowerService>();
+    final cam = context.watch<CameraService>();
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -97,6 +99,12 @@ class _ControlPanelState extends State<ControlPanel>
 
           // ── RPi status + control ─────────────────────────────
           _RpiPowerRow(rpi: rpi),
+          const SizedBox(height: 14),
+          const Divider(color: Colors.white12, height: 1),
+          const SizedBox(height: 14),
+
+          // ── Kamera ──────────────────────────────────────────
+          _CameraSection(cam: cam),
           const SizedBox(height: 14),
           const Divider(color: Colors.white12, height: 1),
           const SizedBox(height: 14),
@@ -398,6 +406,167 @@ class _RpiPowerRow extends StatelessWidget {
         ),
       ),
     ]);
+  }
+}
+
+
+// ── Sekcja kamery ─────────────────────────────────────────────────────────────
+
+class _CameraSection extends StatelessWidget {
+  final CameraService cam;
+  const _CameraSection({required this.cam});
+
+  @override
+  Widget build(BuildContext context) {
+    final hasPhoto = cam.latestPhoto != null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Nagłówek + przycisk nagrywania
+        Row(children: [
+          const Icon(Icons.videocam_outlined, color: Colors.white54, size: 18),
+          const SizedBox(width: 8),
+          const Text('Kamera', style: TextStyle(color: Colors.white70, fontSize: 14)),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: cam.recording
+                  ? Colors.redAccent.withOpacity(0.15)
+                  : Colors.white.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(
+                  color: cam.recording
+                      ? Colors.redAccent.withOpacity(0.5)
+                      : Colors.white12),
+            ),
+            child: Text(
+              cam.recording ? '● REC' : 'STOP',
+              style: TextStyle(
+                color: cam.recording ? Colors.redAccent : Colors.white38,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          const Spacer(),
+          // Toggle nagrywania
+          SizedBox(
+            height: 32,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: cam.recording
+                    ? Colors.redAccent.withOpacity(0.15)
+                    : Colors.greenAccent.withOpacity(0.15),
+                foregroundColor:
+                    cam.recording ? Colors.redAccent : Colors.greenAccent,
+                side: BorderSide(
+                    color: cam.recording ? Colors.redAccent : Colors.greenAccent,
+                    width: 1),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+              ),
+              icon: cam.recLoading
+                  ? const SizedBox(
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 1.5, color: Colors.white54),
+                    )
+                  : Icon(
+                      cam.recording ? Icons.stop_circle_outlined : Icons.fiber_manual_record,
+                      size: 14),
+              label: Text(cam.recording ? 'Stop' : 'Nagraj',
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+              onPressed: cam.recLoading ? null : () => cam.setRecording(!cam.recording),
+            ),
+          ),
+        ]),
+        const SizedBox(height: 10),
+
+        // Przycisk zdjęcia
+        SizedBox(
+          width: double.infinity,
+          height: 40,
+          child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blueAccent.withOpacity(0.15),
+              foregroundColor: Colors.blueAccent,
+              side: BorderSide(color: Colors.blueAccent.withOpacity(0.5), width: 1),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              elevation: 0,
+            ),
+            icon: cam.photoLoading
+                ? const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.blueAccent),
+                  )
+                : const Icon(Icons.camera_alt_outlined, size: 16),
+            label: const Text('Zrób zdjęcie',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            onPressed: cam.photoLoading ? null : cam.requestPhoto,
+          ),
+        ),
+
+        if (cam.lastPhotoOk != null) ...[
+          const SizedBox(height: 4),
+          Row(children: [
+            Icon(
+              cam.lastPhotoOk! ? Icons.check_circle_outline : Icons.error_outline,
+              color: cam.lastPhotoOk! ? Colors.greenAccent : Colors.redAccent,
+              size: 13,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              cam.lastPhotoOk!
+                  ? 'Żądanie wysłane — zdjęcie nadejdzie za ~1 min'
+                  : 'Błąd wysyłania',
+              style: TextStyle(
+                color: cam.lastPhotoOk! ? Colors.white38 : Colors.redAccent,
+                fontSize: 10,
+              ),
+            ),
+          ]),
+        ],
+
+        // Podgląd ostatniego zdjęcia
+        if (hasPhoto) ...[
+          const SizedBox(height: 10),
+          Row(children: [
+            const Icon(Icons.image_outlined, color: Colors.white24, size: 13),
+            const SizedBox(width: 4),
+            Text(
+              'Ostatnie zdjęcie: ${_fmtTs(cam.latestPhotoTs)}',
+              style: const TextStyle(color: Colors.white38, fontSize: 10),
+            ),
+          ]),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.memory(
+              cam.latestPhoto!,
+              fit: BoxFit.contain,
+              width: double.infinity,
+              // ograniczamy wysokość żeby panel nie był za duży
+              height: 160,
+              gaplessPlayback: true,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  String _fmtTs(DateTime? ts) {
+    if (ts == null) return '—';
+    return '${ts.hour.toString().padLeft(2, '0')}:'
+        '${ts.minute.toString().padLeft(2, '0')}:'
+        '${ts.second.toString().padLeft(2, '0')}';
   }
 }
 

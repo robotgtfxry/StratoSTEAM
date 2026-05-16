@@ -14,10 +14,11 @@ from config import (
     INA219_ADDR, INA219_SHUNT_OHMS,
     ESP_UART_PORT, ESP_UART_BAUD, ESP_SEND_INTERVAL_S,
     APRS_BEACON_INTERVAL_S, APRS_BEACON_DURATION_S,
+    CAM_RECORD_DIR, CAM_PHOTO_W, CAM_PHOTO_H, CAM_PHOTO_QUALITY, CAM_CHUNK_INTERVAL_S,
 )
 from sensors import Bme280Sensor, Ms5611Sensor, Bno085Sensor, Ina219Sensor
 from radio import Ad9833Aprs
-from hardware import PowerSignal, EspUartSender
+from hardware import PowerSignal, EspUartSender, CameraModule
 
 logging.basicConfig(
     level=logging.INFO,
@@ -41,11 +42,18 @@ def main():
     pwr  = Ina219Sensor(INA219_SHUNT_OHMS, INA219_ADDR)
     esp  = EspUartSender(ESP_UART_PORT, ESP_UART_BAUD)
     aprs = Ad9833Aprs()
+    cam  = CameraModule(CAM_RECORD_DIR, CAM_PHOTO_W, CAM_PHOTO_H, CAM_PHOTO_QUALITY)
 
-    last_send = 0.0
-    last_aprs = 0.0
-    aprs_on   = False
-    aprs_on_at = 0.0
+    # Start recording immediately on boot if camera is available
+    if cam.available:
+        cam.start_recording()
+
+    last_send      = 0.0
+    last_aprs      = 0.0
+    aprs_on        = False
+    aprs_on_at     = 0.0
+    pending_chunks: list[tuple[int, int, int, str]] = []
+    last_chunk_sent = 0.0
 
     log.info("Starting main loop")
     try:
@@ -58,6 +66,31 @@ def main():
                 power.set_alive(False)
                 os.system("sudo shutdown -h now")
                 break
+
+            # ── Komendy z ESP32 (photo / cam_rec) ────────────────────────────
+            cmd = esp.read_cmd()
+            if cmd:
+                c = cmd.get("cmd", "")
+                if c == "photo" and cam.available:
+                    chunks = cam.capture_photo_chunks()
+                    if chunks:
+                        pending_chunks.extend(chunks)
+                        log.info("Photo queued: %d chunks pending", len(pending_chunks))
+                    else:
+                        log.warning("Photo capture returned no chunks")
+
+                elif c == "cam_rec" and cam.available:
+                    if cmd.get("on", False):
+                        cam.start_recording()
+                    else:
+                        cam.stop_recording()
+
+            # ── Wysyłaj chunki obrazu do ESP32 (po jednym co CAM_CHUNK_INTERVAL_S) ──
+            if pending_chunks and (now - last_chunk_sent >= CAM_CHUNK_INTERVAL_S):
+                img_id, seq, total, b64 = pending_chunks.pop(0)
+                esp.send_img_chunk(img_id, seq, total, b64)
+                last_chunk_sent = now
+                log.info("→ESP32 img chunk %d/%d (id=%d)", seq + 1, total, img_id)
 
             # ── Wyślij dane czujników do ESP32 przez UART ─────────────────────
             if now - last_send >= ESP_SEND_INTERVAL_S:
@@ -93,6 +126,7 @@ def main():
         log.info("Shutdown by keyboard")
     finally:
         power.set_alive(False)
+        cam.close()
         esp.close()
         aprs.close()
         power.close()

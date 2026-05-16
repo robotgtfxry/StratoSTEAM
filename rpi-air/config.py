@@ -39,3 +39,10 @@ UPLINK_RX_WINDOW_S = 2.0
 
 # APRS
 APRS_BEACON_INTERVAL_S = 60    # APRS position beacon interval
+
+# Camera (RPi cam0)
+CAM_RECORD_DIR     = "/home/pi/stratosteam-video"
+CAM_PHOTO_W        = 160    # szerokość zdjęcia wysyłanego przez LoRa
+CAM_PHOTO_H        = 120    # wysokość
+CAM_PHOTO_QUALITY  = 25     # jakość JPEG (1-95); niższa = mniejszy plik = mniej chunków
+CAM_CHUNK_INTERVAL_S = 3.0  # przerwa między wysłaniem kolejnych chunków do ESP32

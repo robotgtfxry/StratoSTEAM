@@ -34,6 +34,7 @@
 #define RPI_PWR_PIN    5
 #define RPI_ALIVE_PIN  6
 #define RPI_SHTDN_PIN  7
+#define RPI_TX_PIN     14   // UART2 TX → RPi GPIO15 (RX)
 #define BATT_ADC_PIN   1
 #define BUZZER_PIN     2
 #define LED_R_PIN      17
@@ -54,6 +55,7 @@
 #define LORA_BW                125E3
 #define LORA_TX_POWER          17
 #define BEACON_INTERVAL_MS     5000     // interwał beacona (=ESP_SEND_INTERVAL_S RPi5)
+#define IMG_CHUNK_DELAY_MS     2200     // min. odstęp między nadaniem kolejnych chunków obrazu
 #define SHUTDOWN_WAIT_MS       20000
 #define LORA_TAKEOVER_DELAY_MS 4000
 #define RPI_AUTO_RESTART_MS    1800000UL
@@ -83,6 +85,7 @@ struct RpiData {
 
 uint32_t rpiLastRx   = 0;
 String   rpiLineBuf  = "";
+uint32_t lastImgChunk = 0;   // timestamp ostatnio wysłanego chunk obrazu
 
 bool     rpiPowered      = false;
 bool     shutdownReq     = false;
@@ -111,11 +114,36 @@ void setLed(int r, int g, int b) {
     ledcWrite(CH_B, b);
 }
 
+// ── Retransmisja chunk obrazu przez LoRa ──────────────────────────────────────
+void forwardImgChunk(const String& line) {
+    uint32_t now = millis();
+    // wymuszamy minimalny odstęp między chunkami
+    if (now - lastImgChunk < IMG_CHUNK_DELAY_MS) {
+        delay(IMG_CHUNK_DELAY_MS - (now - lastImgChunk));
+    }
+    LoRa.beginPacket();
+    LoRa.print(line);
+    LoRa.endPacket();
+    LoRa.receive();
+    lastImgChunk = millis();
+
+    JsonDocument dbg;
+    deserializeJson(dbg, line);
+    Serial.printf("[LoRa] img id=%d seq=%d/%d\n",
+                  (int)(dbg["id"] | 0), (int)(dbg["seq"] | 0), (int)(dbg["tot"] | 0));
+}
+
 // ── Parser danych z RPi5 (line-delimited JSON) ────────────────────────────────
 void parseRpiLine(const String& line) {
     if (line.length() < 5) return;
     JsonDocument doc;
     if (deserializeJson(doc, line) != DeserializationError::Ok) return;
+
+    // chunk obrazu — retransmituj przez LoRa bez parsowania
+    if (strcmp(doc["type"] | "", "img") == 0) {
+        forwardImgChunk(line);
+        return;
+    }
 
     rpi.temp = doc["temp"] | 0.0f;
     rpi.hum  = doc["hum"]  | 0.0f;
@@ -243,6 +271,21 @@ void handleIncoming() {
         if (!on &&  rpiPowered) { rpiRequestShutdown(); }
         return;
     }
+
+    // ── Komendy kamery — forward do RPi przez UART2 TX ────────────────────────
+    if (strcmp(cmd, "photo") == 0) {
+        Serial.println("[ESP32] photo cmd → RPi");
+        rpiSerial.println("{\"cmd\":\"photo\"}");
+        return;
+    }
+
+    if (strcmp(cmd, "cam_rec") == 0) {
+        bool on = doc["on"] | false;
+        Serial.printf("[ESP32] cam_rec on=%d → RPi\n", on);
+        String fwd = String("{\"cmd\":\"cam_rec\",\"on\":") + (on ? "true" : "false") + "}";
+        rpiSerial.println(fwd);
+        return;
+    }
 }
 
 // ── RPi power control ─────────────────────────────────────────────────────────
@@ -279,7 +322,7 @@ void setup() {
     delay(500);
 
     gpsSerial.begin(9600,    SERIAL_8N1, GPS_RX_PIN, -1);
-    rpiSerial.begin(115200,  SERIAL_8N1, RPI_RX_PIN, -1);
+    rpiSerial.begin(115200,  SERIAL_8N1, RPI_RX_PIN, RPI_TX_PIN);
 
     ledcAttach(BUZZER_PIN, PWM_FREQ, PWM_BITS);
     ledcAttach(LED_R_PIN,  PWM_FREQ, PWM_BITS);
