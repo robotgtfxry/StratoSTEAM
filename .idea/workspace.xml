@@ -4,16 +4,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="0789ed74-7e87-4383-a6c9-e483a33e2b02" name="Changes" comment="9">
-      <change beforePath="$PROJECT_DIR$/esp32/src/main.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/esp32/src/main.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/flutter/lib/screens/dashboard_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/flutter/lib/screens/dashboard_screen.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/flutter/lib/widgets/control_panel.dart" beforeDir="false" afterPath="$PROJECT_DIR$/flutter/lib/widgets/control_panel.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/rpi-air/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/rpi-air/config.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/rpi-air/hardware/esp_uart.py" beforeDir="false" afterPath="$PROJECT_DIR$/rpi-air/hardware/esp_uart.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/rpi-air/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/rpi-air/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/rpi-air/radio/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/rpi-air/radio/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/rpi-air/radio/aprs.py" beforeDir="false" afterPath="$PROJECT_DIR$/rpi-air/radio/aprs.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/rpi-ground/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/rpi-ground/main.py" afterDir="false" />
+    <list default="true" id="0789ed74-7e87-4383-a6c9-e483a33e2b02" name="Changes" comment="10">
+      <change beforePath="$PROJECT_DIR$/.claude/worktrees/modest-ride-fecadf" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -215,7 +208,23 @@
       <option name="project" value="LOCAL" />
       <updated>1778950565304</updated>
     </task>
-    <option name="localTasksCounter" value="17" />
+    <task id="LOCAL-00017" summary="10">
+      <option name="closed" value="true" />
+      <created>1778963882130</created>
+      <option name="number" value="00017" />
+      <option name="presentableId" value="LOCAL-00017" />
+      <option name="project" value="LOCAL" />
+      <updated>1778963882130</updated>
+    </task>
+    <task id="LOCAL-00018" summary="10">
+      <option name="closed" value="true" />
+      <created>1778963933180</created>
+      <option name="number" value="00018" />
+      <option name="presentableId" value="LOCAL-00018" />
+      <option name="project" value="LOCAL" />
+      <updated>1778963933180</updated>
+    </task>
+    <option name="localTasksCounter" value="19" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -240,6 +249,7 @@
     <MESSAGE value="7" />
     <MESSAGE value="8" />
     <MESSAGE value="9" />
-    <option name="LAST_COMMIT_MESSAGE" value="9" />
+    <MESSAGE value="10" />
+    <option name="LAST_COMMIT_MESSAGE" value="10" />
   </component>
 </project>
