@@ -1,8 +1,8 @@
 /**
  * StratoSTEAM — ESP32-S3 fallback node
  *
- * Zasada: radio (LoRa) tylko gdy RPi jest WYŁĄCZONA.
- *   RPi ON  → ESP32 milczy, RPi robi wszystko przez swój moduł LoRa
+ * Zasada: ESP32 jest węzłem radiowym (GPS + LoRa), RPi5 węzłem pomiarowym.
+ *   RPi ON  → ESP32 milczy na LoRa, RPi5 obsługuje czujniki
  *   RPi OFF → ESP32 nadaje beacon GPS co BEACON_INTERVAL ms, brak RX
  *
  * Brak odbierania komend przez ESP32 — upraszcza logikę i eliminuje kolizje.
@@ -18,11 +18,8 @@
 #include <HardwareSerial.h>
 #include <TinyGPSPlus.h>
 #include <SPI.h>
-#include <Wire.h>
 #include <LoRa.h>
 #include <ArduinoJson.h>
-#include <Adafruit_BME280.h>
-#include <Adafruit_INA219.h>
 
 // ── Piny ──────────────────────────────────────────────────────────────────────
 #define GPS_RX_PIN     4
@@ -36,8 +33,6 @@
 #define RPI_ALIVE_PIN  6
 #define RPI_SHTDN_PIN  7
 #define BATT_ADC_PIN   1
-#define I2C_SDA_PIN    15
-#define I2C_SCL_PIN    16
 #define BUZZER_PIN     2
 #define LED_R_PIN      17
 #define LED_G_PIN      18
@@ -71,10 +66,6 @@ void rpiCutPower();
 // ── Globals ───────────────────────────────────────────────────────────────────
 HardwareSerial  gpsSerial(1);
 TinyGPSPlus     gps;
-Adafruit_BME280 bme;
-Adafruit_INA219 ina(0x40);
-bool bmeOk = false;
-bool inaOk = false;
 
 bool     rpiPowered    = false;
 bool     shutdownReq   = false;
@@ -129,21 +120,7 @@ void sendBeacon() {
     doc["lon"]  = gps.location.isValid()   ? gps.location.lng()         : 0.0;
     doc["alt"]  = gps.altitude.isValid()   ? gps.altitude.meters()      : 0.0;
     doc["sat"]  = gps.satellites.isValid() ? (int)gps.satellites.value(): 0;
-
-    // INA219 — napięcie i prąd (priorytet nad ADC)
-    if (inaOk) {
-        doc["vbat"] = ina.getBusVoltage_V() + ina.getShuntVoltage_mV() / 1000.0f;
-        doc["imA"]  = ina.getCurrent_mA();
-    } else {
-        doc["vbat"] = readBattAdc();
-    }
-
-    // BME280 — temperatura, ciśnienie, wilgotność
-    if (bmeOk) {
-        doc["temp"] = bme.readTemperature();
-        doc["pres"] = bme.readPressure() / 100.0f;   // hPa
-        doc["hum"]  = bme.readHumidity();
-    }
+    doc["vbat"] = readBattAdc();
 
     char buf[160];
     serializeJson(doc, buf);
@@ -153,10 +130,10 @@ void sendBeacon() {
     LoRa.endPacket();
     LoRa.receive();   // z powrotem do RX_CONT
 
-    Serial.printf("[ESP32] beacon seq=%lu fix=%d lat=%.5f lon=%.5f vbat=%.2fV temp=%.1fC\n",
+    Serial.printf("[ESP32] beacon seq=%lu fix=%d lat=%.5f lon=%.5f vbat=%.2fV\n",
                   beaconSeq - 1, gps.location.isValid(),
                   doc["lat"].as<float>(), doc["lon"].as<float>(),
-                  doc["vbat"].as<float>(), doc["temp"].as<float>());
+                  doc["vbat"].as<float>());
 }
 
 // ── Obsługa odebranego pakietu (zawsze aktywna) ───────────────────────────────
@@ -229,12 +206,6 @@ void setup() {
     delay(500);
 
     gpsSerial.begin(9600, SERIAL_8N1, GPS_RX_PIN, -1);
-
-    Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
-    bmeOk = bme.begin(0x76, &Wire);
-    inaOk = ina.begin(&Wire);
-    Serial.printf("[ESP32] BME280=%s INA219=%s\n",
-                  bmeOk ? "OK" : "FAIL", inaOk ? "OK" : "FAIL");
 
     ledcAttach(BUZZER_PIN, PWM_FREQ, PWM_BITS);
     ledcAttach(LED_R_PIN,  PWM_FREQ, PWM_BITS);

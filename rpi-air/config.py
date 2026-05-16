@@ -1,18 +1,5 @@
 # StratoSTEAM - Air node configuration (Raspberry Pi 5 on balloon)
-
-# LoRa SX1278 (SPI)
-LORA_FREQ = 433.0          # MHz
-LORA_SF = 10               # Spreading Factor (range vs speed tradeoff)
-LORA_BW = 125000           # Bandwidth Hz
-LORA_CR = 5                # Coding rate 4/5
-LORA_TX_POWER = 17         # dBm
-LORA_SPI_BUS = 0
-LORA_SPI_CS = 0
-LORA_DIO0_PIN = 25         # BCM GPIO
-
-# NEO-M8N GPS (UART)
-GPS_PORT = "/dev/ttyAMA0"
-GPS_BAUD = 9600
+# Architektura: RPi5 = czujniki + APRS | ESP32 = GPS + LoRa
 
 # BME280 (I2C)
 BME280_ADDR = 0x76
@@ -42,9 +29,8 @@ ESP32_SHTDN_PIN  = 6    # INPUT  — ESP32 podnosi gdy chce shutdown (pin 31 ←
 # APRS beacon duration (ile sekund nadajemy nośną)
 APRS_BEACON_DURATION_S = 5
 
-# Uplink RX window — after each TX, balon listens for commands this long
+# Uplink RX window — after each APRS TX, balon listens for commands this long
 UPLINK_RX_WINDOW_S = 2.0
 
-# Telemetry
-TELEMETRY_INTERVAL_S = 5       # how often to send packet
+# APRS
 APRS_BEACON_INTERVAL_S = 60    # APRS position beacon interval
