@@ -103,6 +103,17 @@
 
 ---
 
+## UART RPi5 → ESP32 (dane czujników)
+
+| Sygnał       | RPi5 BCM           | ESP32 GPIO | Kierunek       | Port RPi5      |
+|--------------|--------------------|------------|----------------|----------------|
+| TX czujników | GPIO14 (TXD, pin 8)| GPIO3 (RX) | RPi5 → ESP32   | /dev/ttyAMA0   |
+
+> Prędkość: 115200 baud, 8N1. RPi5 wysyła line-delimited JSON co 5 s.  
+> Dane: temp, hum, pres (BME280), p2, alt2 (MS5611), roll, pit, yaw, ax, ay, az (BNO085), vbat, imA (INA219).
+
+---
+
 ## Sygnały ESP32 ↔ RPi5 (GPIO)
 
 | Sygnał         | RPi5 BCM          | ESP32 GPIO | Kierunek               |

@@ -1,6 +1,11 @@
 # StratoSTEAM - Air node configuration (Raspberry Pi 5 on balloon)
 # Architektura: RPi5 = czujniki + APRS | ESP32 = GPS + LoRa
 
+# UART do ESP32 (RPi5 GPIO14 TX → ESP32 GPIO3 RX)
+ESP_UART_PORT = "/dev/ttyAMA0"
+ESP_UART_BAUD = 115200
+ESP_SEND_INTERVAL_S = 5     # jak często wysyłamy dane czujników do ESP32
+
 # BME280 (I2C)
 BME280_ADDR = 0x76
 
