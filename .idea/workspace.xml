@@ -4,8 +4,18 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="0789ed74-7e87-4383-a6c9-e483a33e2b02" name="Changes" comment="13">
+    <list default="true" id="0789ed74-7e87-4383-a6c9-e483a33e2b02" name="Changes" comment="14">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/HARDWARE.md" beforeDir="false" afterPath="$PROJECT_DIR$/HARDWARE.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/models.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/models.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/routers/telemetry.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/routers/telemetry.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/schemas.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/schemas.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/flutter/lib/models/telemetry.dart" beforeDir="false" afterPath="$PROJECT_DIR$/flutter/lib/models/telemetry.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/flutter/lib/screens/plots_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/flutter/lib/screens/plots_screen.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rpi-air/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/rpi-air/config.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rpi-air/hardware/esp_uart.py" beforeDir="false" afterPath="$PROJECT_DIR$/rpi-air/hardware/esp_uart.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rpi-air/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/rpi-air/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/simulate_mission.py" beforeDir="false" afterPath="$PROJECT_DIR$/simulate_mission.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -13,7 +23,7 @@
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
   <component name="EmbeddingIndexingInfo">
-    <option name="cachedIndexableFilesCount" value="679" />
+    <option name="cachedIndexableFilesCount" value="3539" />
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
@@ -247,7 +257,15 @@
       <option name="project" value="LOCAL" />
       <updated>1778966539730</updated>
     </task>
-    <option name="localTasksCounter" value="22" />
+    <task id="LOCAL-00022" summary="14">
+      <option name="closed" value="true" />
+      <created>1779289670616</created>
+      <option name="number" value="00022" />
+      <option name="presentableId" value="LOCAL-00022" />
+      <option name="project" value="LOCAL" />
+      <updated>1779289670616</updated>
+    </task>
+    <option name="localTasksCounter" value="23" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -276,6 +294,7 @@
     <MESSAGE value="11" />
     <MESSAGE value="12" />
     <MESSAGE value="13" />
-    <option name="LAST_COMMIT_MESSAGE" value="13" />
+    <MESSAGE value="14" />
+    <option name="LAST_COMMIT_MESSAGE" value="14" />
   </component>
 </project>

@@ -128,19 +128,22 @@ RPi GPIO ──[100Ω]──┬── Gate (BSS138)
 
 ---
 
-## HX711 + czujnik siły — tensometr liny balonu (GPIO, RPi5 balon)
+## 4× HX711 — tensometry zawieszenia ładunku (GPIO, RPi5 balon)
 
-| Pin HX711 | RPi5 BCM         |
-|-----------|------------------|
-| DT        | GPIO16 (pin 36)  |
-| SCK       | GPIO21 (pin 40)  |
-| VCC       | 3.3V (pin 1)     |
-| GND       | GND (pin 34)     |
+Każdy HX711 obsługuje jeden mostek tensometryczny. Cztery czujniki mierzą siłę
+w narożnikach ramy zawieszenia ładunku (przód-lewy, przód-prawy, tył-lewy, tył-prawy).
 
-> RPi5 (balon). Mierzy napięcie liny balonu / siłę uciągu w gramach.  
-> ADC 24-bit, bit-banging przez `RPi.GPIO` — bez dodatkowej biblioteki.  
-> `reference_unit` (ADC units/g) wymaga kalibracji z odważnikiem wzorcowym.  
-> Klucz w JSON UART → ESP32: `"sg"` (siła [g]). Pole `strain_g` w telemetrii.
+| Kanał | Pozycja      | HX711 DT        | HX711 SCK       | VCC          | GND      |
+|-------|--------------|-----------------|-----------------|--------------|----------|
+| #0    | przód lewy   | GPIO16 (pin 36) | GPIO21 (pin 40) | 3.3V (pin 1) | GND      |
+| #1    | przód prawy  | GPIO19 (pin 35) | GPIO20 (pin 38) | 3.3V (pin 1) | GND      |
+| #2    | tył lewy     | GPIO12 (pin 32) | GPIO13 (pin 33) | 3.3V (pin 1) | GND      |
+| #3    | tył prawy    | GPIO24 (pin 18) | GPIO25 (pin 22) | 3.3V (pin 1) | GND      |
+
+> RPi5 (balon). ADC 24-bit, bit-banging przez `RPi.GPIO` — bez dodatkowej biblioteki.  
+> `reference_unit` (ADC units/g) wymaga kalibracji z odważnikiem wzorcowym dla każdego kanału.  
+> Klucze w JSON UART → ESP32: `"sg0"`, `"sg1"`, `"sg2"`, `"sg3"` [g].  
+> Pola w telemetrii: `strain_g0` … `strain_g3`.
 
 ---
 
@@ -183,7 +186,7 @@ RPi GPIO ──[100Ω]──┬── Gate (BSS138)
 | RX komend        | GPIO15 (RXD, pin 10)| GPIO14 (TX)| ESP32 → RPi5   | /dev/ttyAMA0   |
 
 > Prędkość: 115200 baud, 8N1. RPi5 wysyła line-delimited JSON co 5 s.  
-> Dane TX: temp, hum, pres (BME280), p2, alt2 (MS5611), roll, pit, yaw, ax, ay, az (BNO085), vbat, imA (INA219), dsku, dskf (dysk), hfdb (SDR dBFS, opcjonalne), sg (tensometr [g], opcjonalne).  
+> Dane TX: temp, hum, pres (BME280), p2, alt2 (MS5611), roll, pit, yaw, ax, ay, az (BNO085), vbat, imA (INA219), dsku, dskf (dysk), hfdb (SDR dBFS, opcjonalne), sg0–sg3 (tensometry [g], opcjonalne).  
 > Dane RX: komendy JSON od ESP32 — `{"cmd":"photo"}`, `{"cmd":"cam_rec","on":true/false}`, shutdown request.
 
 ---
