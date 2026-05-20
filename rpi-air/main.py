@@ -12,7 +12,7 @@ import os
 from config import (
     BME280_ADDR, MS5611_ADDR, BNO085_ADDR,
     INA219_ADDR, INA219_SHUNT_OHMS,
-    HX711_DT_PIN, HX711_SCK_PIN, HX711_REFERENCE_UNIT,
+    HX711_SENSORS, HX711_REFERENCE_UNIT,
     ESPCAM_PWR_PINS,
     ESP_UART_PORT, ESP_UART_BAUD, ESP_SEND_INTERVAL_S,
     CAM_RECORD_DIR, CAM_PHOTO_W, CAM_PHOTO_H, CAM_PHOTO_QUALITY, CAM_CHUNK_INTERVAL_S,
@@ -42,7 +42,10 @@ def main():
     ms     = Ms5611Sensor(MS5611_ADDR)
     imu    = Bno085Sensor()
     pwr    = Ina219Sensor(INA219_SHUNT_OHMS, INA219_ADDR)
-    strain  = Hx711Sensor(HX711_DT_PIN, HX711_SCK_PIN, HX711_REFERENCE_UNIT)
+    strains = [
+        Hx711Sensor(s["dt"], s["sck"], HX711_REFERENCE_UNIT)
+        for s in HX711_SENSORS
+    ]
     espcams = EspCamPower(ESPCAM_PWR_PINS)
     esp     = EspUartSender(ESP_UART_PORT, ESP_UART_BAUD)
     cam  = CameraModule(CAM_RECORD_DIR, CAM_PHOTO_W, CAM_PHOTO_H, CAM_PHOTO_QUALITY)
@@ -119,16 +122,16 @@ def main():
                 ms_d     = ms.read()
                 imu_d    = imu.read()
                 pwr_d    = pwr.read()
-                strain_d = strain.read()
+                strain_d = [s.read() for s in strains]
 
                 disk_used, disk_free = cam.disk_usage(CAM_RECORD_DIR)
                 esp.send(bme_d, ms_d, imu_d, pwr_d,
                          disk_used_gb=disk_used, disk_free_gb=disk_free,
-                         hf_dbfs=last_hf_dbfs, strain=strain_d)
+                         hf_dbfs=last_hf_dbfs, strains=strain_d)
                 log.info(
-                    "→ESP32 temp=%.1f°C pres=%.1fhPa alt2=%.0fm vbat=%.2fV sg=%.1fg",
-                    bme_d.temperature_c, bme_d.pressure_hpa,
-                    ms_d.altitude_m, pwr_d.voltage_v, strain_d.strain_g,
+                    "→ESP32 temp=%.1f°C alt2=%.0fm vbat=%.2fV sg=[%.0f,%.0f,%.0f,%.0f]g",
+                    bme_d.temperature_c, ms_d.altitude_m, pwr_d.voltage_v,
+                    *[s.strain_g for s in strain_d],
                 )
                 last_send = now
 
@@ -142,7 +145,8 @@ def main():
         if sdr:
             sdr.close()
         esp.close()
-        strain.close()
+        for s in strains:
+            s.close()
         espcams.close()
         power.close()
 

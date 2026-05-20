@@ -64,5 +64,8 @@ class TelemetryRecord(Base):
     current_ma: Mapped[float] = mapped_column(Float, default=0.0)
     power_mw:   Mapped[float] = mapped_column(Float, default=0.0)
 
-    # HX711 tensometr
-    strain_g:   Mapped[float] = mapped_column(Float, default=0.0)
+    # HX711 tensometry (4× czujnik siły)
+    strain_g0:  Mapped[float] = mapped_column(Float, default=0.0)
+    strain_g1:  Mapped[float] = mapped_column(Float, default=0.0)
+    strain_g2:  Mapped[float] = mapped_column(Float, default=0.0)
+    strain_g3:  Mapped[float] = mapped_column(Float, default=0.0)
