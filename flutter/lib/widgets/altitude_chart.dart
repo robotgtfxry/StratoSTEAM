@@ -63,7 +63,7 @@ class AltitudeChart extends StatelessWidget {
                     dotData: const FlDotData(show: false),
                     belowBarData: BarAreaData(
                       show: true,
-                      color: Colors.cyanAccent.withOpacity(0.1),
+                      color: Colors.cyanAccent.withValues(alpha: 0.1),
                     ),
                   ),
                 ],

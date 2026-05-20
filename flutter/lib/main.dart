@@ -7,6 +7,7 @@ import 'services/command_service.dart';
 import 'services/rpi_power_service.dart';
 import 'services/terminal_service.dart';
 import 'services/camera_service.dart';
+import 'services/espcam_service.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/map_screen.dart';
 import 'screens/transmitter_screen.dart';
@@ -45,6 +46,10 @@ void main() async {
         ChangeNotifierProxyProvider<SettingsService, CameraService>(
           create: (ctx) => CameraService(ctx.read<SettingsService>()),
           update: (_, s, prev) => prev ?? CameraService(s),
+        ),
+        ChangeNotifierProxyProvider<SettingsService, EspCamService>(
+          create: (ctx) => EspCamService(ctx.read<SettingsService>()),
+          update: (_, s, prev) => prev ?? EspCamService(s),
         ),
       ],
       child: const StratoSteamApp(),
@@ -97,7 +102,7 @@ class _ShellState extends State<_Shell> {
       body: IndexedStack(index: _idx, children: _screens),
       bottomNavigationBar: NavigationBar(
         backgroundColor: const Color(0xFF161B22),
-        indicatorColor: Colors.cyanAccent.withOpacity(0.15),
+        indicatorColor: Colors.cyanAccent.withValues(alpha: 0.15),
         selectedIndex: _idx,
         onDestinationSelected: (i) => setState(() => _idx = i),
         destinations: [

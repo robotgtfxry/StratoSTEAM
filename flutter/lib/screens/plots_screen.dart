@@ -131,6 +131,13 @@ class PlotsScreen extends StatelessWidget {
                   color1: Colors.lightGreenAccent,
                   data1: history.map((t) => t.speedKmh ?? 0).toList(),
                 ),
+                _ChartCard(
+                  title: 'Tensometr — siła liny',
+                  unit: 'g',
+                  color1: Colors.deepOrangeAccent,
+                  data1: history.map((t) => t.strainG).toList(),
+                  minY: 0,
+                ),
               ],
             ),
     );
@@ -189,7 +196,7 @@ class _ChartCard extends StatelessWidget {
         color: color1,
         barWidth: 2,
         dotData: const FlDotData(show: false),
-        belowBarData: BarAreaData(show: true, color: color1.withOpacity(0.08)),
+        belowBarData: BarAreaData(show: true, color: color1.withValues(alpha: 0.08)),
       ),
       if (spots2 != null)
         LineChartBarData(
@@ -198,7 +205,7 @@ class _ChartCard extends StatelessWidget {
           color: color2!,
           barWidth: 2,
           dotData: const FlDotData(show: false),
-          belowBarData: BarAreaData(show: true, color: color2!.withOpacity(0.05)),
+          belowBarData: BarAreaData(show: true, color: color2!.withValues(alpha: 0.05)),
           dashArray: [4, 4],
         ),
     ];
@@ -209,7 +216,7 @@ class _ChartCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFF161B22),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color1.withOpacity(0.2)),
+        border: Border.all(color: color1.withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -284,7 +291,7 @@ class _ChartCard extends StatelessWidget {
                     ? ExtraLinesData(horizontalLines: [
                         HorizontalLine(
                           y: dangerLine!,
-                          color: Colors.redAccent.withOpacity(0.5),
+                          color: Colors.redAccent.withValues(alpha: 0.5),
                           strokeWidth: 1,
                           dashArray: [6, 4],
                           label: HorizontalLineLabel(
@@ -328,6 +335,6 @@ class _Legend extends StatelessWidget {
         ),
         const SizedBox(width: 4),
         Text(label,
-            style: TextStyle(color: color.withOpacity(0.8), fontSize: 10)),
+            style: TextStyle(color: color.withValues(alpha: 0.8), fontSize: 10)),
       ]);
 }

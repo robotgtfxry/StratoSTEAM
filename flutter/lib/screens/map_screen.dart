@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
@@ -62,7 +62,7 @@ class MapScreen extends StatelessWidget {
                 child: Container(
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.redAccent.withOpacity(0.2),
+                    color: Colors.redAccent.withValues(alpha: 0.2),
                     border: Border.all(color: Colors.redAccent, width: 2),
                   ),
                   child: const Icon(Icons.navigation, color: Colors.redAccent, size: 18),
@@ -74,7 +74,7 @@ class MapScreen extends StatelessWidget {
       floatingActionButton: points.isNotEmpty
           ? FloatingActionButton.small(
               backgroundColor: const Color(0xFF161B22),
-              onPressed: () {},   // MapController.move — TODO if needed
+              onPressed: () {},   // MapController.move â€” TODO if needed
               child: const Icon(Icons.my_location, color: Colors.cyanAccent),
             )
           : null,

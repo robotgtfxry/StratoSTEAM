@@ -47,6 +47,7 @@ async def ingest(
         voltage=body.pwr.voltage_v,
         current_ma=body.pwr.current_ma,
         power_mw=body.pwr.power_mw,
+        strain_g=body.strain_g,
     )
     db.add(record)
     await db.commit()

@@ -32,3 +32,8 @@ def build_photo_command() -> bytes:
 
 def build_cam_rec_command(on: bool) -> bytes:
     return json.dumps({"cmd": "cam_rec", "on": on}, separators=(",", ":")).encode()
+
+
+def build_espcam_power_command(cam: int, on: bool) -> bytes:
+    """cam = 0-3 for single camera, -1 for all."""
+    return json.dumps({"cmd": "espcam_pwr", "cam": cam, "on": on}, separators=(",", ":")).encode()

@@ -101,6 +101,49 @@
 
 ---
 
+## 4× ESP32-CAM — zasilanie przełączane przez RPi5 (GPIO, RPi5 balon)
+
+Każdy ESP-CAM zasilany przez tranzystor N-MOSFET (np. BSS138) na linii GND (low-side switch).
+
+| Kanał   | RPi5 BCM         | MOSFET gate (przez 100 Ω) | ESP-CAM VCC | ESP-CAM GND      |
+|---------|------------------|---------------------------|-------------|------------------|
+| CAM 0   | GPIO17 (pin 11)  | Gate ← GPIO17             | 5V wspólne  | Drain → GND syst.|
+| CAM 1   | GPIO18 (pin 12)  | Gate ← GPIO18             | 5V wspólne  | Drain → GND syst.|
+| CAM 2   | GPIO22 (pin 15)  | Gate ← GPIO22             | 5V wspólne  | Drain → GND syst.|
+| CAM 3   | GPIO23 (pin 16)  | Gate ← GPIO23             | 5V wspólne  | Drain → GND syst.|
+
+Schemat każdego kanału:
+```
+RPi GPIO ──[100Ω]──┬── Gate (BSS138)
+                   └──[10kΩ]── GND      ← pull-down: CAM OFF gdy RPi bootuje
+                         Source ── GND
+                         Drain  ── ESP-CAM GND
+5V ──────────────────── ESP-CAM VCC
+```
+
+> RPi5 (balon). HIGH na GPIO = tranzystor otwarty = ESP-CAM zasilona.  
+> BSS138: Vgs(th) ≤ 2V, kompatybilny z 3.3V GPIO. Alternatywa: IRLZ44N, 2N7000.  
+> Pull-down 10 kΩ na gate gwarantuje wyłączenie podczas restartu RPi.  
+> Komenda LoRa: `{"cmd":"espcam_pwr","cam":0-3,"on":true/false}` (cam=-1 = wszystkie).
+
+---
+
+## HX711 + czujnik siły — tensometr liny balonu (GPIO, RPi5 balon)
+
+| Pin HX711 | RPi5 BCM         |
+|-----------|------------------|
+| DT        | GPIO16 (pin 36)  |
+| SCK       | GPIO21 (pin 40)  |
+| VCC       | 3.3V (pin 1)     |
+| GND       | GND (pin 34)     |
+
+> RPi5 (balon). Mierzy napięcie liny balonu / siłę uciągu w gramach.  
+> ADC 24-bit, bit-banging przez `RPi.GPIO` — bez dodatkowej biblioteki.  
+> `reference_unit` (ADC units/g) wymaga kalibracji z odważnikiem wzorcowym.  
+> Klucz w JSON UART → ESP32: `"sg"` (siła [g]). Pole `strain_g` w telemetrii.
+
+---
+
 ## RTL-SDR — odbiornik HF jonosferyczny (USB, RPi5 balon)
 
 | Złącze    | RPi5               |
@@ -140,7 +183,7 @@
 | RX komend        | GPIO15 (RXD, pin 10)| GPIO14 (TX)| ESP32 → RPi5   | /dev/ttyAMA0   |
 
 > Prędkość: 115200 baud, 8N1. RPi5 wysyła line-delimited JSON co 5 s.  
-> Dane TX: temp, hum, pres (BME280), p2, alt2 (MS5611), roll, pit, yaw, ax, ay, az (BNO085), vbat, imA (INA219), dsku, dskf (dysk), hfdb (SDR dBFS, opcjonalne).  
+> Dane TX: temp, hum, pres (BME280), p2, alt2 (MS5611), roll, pit, yaw, ax, ay, az (BNO085), vbat, imA (INA219), dsku, dskf (dysk), hfdb (SDR dBFS, opcjonalne), sg (tensometr [g], opcjonalne).  
 > Dane RX: komendy JSON od ESP32 — `{"cmd":"photo"}`, `{"cmd":"cam_rec","on":true/false}`, shutdown request.
 
 ---

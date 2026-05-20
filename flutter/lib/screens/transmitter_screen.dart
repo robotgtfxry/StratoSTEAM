@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../services/hf_service.dart';
@@ -52,13 +52,13 @@ class _TransmitterScreenState extends State<TransmitterScreen> {
         padding: const EdgeInsets.all(16),
         children: [
 
-          // ── Status sprzętu ────────────────────────────────────
+          // â”€â”€ Status sprzÄ™tu â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           _StatusCard(hf: hf),
           const SizedBox(height: 16),
 
-          // ── Wybór pasma ───────────────────────────────────────
+          // â”€â”€ WybĂłr pasma â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           _SectionBox(
-            title: 'Pasmo / częstotliwość',
+            title: 'Pasmo / czÄ™stotliwoĹ›Ä‡',
             icon: Icons.radio,
             color: Colors.orangeAccent,
             child: Column(
@@ -93,7 +93,7 @@ class _TransmitterScreenState extends State<TransmitterScreen> {
                   keyboardType: TextInputType.number,
                   style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
-                    labelText: 'Częstotliwość (Hz)',
+                    labelText: 'CzÄ™stotliwoĹ›Ä‡ (Hz)',
                     labelStyle: const TextStyle(color: Colors.white54),
                     helperText: _freqHz > 0
                         ? '${(_freqHz / 1e6).toStringAsFixed(4)} MHz'
@@ -124,7 +124,7 @@ class _TransmitterScreenState extends State<TransmitterScreen> {
           ),
           const SizedBox(height: 16),
 
-          // ── Sterowanie ────────────────────────────────────────
+          // â”€â”€ Sterowanie â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           _SectionBox(
             title: 'Sterowanie',
             icon: Icons.power_settings_new,
@@ -154,7 +154,7 @@ class _TransmitterScreenState extends State<TransmitterScreen> {
                       ),
                       icon: const Icon(Icons.swap_horiz),
                       label: Text(
-                          'Zmień na ${(_freqHz / 1e6).toStringAsFixed(4)} MHz'),
+                          'ZmieĹ„ na ${(_freqHz / 1e6).toStringAsFixed(4)} MHz'),
                       onPressed: hf.loading
                           ? null
                           : () => hf.sendCommand('set_freq', _freqHz),
@@ -166,13 +166,13 @@ class _TransmitterScreenState extends State<TransmitterScreen> {
           ),
           const SizedBox(height: 16),
 
-          // ── Info / ostrzeżenie ────────────────────────────────
+          // â”€â”€ Info / ostrzeĹĽenie â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Colors.amber.withOpacity(0.08),
+              color: Colors.amber.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.amber.withOpacity(0.3)),
+              border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
             ),
             child: const Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -182,8 +182,8 @@ class _TransmitterScreenState extends State<TransmitterScreen> {
                 SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Upewnij się że antena jest podłączona przed włączeniem nadajnika. '
-                    'RD06HHF1 bez obciążenia może ulec uszkodzeniu.',
+                    'Upewnij siÄ™ ĹĽe antena jest podĹ‚Ä…czona przed wĹ‚Ä…czeniem nadajnika. '
+                    'RD06HHF1 bez obciÄ…ĹĽenia moĹĽe ulec uszkodzeniu.',
                     style: TextStyle(color: Colors.amber, fontSize: 12),
                   ),
                 ),
@@ -192,7 +192,7 @@ class _TransmitterScreenState extends State<TransmitterScreen> {
           ),
           const SizedBox(height: 16),
 
-          // ── Wykres dBFS vs wysokość ───────────────────────────
+          // â”€â”€ Wykres dBFS vs wysokoĹ›Ä‡ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           _MeasurementsChart(measurements: hf.measurements),
         ],
       ),
@@ -201,7 +201,7 @@ class _TransmitterScreenState extends State<TransmitterScreen> {
 }
 
 
-// ── Widgety pomocnicze ────────────────────────────────────────────────────────
+// â”€â”€ Widgety pomocnicze â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _MeasurementsChart extends StatelessWidget {
   final List<HfMeasurement> measurements;
@@ -214,7 +214,7 @@ class _MeasurementsChart extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFF161B22),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.purpleAccent.withOpacity(0.25)),
+        border: Border.all(color: Colors.purpleAccent.withValues(alpha: 0.25)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -222,7 +222,7 @@ class _MeasurementsChart extends StatelessWidget {
           Row(children: [
             const Icon(Icons.show_chart, color: Colors.purpleAccent, size: 18),
             const SizedBox(width: 8),
-            const Text('Pomiary SDR — dBFS vs wysokość',
+            const Text('Pomiary SDR â€” dBFS vs wysokoĹ›Ä‡',
                 style: TextStyle(
                     color: Colors.purpleAccent,
                     fontWeight: FontWeight.bold,
@@ -239,7 +239,7 @@ class _MeasurementsChart extends StatelessWidget {
             const Center(
               child: Padding(
                 padding: EdgeInsets.symmetric(vertical: 32),
-                child: Text('Brak pomiarów',
+                child: Text('Brak pomiarĂłw',
                     style: TextStyle(color: Colors.white38, fontSize: 13)),
               ),
             )
@@ -269,7 +269,7 @@ class _LastMeasurement extends StatelessWidget {
       _Stat(label: 'dBFS', value: m.dbfs.toStringAsFixed(1),
           color: Colors.purpleAccent),
       const SizedBox(width: 24),
-      _Stat(label: 'Wysokość', value: '${m.alt.toStringAsFixed(0)} m',
+      _Stat(label: 'WysokoĹ›Ä‡', value: '${m.alt.toStringAsFixed(0)} m',
           color: Colors.cyanAccent),
     ]);
   }
@@ -342,7 +342,7 @@ class _Chart extends StatelessWidget {
             ),
           ),
           bottomTitles: AxisTitles(
-            axisNameWidget: const Text('Wysokość (m)',
+            axisNameWidget: const Text('WysokoĹ›Ä‡ (m)',
                 style: TextStyle(color: Colors.white38, fontSize: 10)),
             sideTitles: SideTitles(
               showTitles: true,
@@ -378,7 +378,7 @@ class _Chart extends StatelessWidget {
             ),
             belowBarData: BarAreaData(
               show: true,
-              color: Colors.purpleAccent.withOpacity(0.07),
+              color: Colors.purpleAccent.withValues(alpha: 0.07),
             ),
           ),
         ],
@@ -431,7 +431,7 @@ class _StatusCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: hf.hwActive
-              ? Colors.redAccent.withOpacity(0.5)
+              ? Colors.redAccent.withValues(alpha: 0.5)
               : Colors.white12,
           width: hf.hwActive ? 2 : 1,
         ),
@@ -445,8 +445,8 @@ class _StatusCard extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: hf.hwActive
-                  ? Colors.redAccent.withOpacity(0.15)
-                  : Colors.white.withOpacity(0.05),
+                  ? Colors.redAccent.withValues(alpha: 0.15)
+                  : Colors.white.withValues(alpha: 0.05),
               border: Border.all(
                 color: hf.hwActive ? Colors.redAccent : Colors.white24,
                 width: 2,
@@ -463,7 +463,7 @@ class _StatusCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                hf.hwActive ? 'NADAWANIE' : 'WYŁĄCZONY',
+                hf.hwActive ? 'NADAWANIE' : 'WYĹÄ„CZONY',
                 style: TextStyle(
                   color: hf.hwActive ? Colors.redAccent : Colors.white38,
                   fontWeight: FontWeight.bold,
@@ -531,7 +531,7 @@ class _TxToggle extends StatelessWidget {
               )
             : Icon(active ? Icons.stop_circle : Icons.play_circle),
         label: Text(
-          active ? 'WYŁĄCZ NADAJNIK' : 'WŁĄCZ NADAJNIK',
+          active ? 'WYĹÄ„CZ NADAJNIK' : 'WĹÄ„CZ NADAJNIK',
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
         ),
         onPressed: loading ? null : (active ? onStop : onStart),
@@ -561,7 +561,7 @@ class _SectionBox extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFF161B22),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.25)),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

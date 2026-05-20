@@ -1,4 +1,4 @@
-import 'dart:math' as math;
+﻿import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 class AttitudeIndicator extends StatefulWidget {
@@ -108,12 +108,12 @@ class _AngleChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withOpacity(0.4)),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
       ),
       child: Text(
-        '$label ${value >= 0 ? '+' : ''}${value.toStringAsFixed(1)}°',
+        '$label ${value >= 0 ? '+' : ''}${value.toStringAsFixed(1)}Â°',
         style: TextStyle(
             color: color, fontSize: 12, fontWeight: FontWeight.bold),
       ),

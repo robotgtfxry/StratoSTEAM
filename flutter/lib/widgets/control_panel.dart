@@ -1,35 +1,35 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/command_service.dart';
 import '../services/rpi_power_service.dart';
 
-// ── Paleta kolorów LED ────────────────────────────────────────────────────────
+// â”€â”€ Paleta kolorĂłw LED â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const _palette = [
-  // rząd 1 — podstawowe
+  // rzÄ…d 1 â€” podstawowe
   {'r': 0,   'g': 0,   'b': 0,   'name': 'OFF'},
   {'r': 255, 'g': 0,   'b': 0,   'name': 'Czerwony'},
   {'r': 0,   'g': 255, 'b': 0,   'name': 'Zielony'},
   {'r': 0,   'g': 0,   'b': 255, 'name': 'Niebieski'},
-  {'r': 255, 'g': 255, 'b': 0,   'name': 'Żółty'},
+  {'r': 255, 'g': 255, 'b': 0,   'name': 'Ĺ»ĂłĹ‚ty'},
   {'r': 0,   'g': 255, 'b': 255, 'name': 'Cyjan'},
   {'r': 255, 'g': 0,   'b': 255, 'name': 'Magenta'},
-  {'r': 255, 'g': 255, 'b': 255, 'name': 'Biały'},
-  // rząd 2 — pastelowe
-  {'r': 255, 'g': 128, 'b': 0,   'name': 'Pomarańcz'},
+  {'r': 255, 'g': 255, 'b': 255, 'name': 'BiaĹ‚y'},
+  // rzÄ…d 2 â€” pastelowe
+  {'r': 255, 'g': 128, 'b': 0,   'name': 'PomaraĹ„cz'},
   {'r': 180, 'g': 0,   'b': 255, 'name': 'Fiolet'},
-  {'r': 0,   'g': 255, 'b': 128, 'name': 'Miętowy'},
-  {'r': 255, 'g': 192, 'b': 203, 'name': 'Różowy'},
+  {'r': 0,   'g': 255, 'b': 128, 'name': 'MiÄ™towy'},
+  {'r': 255, 'g': 192, 'b': 203, 'name': 'RĂłĹĽowy'},
   {'r': 64,  'g': 224, 'b': 208, 'name': 'Turkus'},
   {'r': 255, 'g': 69,  'b': 0,   'name': 'Vermeil'},
   {'r': 50,  'g': 205, 'b': 50,  'name': 'Limonka'},
-  {'r': 135, 'g': 206, 'b': 235, 'name': 'Błękit'},
-  // rząd 3 — ciemne
+  {'r': 135, 'g': 206, 'b': 235, 'name': 'BĹ‚Ä™kit'},
+  // rzÄ…d 3 â€” ciemne
   {'r': 128, 'g': 0,   'b': 0,   'name': 'Bordo'},
-  {'r': 0,   'g': 128, 'b': 0,   'name': 'Ciemna zieleń'},
+  {'r': 0,   'g': 128, 'b': 0,   'name': 'Ciemna zieleĹ„'},
   {'r': 0,   'g': 0,   'b': 128, 'name': 'Granat'},
   {'r': 128, 'g': 128, 'b': 0,   'name': 'Oliwka'},
   {'r': 64,  'g': 0,   'b': 128, 'name': 'Purpura'},
-  {'r': 128, 'g': 64,  'b': 0,   'name': 'Brąz'},
+  {'r': 128, 'g': 64,  'b': 0,   'name': 'BrÄ…z'},
   {'r': 192, 'g': 192, 'b': 192, 'name': 'Srebro'},
   {'r': 255, 'g': 140, 'b': 0,   'name': 'Ciemny amber'},
 ];
@@ -69,12 +69,12 @@ class _ControlPanelState extends State<ControlPanel>
       decoration: BoxDecoration(
         color: const Color(0xFF161B22),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.cyanAccent.withOpacity(0.2)),
+        border: Border.all(color: Colors.cyanAccent.withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Nagłówek ────────────────────────────────────────
+          // â”€â”€ NagĹ‚Ăłwek â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           Row(children: [
             const Icon(Icons.settings_remote, color: Colors.cyanAccent, size: 18),
             const SizedBox(width: 8),
@@ -95,13 +95,13 @@ class _ControlPanelState extends State<ControlPanel>
           const Divider(color: Colors.white12, height: 1),
           const SizedBox(height: 14),
 
-          // ── RPi status + control ─────────────────────────────
+          // â”€â”€ RPi status + control â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           _RpiPowerRow(rpi: rpi),
           const SizedBox(height: 14),
           const Divider(color: Colors.white12, height: 1),
           const SizedBox(height: 14),
 
-          // ── Buzzer ──────────────────────────────────────────
+          // â”€â”€ Buzzer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           Row(children: [
             const Icon(Icons.volume_up, color: Colors.white54, size: 18),
             const SizedBox(width: 10),
@@ -117,8 +117,8 @@ class _ControlPanelState extends State<ControlPanel>
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
                 color: cmd.buzzer
-                    ? Colors.cyanAccent.withOpacity(0.15)
-                    : Colors.white.withOpacity(0.05),
+                    ? Colors.cyanAccent.withValues(alpha: 0.15)
+                    : Colors.white.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Text(
@@ -133,14 +133,14 @@ class _ControlPanelState extends State<ControlPanel>
           ]),
           const SizedBox(height: 16),
 
-          // ── LED RGB ─────────────────────────────────────────
+          // â”€â”€ LED RGB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           Row(children: [
             const Icon(Icons.lightbulb_outline, color: Colors.white54, size: 18),
             const SizedBox(width: 8),
             const Text('LED RGB',
                 style: TextStyle(color: Colors.white70, fontSize: 14)),
             const Spacer(),
-            // podgląd koloru
+            // podglÄ…d koloru
             Container(
               width: 28,
               height: 28,
@@ -187,20 +187,20 @@ class _ControlPanelState extends State<ControlPanel>
             child: TabBarView(
               controller: _tab,
               children: [
-                // ── PALETA ──────────────────────────────────
+                // â”€â”€ PALETA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                 _buildPalette(cmd),
-                // ── SUWAKI ──────────────────────────────────
+                // â”€â”€ SUWAKI â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                 _buildSliders(cmd),
               ],
             ),
           ),
           const SizedBox(height: 16),
 
-          // ── Jasność ─────────────────────────────────────────
+          // â”€â”€ JasnoĹ›Ä‡ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           Row(children: [
             const Icon(Icons.brightness_6, color: Colors.white38, size: 16),
             const SizedBox(width: 8),
-            const Text('Jasność',
+            const Text('JasnoĹ›Ä‡',
                 style: TextStyle(color: Colors.white54, fontSize: 12)),
             Expanded(
               child: SliderTheme(
@@ -226,7 +226,7 @@ class _ControlPanelState extends State<ControlPanel>
           ]),
           const SizedBox(height: 16),
 
-          // ── Wyślij ───────────────────────────────────────────
+          // â”€â”€ WyĹ›lij â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           SizedBox(
             width: double.infinity,
             height: 44,
@@ -245,14 +245,14 @@ class _ControlPanelState extends State<ControlPanel>
                           strokeWidth: 2, color: Colors.black),
                     )
                   : const Icon(Icons.send, size: 16),
-              label: const Text('Wyślij do balonu',
+              label: const Text('WyĹ›lij do balonu',
                   style: TextStyle(fontWeight: FontWeight.bold)),
               onPressed: cmd.loading ? null : cmd.send,
             ),
           ),
           const SizedBox(height: 6),
           const Text(
-            'Komenda zostanie wysłana przy najbliższym pakiecie telemetrii.',
+            'Komenda zostanie wysĹ‚ana przy najbliĹĽszym pakiecie telemetrii.',
             style: TextStyle(color: Colors.white24, fontSize: 10),
             textAlign: TextAlign.center,
           ),
@@ -338,7 +338,7 @@ class _RpiPowerRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final running = rpi.rpiRunning;
     final color   = running ? Colors.greenAccent : Colors.orangeAccent;
-    final label   = running ? 'DZIAŁA' : 'WYŁĄCZONA';
+    final label   = running ? 'DZIAĹA' : 'WYĹÄ„CZONA';
     final icon    = running ? Icons.memory : Icons.power_off;
 
     return Row(children: [
@@ -350,9 +350,9 @@ class _RpiPowerRow extends StatelessWidget {
       Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.12),
+          color: color.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: color.withOpacity(0.4)),
+          border: Border.all(color: color.withValues(alpha: 0.4)),
         ),
         child: Text(label,
             style: TextStyle(
@@ -366,14 +366,14 @@ class _RpiPowerRow extends StatelessWidget {
         ),
       ],
       const Spacer(),
-      // Przycisk włącz / wyłącz
+      // Przycisk wĹ‚Ä…cz / wyĹ‚Ä…cz
       SizedBox(
         height: 34,
         child: ElevatedButton.icon(
           style: ElevatedButton.styleFrom(
             backgroundColor: running
-                ? Colors.redAccent.withOpacity(0.15)
-                : Colors.greenAccent.withOpacity(0.15),
+                ? Colors.redAccent.withValues(alpha: 0.15)
+                : Colors.greenAccent.withValues(alpha: 0.15),
             foregroundColor: running ? Colors.redAccent : Colors.greenAccent,
             side: BorderSide(
                 color: running ? Colors.redAccent : Colors.greenAccent,
@@ -391,7 +391,7 @@ class _RpiPowerRow extends StatelessWidget {
                 )
               : Icon(running ? Icons.power_off : Icons.power, size: 16),
           label: Text(
-            running ? 'Wyłącz' : 'Włącz',
+            running ? 'WyĹ‚Ä…cz' : 'WĹ‚Ä…cz',
             style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
           ),
           onPressed: rpi.loading ? null : () => rpi.setPower(!running),
@@ -422,10 +422,10 @@ class _RgbSlider extends StatelessWidget {
       Expanded(
         child: SliderTheme(
           data: SliderTheme.of(context).copyWith(
-            activeTrackColor: color.withOpacity(0.8),
-            inactiveTrackColor: color.withOpacity(0.15),
+            activeTrackColor: color.withValues(alpha: 0.8),
+            inactiveTrackColor: color.withValues(alpha: 0.15),
             thumbColor: color,
-            overlayColor: color.withOpacity(0.1),
+            overlayColor: color.withValues(alpha: 0.1),
             trackHeight: 3,
             thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
           ),

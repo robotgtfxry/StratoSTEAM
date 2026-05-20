@@ -19,6 +19,14 @@ BNO085_ADDR = 0x4A
 INA219_ADDR = 0x40
 INA219_SHUNT_OHMS = 0.1
 
+# ESP32-CAM — 4× kamera, zasilanie przełączane przez MOSFET (low-side, GPIO → gate 100Ω)
+ESPCAM_PWR_PINS = [17, 18, 22, 23]   # GPIO BCM dla CAM 0-3
+
+# HX711 — czujnik siły (tensometr, lina balonu)
+HX711_DT_PIN        = 16     # GPIO16 (pin 36) — DATA OUT
+HX711_SCK_PIN       = 21     # GPIO21 (pin 40) — CLK
+HX711_REFERENCE_UNIT = 1.0   # ADC units per gram — wymaga kalibracji z odważnikiem
+
 # Buzzer i RGB LED — obsługiwane przez ESP32-S3 (zawsze zasilony)
 
 # ESP32-S3 współpraca

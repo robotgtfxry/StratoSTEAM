@@ -5,7 +5,7 @@ RX: commands from ESP32 (photo request, cam_rec toggle).
 """
 import json
 import serial
-from sensors import Bme280Data, Ms5611Data, Bno085Data, Ina219Data
+from sensors import Bme280Data, Ms5611Data, Bno085Data, Ina219Data, Hx711Data
 
 
 class EspUartSender:
@@ -17,7 +17,8 @@ class EspUartSender:
 
     def send(self, bme: Bme280Data, ms: Ms5611Data, imu: Bno085Data, pwr: Ina219Data,
              disk_used_gb: float = 0.0, disk_free_gb: float = 0.0,
-             hf_dbfs: float | None = None) -> None:
+             hf_dbfs: float | None = None,
+             strain: Hx711Data | None = None) -> None:
         payload = {
             "temp": bme.temperature_c,
             "hum":  bme.humidity_pct,
@@ -37,6 +38,8 @@ class EspUartSender:
         }
         if hf_dbfs is not None:
             payload["hfdb"] = hf_dbfs
+        if strain is not None:
+            payload["sg"] = strain.strain_g
         line = json.dumps(payload, separators=(",", ":")) + "\n"
         self._ser.write(line.encode())
 

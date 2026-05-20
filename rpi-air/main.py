@@ -12,13 +12,15 @@ import os
 from config import (
     BME280_ADDR, MS5611_ADDR, BNO085_ADDR,
     INA219_ADDR, INA219_SHUNT_OHMS,
+    HX711_DT_PIN, HX711_SCK_PIN, HX711_REFERENCE_UNIT,
+    ESPCAM_PWR_PINS,
     ESP_UART_PORT, ESP_UART_BAUD, ESP_SEND_INTERVAL_S,
     CAM_RECORD_DIR, CAM_PHOTO_W, CAM_PHOTO_H, CAM_PHOTO_QUALITY, CAM_CHUNK_INTERVAL_S,
     SDR_ENABLED, SDR_TARGET_FREQ, SDR_SAMPLE_RATE, SDR_GAIN,
     SDR_FREQ_CORRECTION, SDR_MEASURE_INTERVAL_S, SDR_NUM_SAMPLES, SDR_BIN_WINDOW,
 )
-from sensors import Bme280Sensor, Ms5611Sensor, Bno085Sensor, Ina219Sensor
-from hardware import PowerSignal, EspUartSender, CameraModule, SdrReceiver
+from sensors import Bme280Sensor, Ms5611Sensor, Bno085Sensor, Ina219Sensor, Hx711Sensor
+from hardware import PowerSignal, EspUartSender, CameraModule, SdrReceiver, EspCamPower
 
 logging.basicConfig(
     level=logging.INFO,
@@ -36,11 +38,13 @@ def main():
     power = PowerSignal()
     power.set_alive(True)
 
-    bme  = Bme280Sensor(BME280_ADDR)
-    ms   = Ms5611Sensor(MS5611_ADDR)
-    imu  = Bno085Sensor()
-    pwr  = Ina219Sensor(INA219_SHUNT_OHMS, INA219_ADDR)
-    esp  = EspUartSender(ESP_UART_PORT, ESP_UART_BAUD)
+    bme    = Bme280Sensor(BME280_ADDR)
+    ms     = Ms5611Sensor(MS5611_ADDR)
+    imu    = Bno085Sensor()
+    pwr    = Ina219Sensor(INA219_SHUNT_OHMS, INA219_ADDR)
+    strain  = Hx711Sensor(HX711_DT_PIN, HX711_SCK_PIN, HX711_REFERENCE_UNIT)
+    espcams = EspCamPower(ESPCAM_PWR_PINS)
+    esp     = EspUartSender(ESP_UART_PORT, ESP_UART_BAUD)
     cam  = CameraModule(CAM_RECORD_DIR, CAM_PHOTO_W, CAM_PHOTO_H, CAM_PHOTO_QUALITY)
     sdr  = SdrReceiver(
         target_freq_hz  = SDR_TARGET_FREQ,
@@ -91,6 +95,9 @@ def main():
                     else:
                         cam.stop_recording()
 
+                elif c == "espcam_pwr":
+                    espcams.set(int(cmd.get("cam", -1)), bool(cmd.get("on", False)))
+
             # ── Wysyłaj chunki obrazu do ESP32 (po jednym co CAM_CHUNK_INTERVAL_S) ──
             if pending_chunks and (now - last_chunk_sent >= CAM_CHUNK_INTERVAL_S):
                 img_id, seq, total, b64 = pending_chunks.pop(0)
@@ -108,19 +115,20 @@ def main():
 
             # ── Wyślij dane czujników do ESP32 przez UART ─────────────────────
             if now - last_send >= ESP_SEND_INTERVAL_S:
-                bme_d = bme.read()
-                ms_d  = ms.read()
-                imu_d = imu.read()
-                pwr_d = pwr.read()
+                bme_d    = bme.read()
+                ms_d     = ms.read()
+                imu_d    = imu.read()
+                pwr_d    = pwr.read()
+                strain_d = strain.read()
 
                 disk_used, disk_free = cam.disk_usage(CAM_RECORD_DIR)
                 esp.send(bme_d, ms_d, imu_d, pwr_d,
                          disk_used_gb=disk_used, disk_free_gb=disk_free,
-                         hf_dbfs=last_hf_dbfs)
+                         hf_dbfs=last_hf_dbfs, strain=strain_d)
                 log.info(
-                    "→ESP32 temp=%.1f°C pres=%.1fhPa alt2=%.0fm vbat=%.2fV disk=%.1f/%.1fGB",
+                    "→ESP32 temp=%.1f°C pres=%.1fhPa alt2=%.0fm vbat=%.2fV sg=%.1fg",
                     bme_d.temperature_c, bme_d.pressure_hpa,
-                    ms_d.altitude_m, pwr_d.voltage_v, disk_used, disk_free,
+                    ms_d.altitude_m, pwr_d.voltage_v, strain_d.strain_g,
                 )
                 last_send = now
 
@@ -134,6 +142,8 @@ def main():
         if sdr:
             sdr.close()
         esp.close()
+        strain.close()
+        espcams.close()
         power.close()
 
 

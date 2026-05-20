@@ -19,9 +19,10 @@ from command_store import CommandStore
 from rpi_power_store import RpiPowerStore
 from exec_store import ExecStore
 from camera_store import CameraStore
+from espcam_store import EspCamStore
 from packet import (
     build_command, build_rpi_power_command, build_exec_command,
-    build_photo_command, build_cam_rec_command,
+    build_photo_command, build_cam_rec_command, build_espcam_power_command,
 )
 from config import BACKEND_URL, BACKEND_API_KEY
 
@@ -60,12 +61,14 @@ def main():
     rpi_power = RpiPowerStore()
     exec_s    = ExecStore()
     camera_s  = CameraStore()
+    espcam_s  = EspCamStore()
 
     hf.start()
     commands.start()
     rpi_power.start()
     exec_s.start()
     camera_s.start()
+    espcam_s.start()
     log.info("Ground station listening…")
 
     try:
@@ -178,6 +181,13 @@ def main():
                     if rec is not None:
                         ok = lora.send_command(build_cam_rec_command(rec))
                         log.info("Camera rec cmd on=%s sent ok=%s", rec, ok)
+
+                # ── ESP-CAM power ─────────────────────────────────────────────
+                espcam_cmd = espcam_s.pop()
+                if espcam_cmd is not None:
+                    cam_i, cam_on = espcam_cmd
+                    ok = lora.send_command(build_espcam_power_command(cam_i, cam_on))
+                    log.info("EspCam power cmd cam=%d on=%s ok=%s", cam_i, cam_on, ok)
 
             else:
                 # ESP32 beacon — możemy wysłać tylko rpi_power (ESP32 słucha)

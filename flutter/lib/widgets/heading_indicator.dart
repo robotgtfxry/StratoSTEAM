@@ -1,4 +1,4 @@
-import 'dart:math' as math;
+﻿import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 class HeadingIndicator extends StatefulWidget {
@@ -50,7 +50,7 @@ class _HeadingState extends State<HeadingIndicator>
     if (old.yaw   != widget.yaw  ||
         old.roll  != widget.roll ||
         old.pitch != widget.pitch) {
-      // Yaw: animate via shortest arc (handles 350°→10° correctly).
+      // Yaw: animate via shortest arc (handles 350Â°â†’10Â° correctly).
       final yawFrom = _yawAnim.value;
       final yawTo   = yawFrom + _shortestDelta(yawFrom, widget.yaw);
 
@@ -131,7 +131,7 @@ class _HeadingState extends State<HeadingIndicator>
 }
 
 
-// ── Small angle chip ─────────────────────────────────────────────────────────
+// â”€â”€ Small angle chip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _Chip extends StatelessWidget {
   final String label;
@@ -144,14 +144,14 @@ class _Chip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = forcePositive
-        ? '$label ${value.toStringAsFixed(0)}°'
-        : '$label ${value >= 0 ? '+' : ''}${value.toStringAsFixed(1)}°';
+        ? '$label ${value.toStringAsFixed(0)}Â°'
+        : '$label ${value >= 0 ? '+' : ''}${value.toStringAsFixed(1)}Â°';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withOpacity(0.4)),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
       ),
       child: Text(text,
           style: TextStyle(
@@ -161,7 +161,7 @@ class _Chip extends StatelessWidget {
 }
 
 
-// ── Heading readout ──────────────────────────────────────────────────────────
+// â”€â”€ Heading readout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _HeadingText extends StatelessWidget {
   final double yaw;
@@ -179,7 +179,7 @@ class _HeadingText extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Text(
-          '${yaw.toStringAsFixed(1)}°',
+          '${yaw.toStringAsFixed(1)}Â°',
           style: const TextStyle(
               color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
         ),
@@ -188,10 +188,10 @@ class _HeadingText extends StatelessWidget {
           padding:
               const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
           decoration: BoxDecoration(
-            color: Colors.greenAccent.withOpacity(0.15),
+            color: Colors.greenAccent.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(6),
             border:
-                Border.all(color: Colors.greenAccent.withOpacity(0.4)),
+                Border.all(color: Colors.greenAccent.withValues(alpha: 0.4)),
           ),
           child: Text(_cardinalPoint(yaw),
               style: const TextStyle(
@@ -205,7 +205,7 @@ class _HeadingText extends StatelessWidget {
 }
 
 
-// ── Compass CustomPainter ─────────────────────────────────────────────────────
+// â”€â”€ Compass CustomPainter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _CompassPainter extends CustomPainter {
   final double yaw;
@@ -228,7 +228,7 @@ class _CompassPainter extends CustomPainter {
         ..strokeWidth = 1.5,
     );
 
-    // ── rotating compass rose ──
+    // â”€â”€ rotating compass rose â”€â”€
     canvas.save();
     canvas.translate(cx, cy);
     canvas.rotate(-yaw * math.pi / 180);
@@ -288,7 +288,7 @@ class _CompassPainter extends CustomPainter {
 
     canvas.restore();
 
-    // ── fixed north-pointer arrow ──
+    // â”€â”€ fixed north-pointer arrow â”€â”€
     final arrowLen = r * 0.55;
     canvas.drawLine(Offset(cx, cy), Offset(cx, cy - arrowLen),
         Paint()
@@ -317,7 +317,7 @@ class _CompassPainter extends CustomPainter {
           ..style = PaintingStyle.stroke
           ..strokeWidth = 1);
 
-    // ── roll arc (bank angle indicator) ──
+    // â”€â”€ roll arc (bank angle indicator) â”€â”€
     final rollRad = roll * math.pi / 180;
     const arcHalf = 20 * math.pi / 180;
     canvas.drawArc(
@@ -326,7 +326,7 @@ class _CompassPainter extends CustomPainter {
       arcHalf * 2,
       false,
       Paint()
-        ..color = Colors.cyanAccent.withOpacity(0.8)
+        ..color = Colors.cyanAccent.withValues(alpha: 0.8)
         ..strokeWidth = 3
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.round,
