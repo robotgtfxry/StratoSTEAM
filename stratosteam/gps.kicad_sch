@@ -5,6 +5,161 @@
 	(uuid "b2d23660-074d-4f9b-9259-db741cfe8680")
 	(paper "A4")
 	(lib_symbols
+		(symbol "Device:C"
+			(pin_numbers
+				(hide yes)
+			)
+			(pin_names
+				(offset 0.254)
+			)
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(in_pos_files yes)
+			(duplicate_pin_numbers_are_jumpers no)
+			(property "Reference" "C"
+				(at 0.635 2.54 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left)
+				)
+			)
+			(property "Value" "C"
+				(at 0.635 -2.54 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left)
+				)
+			)
+			(property "Footprint" ""
+				(at 0.9652 -3.81 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Datasheet" ""
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Description" "Unpolarized capacitor"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "ki_keywords" "cap capacitor"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "ki_fp_filters" "C_*"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(symbol "C_0_1"
+				(polyline
+					(pts
+						(xy -2.032 0.762) (xy 2.032 0.762)
+					)
+					(stroke
+						(width 0.508)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy -2.032 -0.762) (xy 2.032 -0.762)
+					)
+					(stroke
+						(width 0.508)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+			)
+			(symbol "C_1_1"
+				(pin passive line
+					(at 0 3.81 270)
+					(length 2.794)
+					(name ""
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 0 -3.81 90)
+					(length 2.794)
+					(name ""
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
 		(symbol "NEO-M8M-0:MEO-M8M-0_MODULE"
 			(exclude_from_sim no)
 			(in_bom yes)
@@ -163,9 +318,93 @@
 			(embedded_fonts no)
 		)
 	)
+	(junction
+		(at 181.61 49.53)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "02c71a13-420e-406e-8fcc-b61185c9c0f7")
+	)
+	(junction
+		(at 161.29 48.26)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "735ae944-0fad-48a1-ad58-a1fbf47a23a7")
+	)
+	(junction
+		(at 181.61 60.96)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "79b5d628-5708-4287-acfb-87d1ae13c79b")
+	)
+	(junction
+		(at 162.56 64.77)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "d946c3be-59fc-449c-9533-efe3d20f96f3")
+	)
 	(wire
 		(pts
-			(xy 149.86 64.77) (xy 163.83 64.77)
+			(xy 181.61 49.53) (xy 161.29 49.53)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "01535e19-4fcc-4235-b7f8-4862981b75bf")
+	)
+	(wire
+		(pts
+			(xy 190.5 49.53) (xy 181.61 49.53)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "0317d12d-2078-485f-8155-18e4c0322a00")
+	)
+	(wire
+		(pts
+			(xy 181.61 60.96) (xy 190.5 60.96)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "175c4ac4-b73e-464e-be22-0e9970be06ab")
+	)
+	(wire
+		(pts
+			(xy 162.56 64.77) (xy 163.83 64.77)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "4f1f4cc0-0152-4283-960c-ba527998c50a")
+	)
+	(wire
+		(pts
+			(xy 161.29 49.53) (xy 161.29 48.26)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "5c949bc6-c686-4a24-82a0-c789958cb5a1")
+	)
+	(wire
+		(pts
+			(xy 181.61 60.96) (xy 162.56 60.96)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "6710f8e5-e7d3-4dee-a0e0-28af656eb831")
+	)
+	(wire
+		(pts
+			(xy 149.86 64.77) (xy 162.56 64.77)
 		)
 		(stroke
 			(width 0)
@@ -175,7 +414,27 @@
 	)
 	(wire
 		(pts
-			(xy 149.86 48.26) (xy 163.83 48.26)
+			(xy 162.56 60.96) (xy 162.56 64.77)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "7b884ec4-838e-4c5c-bd16-e4064c38019d")
+	)
+	(wire
+		(pts
+			(xy 181.61 53.34) (xy 181.61 49.53)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "b11ba089-d6bb-4bd4-b751-019c40c516be")
+	)
+	(wire
+		(pts
+			(xy 149.86 48.26) (xy 161.29 48.26)
 		)
 		(stroke
 			(width 0)
@@ -195,6 +454,16 @@
 	)
 	(wire
 		(pts
+			(xy 161.29 48.26) (xy 163.83 48.26)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "c716094a-c8e6-40bc-8962-f3fdb2ae2057")
+	)
+	(wire
+		(pts
 			(xy 149.86 53.34) (xy 163.83 53.34)
 		)
 		(stroke
@@ -202,6 +471,16 @@
 			(type default)
 		)
 		(uuid "c729c4f0-1297-4a51-8bba-d640f7a36c6f")
+	)
+	(wire
+		(pts
+			(xy 190.5 53.34) (xy 190.5 49.53)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "c7939d80-49c5-46ed-880b-d10dfd1d2850")
 	)
 	(global_label "UART_RX"
 		(shape input)
@@ -357,6 +636,170 @@
 			(project "stratosteam"
 				(path "/98cd4534-940d-4619-ad23-aa145f5f580e/9892ff72-7120-48c9-ab68-2345c35c7fce"
 					(reference "U1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:C")
+		(at 190.5 57.15 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "96cbadaf-5c68-4225-bb39-531dfc90bb09")
+		(property "Reference" "C2"
+			(at 194.31 55.8799 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "10n"
+			(at 194.31 58.4199 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Capacitor_SMD:C_1210_3225Metric_Pad1.33x2.70mm_HandSolder"
+			(at 191.4652 60.96 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 190.5 57.15 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Unpolarized capacitor"
+			(at 190.5 57.15 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "2"
+			(uuid "a1a4f81b-0110-446d-bc75-ab10377a2c72")
+		)
+		(pin "1"
+			(uuid "9baa19ee-dca8-4629-820e-ce2371f10d8a")
+		)
+		(instances
+			(project "stratosteam"
+				(path "/98cd4534-940d-4619-ad23-aa145f5f580e/9892ff72-7120-48c9-ab68-2345c35c7fce"
+					(reference "C2")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:C")
+		(at 181.61 57.15 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "b38d945f-c5df-4d1f-b20e-9fc553bc1e82")
+		(property "Reference" "C1"
+			(at 185.42 55.8799 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "10u"
+			(at 185.42 58.4199 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Capacitor_SMD:C_1210_3225Metric_Pad1.33x2.70mm_HandSolder"
+			(at 182.5752 60.96 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 181.61 57.15 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Unpolarized capacitor"
+			(at 181.61 57.15 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "2"
+			(uuid "93bce2e7-3131-40db-8f17-20eb093fe669")
+		)
+		(pin "1"
+			(uuid "2ea51f8f-0cde-47fc-ac1b-72bdf0c45308")
+		)
+		(instances
+			(project "stratosteam"
+				(path "/98cd4534-940d-4619-ad23-aa145f5f580e/9892ff72-7120-48c9-ab68-2345c35c7fce"
+					(reference "C1")
 					(unit 1)
 				)
 			)
