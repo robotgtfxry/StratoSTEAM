@@ -10,6 +10,7 @@ import '../widgets/heading_indicator.dart';
 import '../widgets/control_panel.dart';
 import '../widgets/camera_card.dart';
 import '../widgets/espcam_card.dart';
+import '../widgets/balloon_simulation_card.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -167,6 +168,8 @@ class DashboardScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   SizedBox(height: 200, child: AltitudeChart(history: svc.history)),
+                  const SizedBox(height: 12),
+                  const BalloonSimulationCard(),
                   const SizedBox(height: 12),
                   const CameraCard(),
                   const SizedBox(height: 12),
