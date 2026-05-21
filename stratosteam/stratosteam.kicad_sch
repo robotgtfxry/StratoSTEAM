@@ -3182,6 +3182,16 @@
 			(embedded_fonts no)
 		)
 	)
+	(text "PRZEKAZNIKI ESPCAM TENSOMETRY"
+		(exclude_from_sim no)
+		(at 50.292 150.114 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+		(uuid "2fe71ac6-9dda-4aa5-965b-5d254e5e5e8f")
+	)
 	(junction
 		(at 222.25 119.38)
 		(diameter 0)
@@ -3602,6 +3612,16 @@
 	)
 	(wire
 		(pts
+			(xy 143.51 59.69) (xy 148.59 59.69)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "6d52c13f-44d6-4f78-abfe-fd3a5bc48ab1")
+	)
+	(wire
+		(pts
 			(xy 63.5 95.25) (xy 63.5 119.38)
 		)
 		(stroke
@@ -3749,6 +3769,16 @@
 			(type default)
 		)
 		(uuid "9b688ee5-69c5-4457-b446-314baad3c80e")
+	)
+	(wire
+		(pts
+			(xy 76.2 67.31) (xy 80.01 67.31)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "9c82378d-ab54-44d3-b4aa-6bb318e34a27")
 	)
 	(wire
 		(pts
@@ -3912,6 +3942,16 @@
 	)
 	(wire
 		(pts
+			(xy 92.71 59.69) (xy 95.25 59.69)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "cefb146b-438d-44a5-a66b-dd808320138f")
+	)
+	(wire
+		(pts
 			(xy 69.85 44.45) (xy 69.85 49.53)
 		)
 		(stroke
@@ -3992,6 +4032,16 @@
 	)
 	(wire
 		(pts
+			(xy 92.71 57.15) (xy 95.25 57.15)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "e9f4df20-09fe-44f4-9581-4344fa12e237")
+	)
+	(wire
+		(pts
 			(xy 179.07 62.23) (xy 233.68 62.23)
 		)
 		(stroke
@@ -4029,6 +4079,30 @@
 			(type default)
 		)
 		(uuid "f9742c1e-57de-4720-bafe-a5c87c0ff86d")
+	)
+	(global_label "5V"
+		(shape input)
+		(at 95.25 57.15 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "17351a8f-21ca-4a93-9b48-d7d6b7357958")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 100.5333 57.15 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
 	)
 	(global_label "LORA_RST"
 		(shape input)
@@ -4102,6 +4176,30 @@
 			)
 		)
 	)
+	(global_label "BATT_ADC"
+		(shape input)
+		(at 143.51 59.69 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "4622c03d-1ed7-4196-9087-8d72183fc873")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 131.6348 59.69 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
 	(global_label "SPI_SCLK"
 		(shape input)
 		(at 143.51 87.63 180)
@@ -4150,6 +4248,30 @@
 			)
 		)
 	)
+	(global_label "GND"
+		(shape input)
+		(at 76.2 67.31 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "78bd860a-4cdb-4650-a479-6324c062e34d")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 69.3443 67.31 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
 	(global_label "SPI_CS_SX1278"
 		(shape input)
 		(at 143.51 82.55 180)
@@ -4195,6 +4317,30 @@
 					(size 1.27 1.27)
 				)
 				(justify right)
+			)
+		)
+	)
+	(global_label "5V"
+		(shape input)
+		(at 95.25 59.69 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "8b17bb34-9f23-40bb-bee1-ef4e8f0e3e60")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 100.5333 59.69 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
 			)
 		)
 	)
@@ -4270,30 +4416,6 @@
 			)
 		)
 	)
-	(global_label "???"
-		(shape input)
-		(at 143.51 69.85 180)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right)
-		)
-		(uuid "b97913fb-acb9-4d4e-a431-c4edb3d55f58")
-		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 137.259 69.85 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-			)
-		)
-	)
 	(global_label "I2C_CLK"
 		(shape input)
 		(at 59.69 62.23 180)
@@ -4331,30 +4453,6 @@
 		(uuid "db6243e0-3db0-4fc7-aaf8-310647ee1575")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
 			(at 131.8767 90.17 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-			)
-		)
-	)
-	(global_label "???"
-		(shape input)
-		(at 143.51 59.69 180)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right)
-		)
-		(uuid "fc8b600d-64b8-49e8-bfca-8fa8a08817f8")
-		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 137.259 59.69 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -4744,7 +4842,7 @@
 				)
 			)
 		)
-		(property "Footprint" ""
+		(property "Footprint" "Connector_PinHeader_1.00mm:PinHeader_2x40_P1.00mm_Vertical"
 			(at 85.09 80.01 0)
 			(hide yes)
 			(show_name no)
