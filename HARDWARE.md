@@ -2,7 +2,7 @@
 
 > **Architektura systemu:**
 > - **ESP32-S3 (balon)** — węzeł radiowy: GPS (NEO-M8N) + LoRa (SX1278), retransmisja danych z RPi5
-> - **Raspberry Pi 5 (balon)** — węzeł pomiarowy: czujniki atmosferyczne, IMU, kamera, RTL-SDR (odbiór sygnału HF z ziemi)
+> - **Raspberry Pi 5 (balon)** — węzeł pomiarowy: czujniki atmosferyczne, IMU, kamera, RTL-SDR (odbiór sygnału HF z ziemi), 2× przekaźnik HJR1-2C L-3VDC (system zwalniania linek)
 > - **Raspberry Pi 5 (ziemia)** — stacja naziemna: LoRa RX/TX, nadajnik HF (AD9833 + RD06HHF1)
 > - Limit wagowy ładunku: **1 kg** (większa pojemność baterii)
 
@@ -210,3 +210,32 @@ w narożnikach ramy zawieszenia ładunku (przód-lewy, przód-prawy, tył-lewy, 
 | LED G       | GPIO18     | status (PWM)                                       |
 | LED B       | GPIO20     | status (PWM)                                       |
 | ADC baterii | GPIO1      | napięcie baterii (backup gdy RPi5 wyłączona)       |
+
+---
+
+## 2× HJR1-2C L-3VDC — przekaźniki systemu zwalniania linek (GPIO, RPi5 balon)
+
+Model: **HJR1-2C L-3VDC** (cewka 3 V DC, ~70 mA, przełącznik 2C/DPDT).  
+Każdy przekaźnik steruje jedną liną mocującą ładunek. Aktywacja przekaźnika przepala/zwalnia linkę i oddziela ładunek od balonu.
+
+Cewka pobiera ~70 mA — zbyt dużo dla GPIO RPi5 (max 16 mA). Każdy kanał wymaga tranzystora NPN (np. 2N2222 / BC547) i diody zabezpieczającej cewkę (1N4007).
+
+| Kanał    | RPi5 BCM          | Tranzystor base    | Rola                     |
+|----------|-------------------|--------------------|--------------------------|
+| Relay #0 | GPIO27 (pin 13)   | przez 100 Ω        | zwolnienie linki 0       |
+| Relay #1 | GPIO5  (pin 29)   | przez 100 Ω        | zwolnienie linki 1       |
+
+Schemat każdego kanału:
+```
+RPi GPIO ──[100Ω]──── Base (2N2222)
+                       Emitter ──── GND
+                       Collector ── Relay cewka (−)
+3.3V ────────────────────────────── Relay cewka (+)
+                       1N4007 (katoda → 3.3V, anoda → Collector)  ← ochrona przed back-EMF
+Relay NO ──────────────────────────── mechanizm zwalniania linki
+```
+
+> RPi5 (balon). HIGH na GPIO = tranzystor otwarty = cewka aktywna = przekaźnik zamknięty = linka zwolniona.  
+> Polecenie JSON (RPi5 ← ESP32 przez UART): `{"cmd":"release_line","line":0}` / `{"cmd":"release_line","line":1}`.  
+> Obie linki jednocześnie: `{"cmd":"release_line","line":-1}`.  
+> Po zwolnieniu GPIO wraca do LOW — cewka nie jest trzymana w sposób ciągły.
