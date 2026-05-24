@@ -471,7 +471,9 @@
   },
   "libraries": {
     "pinned_footprint_libs": [],
-    "pinned_symbol_libs": []
+    "pinned_symbol_libs": [
+      "Relay"
+    ]
   },
   "meta": {
     "filename": "stratosteam.kicad_pro",
@@ -641,7 +643,7 @@
         "uuid": "98cd4534-940d-4619-ad23-aa145f5f580e"
       }
     ],
-    "used_designators": "U1-9,R1-19,BZ1,J1-4,Y1-2,Q1,C1-26,D1-6,BT1,SW1-2,F1,L1-3",
+    "used_designators": "U1-11,R1-29,BZ1,J1-14,Y1-2,Q1-10,C1-26,D1-8,BT1,SW1-2,F1,L1-3",
     "variants": []
   },
   "sheets": [
