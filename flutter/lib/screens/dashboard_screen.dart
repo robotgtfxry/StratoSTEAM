@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/telemetry_service.dart';
+import '../models/telemetry.dart';
 import '../services/rpi_power_service.dart';
 import '../widgets/info_card.dart';
 import '../widgets/altitude_chart.dart';
@@ -10,7 +11,6 @@ import '../widgets/heading_indicator.dart';
 import '../widgets/control_panel.dart';
 import '../widgets/camera_card.dart';
 import '../widgets/espcam_card.dart';
-import '../widgets/balloon_simulation_card.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -169,7 +169,7 @@ class DashboardScreen extends StatelessWidget {
                   const SizedBox(height: 12),
                   SizedBox(height: 200, child: AltitudeChart(history: svc.history)),
                   const SizedBox(height: 12),
-                  const BalloonSimulationCard(),
+                  _MapCard(history: svc.history),
                   const SizedBox(height: 12),
                   const CameraCard(),
                   const SizedBox(height: 12),
@@ -245,4 +245,37 @@ class _Stat extends StatelessWidget {
           Text(value, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 15)),
         ],
       );
+}
+
+
+class _MapCard extends StatelessWidget {
+  final List<Telemetry> history;
+  const _MapCard({required this.history});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF161B22),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white12),
+      ),
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'MAPA TRASY',
+            style: TextStyle(
+                color: Colors.white38, fontSize: 11, letterSpacing: 1.2),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 340,
+            child: MapView(history: history),
+          ),
+        ],
+      ),
+    );
+  }
 }
