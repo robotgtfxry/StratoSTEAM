@@ -2,6 +2,7 @@
 import 'dart:ui' show FontFeature;
 import 'package:provider/provider.dart';
 import '../services/camera_service.dart';
+import 'pin_dialog.dart';
 
 class CameraCard extends StatelessWidget {
   const CameraCard({super.key});
@@ -20,7 +21,7 @@ class CameraCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // â”€â”€ NagĹ‚Ăłwek â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+          // â”€â”€ Nagłówek â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           Row(children: [
             const Icon(Icons.videocam, color: Colors.blueAccent, size: 18),
             const SizedBox(width: 8),
@@ -39,11 +40,11 @@ class CameraCard extends StatelessWidget {
           ]),
           const SizedBox(height: 14),
 
-          // â”€â”€ Licznik pamiÄ™ci â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+          // â”€â”€ Licznik pamięci â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           _DiskBar(cam: cam),
           const SizedBox(height: 14),
 
-          // â”€â”€ Przycisk zdjÄ™cia â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+          // â”€â”€ Przycisk zdjęcia â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           SizedBox(
             width: double.infinity,
             height: 48,
@@ -64,14 +65,19 @@ class CameraCard extends StatelessWidget {
                     )
                   : const Icon(Icons.camera_alt, size: 20),
               label: const Text(
-                'ZrĂłb zdjÄ™cie',
+                'Zrób zdjęcie',
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
               ),
-              onPressed: cam.photoLoading ? null : cam.requestPhoto,
+              onPressed: cam.photoLoading
+                  ? null
+                  : () async {
+                      if (!await requirePin(context)) return;
+                      cam.requestPhoto();
+                    },
             ),
           ),
 
-          // Status wysĹ‚ania ĹĽÄ…dania
+          // Status wysłania żądania
           if (cam.lastPhotoOk != null) ...[
             const SizedBox(height: 6),
             Row(children: [
@@ -87,8 +93,8 @@ class CameraCard extends StatelessWidget {
               Flexible(
                 child: Text(
                   cam.lastPhotoOk!
-                      ? 'Ĺ»Ä…danie wysĹ‚ane â€” zdjÄ™cie dotrze za ok. 1 min'
-                      : 'BĹ‚Ä…d wysyĹ‚ania ĹĽÄ…dania',
+                      ? 'Żądanie wysłane â€” zdjęcie dotrze za ok. 1 min'
+                      : 'Błąd wysyłania żądania',
                   style: TextStyle(
                     color: cam.lastPhotoOk!
                         ? Colors.white38
@@ -100,14 +106,14 @@ class CameraCard extends StatelessWidget {
             ]),
           ],
 
-          // â”€â”€ PodglÄ…d ostatniego zdjÄ™cia â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+          // â”€â”€ Podgląd ostatniego zdjęcia â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           if (cam.latestPhoto != null) ...[
             const SizedBox(height: 12),
             Row(children: [
               const Icon(Icons.image_outlined, color: Colors.white24, size: 13),
               const SizedBox(width: 5),
               Text(
-                'Ostatnie zdjÄ™cie â€˘ ${_fmtTs(cam.latestPhotoTs)}',
+                'Ostatnie zdjęcie â€˘ ${_fmtTs(cam.latestPhotoTs)}',
                 style: const TextStyle(color: Colors.white38, fontSize: 11),
               ),
             ]),
@@ -178,7 +184,7 @@ class _RecBadge extends StatelessWidget {
 }
 
 
-// â”€â”€ Przycisk stop / wznĂłw nagrywanie â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ Przycisk stop / wznów nagrywanie â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _RecToggle extends StatelessWidget {
   final CameraService cam;
@@ -215,17 +221,21 @@ class _RecToggle extends StatelessWidget {
                       : Icons.fiber_manual_record,
                   size: 15),
           label: Text(
-            cam.recording ? 'Zatrzymaj' : 'WznĂłw',
+            cam.recording ? 'Zatrzymaj' : 'Wznów',
             style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
           ),
-          onPressed:
-              cam.recLoading ? null : () => cam.setRecording(!cam.recording),
+          onPressed: cam.recLoading
+              ? null
+              : () async {
+                  if (!await requirePin(context)) return;
+                  cam.setRecording(!cam.recording);
+                },
         ),
       );
 }
 
 
-// â”€â”€ Pasek pamiÄ™ci â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ Pasek pamięci â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _DiskBar extends StatelessWidget {
   final CameraService cam;
@@ -247,7 +257,7 @@ class _DiskBar extends StatelessWidget {
         Row(children: [
           const Icon(Icons.storage_outlined, color: Colors.white38, size: 14),
           const SizedBox(width: 6),
-          const Text('PamiÄ™Ä‡ RPi5',
+          const Text('Pamięć RPi5',
               style: TextStyle(color: Colors.white54, fontSize: 12)),
           const Spacer(),
           Text(

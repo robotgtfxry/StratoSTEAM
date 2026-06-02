@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../services/terminal_service.dart';
+import '../widgets/pin_dialog.dart';
 
 class TerminalScreen extends StatefulWidget {
   const TerminalScreen({super.key});
@@ -25,9 +26,10 @@ class _TerminalScreenState extends State<TerminalScreen> {
     super.dispose();
   }
 
-  void _submit(TerminalService svc) {
+  Future<void> _submit(TerminalService svc) async {
     final text = _ctrl.text.trim();
     if (text.isEmpty) return;
+    if (!await requirePin(context)) return;
     _history.insert(0, text);
     _histIdx = -1;
     _ctrl.clear();

@@ -2,6 +2,7 @@
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../services/hf_service.dart';
+import '../widgets/pin_dialog.dart';
 
 class TransmitterScreen extends StatefulWidget {
   const TransmitterScreen({super.key});
@@ -52,13 +53,13 @@ class _TransmitterScreenState extends State<TransmitterScreen> {
         padding: const EdgeInsets.all(16),
         children: [
 
-          // â”€â”€ Status sprzÄ™tu â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+          // â”€â”€ Status sprzętu â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           _StatusCard(hf: hf),
           const SizedBox(height: 16),
 
-          // â”€â”€ WybĂłr pasma â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+          // â”€â”€ Wybór pasma â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           _SectionBox(
-            title: 'Pasmo / czÄ™stotliwoĹ›Ä‡',
+            title: 'Pasmo / częstotliwość',
             icon: Icons.radio,
             color: Colors.orangeAccent,
             child: Column(
@@ -93,7 +94,7 @@ class _TransmitterScreenState extends State<TransmitterScreen> {
                   keyboardType: TextInputType.number,
                   style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
-                    labelText: 'CzÄ™stotliwoĹ›Ä‡ (Hz)',
+                    labelText: 'Częstotliwość (Hz)',
                     labelStyle: const TextStyle(color: Colors.white54),
                     helperText: _freqHz > 0
                         ? '${(_freqHz / 1e6).toStringAsFixed(4)} MHz'
@@ -135,10 +136,14 @@ class _TransmitterScreenState extends State<TransmitterScreen> {
                 _TxToggle(
                   active: hf.hwActive,
                   loading: hf.loading,
-                  onStart: () =>
-                      hf.sendCommand('start', _freqHz),
-                  onStop: () =>
-                      hf.sendCommand('stop', _freqHz),
+                  onStart: () async {
+                    if (!await requirePin(context)) return;
+                    hf.sendCommand('start', _freqHz);
+                  },
+                  onStop: () async {
+                    if (!await requirePin(context)) return;
+                    hf.sendCommand('stop', _freqHz);
+                  },
                 ),
                 if (hf.hwActive) ...[
                   const SizedBox(height: 16),
@@ -154,10 +159,13 @@ class _TransmitterScreenState extends State<TransmitterScreen> {
                       ),
                       icon: const Icon(Icons.swap_horiz),
                       label: Text(
-                          'ZmieĹ„ na ${(_freqHz / 1e6).toStringAsFixed(4)} MHz'),
+                          'Zmień na ${(_freqHz / 1e6).toStringAsFixed(4)} MHz'),
                       onPressed: hf.loading
                           ? null
-                          : () => hf.sendCommand('set_freq', _freqHz),
+                          : () async {
+                              if (!await requirePin(context)) return;
+                              hf.sendCommand('set_freq', _freqHz);
+                            },
                     ),
                   ),
                 ],
@@ -166,7 +174,7 @@ class _TransmitterScreenState extends State<TransmitterScreen> {
           ),
           const SizedBox(height: 16),
 
-          // â”€â”€ Info / ostrzeĹĽenie â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+          // â”€â”€ Info / ostrzeżenie â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
@@ -182,8 +190,8 @@ class _TransmitterScreenState extends State<TransmitterScreen> {
                 SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Upewnij siÄ™ ĹĽe antena jest podĹ‚Ä…czona przed wĹ‚Ä…czeniem nadajnika. '
-                    'RD06HHF1 bez obciÄ…ĹĽenia moĹĽe ulec uszkodzeniu.',
+                    'Upewnij się że antena jest podłączona przed włączeniem nadajnika. '
+                    'RD06HHF1 bez obciążenia może ulec uszkodzeniu.',
                     style: TextStyle(color: Colors.amber, fontSize: 12),
                   ),
                 ),
@@ -192,7 +200,7 @@ class _TransmitterScreenState extends State<TransmitterScreen> {
           ),
           const SizedBox(height: 16),
 
-          // â”€â”€ Wykres dBFS vs wysokoĹ›Ä‡ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+          // â”€â”€ Wykres dBFS vs wysokość â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           _MeasurementsChart(measurements: hf.measurements),
         ],
       ),
@@ -222,7 +230,7 @@ class _MeasurementsChart extends StatelessWidget {
           Row(children: [
             const Icon(Icons.show_chart, color: Colors.purpleAccent, size: 18),
             const SizedBox(width: 8),
-            const Text('Pomiary SDR â€” dBFS vs wysokoĹ›Ä‡',
+            const Text('Pomiary SDR – dBFS vs wysokość',
                 style: TextStyle(
                     color: Colors.purpleAccent,
                     fontWeight: FontWeight.bold,
@@ -239,7 +247,7 @@ class _MeasurementsChart extends StatelessWidget {
             const Center(
               child: Padding(
                 padding: EdgeInsets.symmetric(vertical: 32),
-                child: Text('Brak pomiarĂłw',
+                child: Text('Brak pomiarów',
                     style: TextStyle(color: Colors.white38, fontSize: 13)),
               ),
             )
@@ -269,7 +277,7 @@ class _LastMeasurement extends StatelessWidget {
       _Stat(label: 'dBFS', value: m.dbfs.toStringAsFixed(1),
           color: Colors.purpleAccent),
       const SizedBox(width: 24),
-      _Stat(label: 'WysokoĹ›Ä‡', value: '${m.alt.toStringAsFixed(0)} m',
+      _Stat(label: 'Wysokość', value: '${m.alt.toStringAsFixed(0)} m',
           color: Colors.cyanAccent),
     ]);
   }
@@ -342,7 +350,7 @@ class _Chart extends StatelessWidget {
             ),
           ),
           bottomTitles: AxisTitles(
-            axisNameWidget: const Text('WysokoĹ›Ä‡ (m)',
+            axisNameWidget: const Text('Wysokość (m)',
                 style: TextStyle(color: Colors.white38, fontSize: 10)),
             sideTitles: SideTitles(
               showTitles: true,
@@ -463,7 +471,7 @@ class _StatusCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                hf.hwActive ? 'NADAWANIE' : 'WYĹÄ„CZONY',
+                hf.hwActive ? 'NADAWANIE' : 'WYŁÄ„CZONY',
                 style: TextStyle(
                   color: hf.hwActive ? Colors.redAccent : Colors.white38,
                   fontWeight: FontWeight.bold,
@@ -531,7 +539,7 @@ class _TxToggle extends StatelessWidget {
               )
             : Icon(active ? Icons.stop_circle : Icons.play_circle),
         label: Text(
-          active ? 'WYĹÄ„CZ NADAJNIK' : 'WĹÄ„CZ NADAJNIK',
+          active ? 'WYŁÄ„CZ NADAJNIK' : 'WŁÄ„CZ NADAJNIK',
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
         ),
         onPressed: loading ? null : (active ? onStop : onStart),

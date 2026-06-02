@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/espcam_service.dart';
+import 'pin_dialog.dart';
 
 class EspCamCard extends StatelessWidget {
   const EspCamCard({super.key});
@@ -47,7 +48,10 @@ class EspCamCard extends StatelessWidget {
                   index: i,
                   on: i < svc.state.length ? svc.state[i] : false,
                   loading: svc.loading,
-                  onTap: () => svc.setPower(i, !(i < svc.state.length && svc.state[i])),
+                  onTap: () async {
+                    if (!await requirePin(context)) return;
+                    svc.setPower(i, !(i < svc.state.length && svc.state[i]));
+                  },
                 ),
               ),
             )),
@@ -61,7 +65,12 @@ class EspCamCard extends StatelessWidget {
                 label: 'Wszystkie ON',
                 color: Colors.tealAccent,
                 icon: Icons.power,
-                onTap: svc.loading ? null : () => svc.setPower(-1, true),
+                onTap: svc.loading
+                    ? null
+                    : () async {
+                        if (!await requirePin(context)) return;
+                        svc.setPower(-1, true);
+                      },
               ),
             ),
             const SizedBox(width: 8),
@@ -70,7 +79,12 @@ class EspCamCard extends StatelessWidget {
                 label: 'Wszystkie OFF',
                 color: Colors.redAccent,
                 icon: Icons.power_off,
-                onTap: svc.loading ? null : () => svc.setPower(-1, false),
+                onTap: svc.loading
+                    ? null
+                    : () async {
+                        if (!await requirePin(context)) return;
+                        svc.setPower(-1, false);
+                      },
               ),
             ),
           ]),

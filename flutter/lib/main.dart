@@ -8,12 +8,14 @@ import 'services/rpi_power_service.dart';
 import 'services/terminal_service.dart';
 import 'services/camera_service.dart';
 import 'services/espcam_service.dart';
+import 'services/pin_service.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/map_screen.dart';
 import 'screens/transmitter_screen.dart';
 import 'screens/plots_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/terminal_screen.dart';
+import 'screens/simulation_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -50,6 +52,10 @@ void main() async {
         ChangeNotifierProxyProvider<SettingsService, EspCamService>(
           create: (ctx) => EspCamService(ctx.read<SettingsService>()),
           update: (_, s, prev) => prev ?? EspCamService(s),
+        ),
+        ChangeNotifierProxyProvider<SettingsService, PinService>(
+          create: (ctx) => PinService(ctx.read<SettingsService>()),
+          update: (_, s, prev) => prev ?? PinService(s),
         ),
       ],
       child: const StratoSteamApp(),
@@ -88,6 +94,7 @@ class _ShellState extends State<_Shell> {
     DashboardScreen(),
     MapScreen(),
     PlotsScreen(),
+    SimulationScreen(),
     TransmitterScreen(),
     TerminalScreen(),
     SettingsScreen(),
@@ -95,9 +102,6 @@ class _ShellState extends State<_Shell> {
 
   @override
   Widget build(BuildContext context) {
-    final telemetry = context.watch<TelemetryService>();
-    final hf = context.watch<HfService>();
-
     return Scaffold(
       body: IndexedStack(index: _idx, children: _screens),
       bottomNavigationBar: NavigationBar(
@@ -111,13 +115,9 @@ class _ShellState extends State<_Shell> {
             selectedIcon: Icon(Icons.dashboard, color: Colors.cyanAccent),
             label: 'Dashboard',
           ),
-          NavigationDestination(
-            icon: Badge(
-              isLabelVisible: telemetry.latest?.gpsFix == true,
-              backgroundColor: Colors.greenAccent,
-              child: const Icon(Icons.map_outlined),
-            ),
-            selectedIcon: const Icon(Icons.map, color: Colors.cyanAccent),
+          const NavigationDestination(
+            icon: Icon(Icons.map_outlined),
+            selectedIcon: Icon(Icons.map, color: Colors.cyanAccent),
             label: 'Mapa',
           ),
           const NavigationDestination(
@@ -125,13 +125,14 @@ class _ShellState extends State<_Shell> {
             selectedIcon: Icon(Icons.show_chart, color: Colors.cyanAccent),
             label: 'Wykresy',
           ),
-          NavigationDestination(
-            icon: Badge(
-              isLabelVisible: hf.hwActive,
-              backgroundColor: Colors.redAccent,
-              child: const Icon(Icons.broadcast_on_personal_outlined),
-            ),
-            selectedIcon: const Icon(Icons.broadcast_on_personal,
+          const NavigationDestination(
+            icon: Icon(Icons.view_in_ar_outlined),
+            selectedIcon: Icon(Icons.view_in_ar, color: Colors.cyanAccent),
+            label: 'Symulacja',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.broadcast_on_personal_outlined),
+            selectedIcon: Icon(Icons.broadcast_on_personal,
                 color: Colors.cyanAccent),
             label: 'Nadajnik',
           ),

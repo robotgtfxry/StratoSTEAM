@@ -2,6 +2,7 @@
 import 'package:provider/provider.dart';
 import '../services/settings_service.dart';
 import '../services/telemetry_service.dart';
+import '../widgets/pin_dialog.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -45,6 +46,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _save() async {
+    if (!await requirePin(context)) return;
     await context.read<SettingsService>().save(
       serverUrl:  _serverCtrl.text.trim(),
       apiKey:     _apiKeyCtrl.text.trim(),
@@ -67,8 +69,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: const Color(0xFF161B22),
-        title: const Text('Reset ustawieĹ„', style: TextStyle(color: Colors.white)),
-        content: const Text('PrzywrĂłciÄ‡ domyĹ›lne wartoĹ›ci?', style: TextStyle(color: Colors.white70)),
+        title: const Text('Reset ustawień', style: TextStyle(color: Colors.white)),
+        content: const Text('Przywrócić domyślne wartości?', style: TextStyle(color: Colors.white70)),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Anuluj')),
           TextButton(
@@ -79,6 +81,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
     if (ok == true) {
+      if (!await requirePin(context)) return;
       await context.read<SettingsService>().reset();
       final s = context.read<SettingsService>();
       setState(() {
@@ -110,7 +113,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           IconButton(
             icon: const Icon(Icons.restart_alt, color: Colors.white54),
-            tooltip: 'Reset do domyĹ›lnych',
+            tooltip: 'Reset do domyślnych',
             onPressed: _reset,
           ),
         ],
@@ -119,9 +122,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         padding: const EdgeInsets.all(16),
         children: [
 
-          // â”€â”€ PoĹ‚Ä…czenie â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+          // â”€â”€ Połączenie â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           _Section(
-            title: 'PoĹ‚Ä…czenie z serwerem',
+            title: 'Połączenie z serwerem',
             icon: Icons.cloud,
             color: Colors.cyanAccent,
             children: [
@@ -179,7 +182,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             color: Colors.purpleAccent,
             children: [
               _Field(
-                label: 'CzÄ™stotliwoĹ›Ä‡ (MHz)',
+                label: 'Częstotliwość (MHz)',
                 hint: '433.0',
                 controller: _loraFreqCtrl,
                 icon: Icons.radio,
@@ -208,24 +211,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ],
               ),
-              _HintText('WyĹĽszy SF = wiÄ™kszy zasiÄ™g, wolniejsza transmisja'),
+              _HintText('Wyższy SF = większy zasięg, wolniejsza transmisja'),
             ],
           ),
           const SizedBox(height: 16),
 
-          // â”€â”€ NoĹ›na 144 MHz â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+          // â”€â”€ Nośna 144 MHz â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           _Section(
-            title: 'NoĹ›na 144.800 MHz',
+            title: 'Nośna 144.800 MHz',
             icon: Icons.broadcast_on_personal,
             color: Colors.orangeAccent,
             children: [
               _Field(
-                label: 'Znak wywoĹ‚awczy',
+                label: 'Znak wywoławczy',
                 hint: 'SP0STR-11',
                 controller: _callsignCtrl,
                 icon: Icons.badge,
               ),
-              _HintText('UĹĽywany do logowania eksperymentu jonosferycznego'),
+              _HintText('Używany do logowania eksperymentu jonosferycznego'),
             ],
           ),
           const SizedBox(height: 16),
@@ -237,7 +240,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             color: Colors.redAccent,
             children: [
               _Field(
-                label: 'Min. napiÄ™cie baterii (V)',
+                label: 'Min. napięcie baterii (V)',
                 hint: '3.5',
                 controller: _minVoltCtrl,
                 icon: Icons.battery_alert,
@@ -268,6 +271,53 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ],
           ),
+          const SizedBox(height: 16),
+
+          // ── Bezpieczeństwo ──────────────────────────────────────────────────
+          _Section(
+            title: 'Bezpieczeństwo',
+            icon: Icons.lock_outline,
+            color: Colors.cyanAccent,
+            children: [
+              Row(
+                children: [
+                  const Text(
+                    'Kod PIN',
+                    style: TextStyle(color: Colors.white70, fontSize: 14),
+                  ),
+                  const Spacer(),
+                  const Text(
+                    '••••',
+                    style: TextStyle(
+                      color: Colors.white38,
+                      fontSize: 18,
+                      letterSpacing: 4,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  SizedBox(
+                    height: 32,
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.cyanAccent,
+                        side: const BorderSide(
+                            color: Colors.cyanAccent, width: 1),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 12),
+                      ),
+                      onPressed: () => showChangePinDialog(context),
+                      child: const Text('Zmień',
+                          style: TextStyle(fontSize: 12)),
+                    ),
+                  ),
+                ],
+              ),
+              _HintText(
+                  'Wymagany do wysyłania komend i modyfikacji ustawień'),
+            ],
+          ),
           const SizedBox(height: 24),
 
           // â”€â”€ Zapisz â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -281,7 +331,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
               icon: const Icon(Icons.save),
-              label: const Text('Zapisz i poĹ‚Ä…cz ponownie',
+              label: const Text('Zapisz i połącz ponownie',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
               onPressed: _save,
             ),
@@ -424,7 +474,7 @@ class _StatusTile extends StatelessWidget {
       ),
       const SizedBox(width: 8),
       Text(
-        connected ? 'PoĹ‚Ä…czono z serwerem' : 'Brak poĹ‚Ä…czenia',
+        connected ? 'Połączono z serwerem' : 'Brak połączenia',
         style: TextStyle(
           color: connected ? Colors.greenAccent : Colors.redAccent,
           fontSize: 13,
