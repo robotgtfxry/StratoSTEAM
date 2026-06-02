@@ -13,14 +13,14 @@ from config import (
     BME280_ADDR, MS5611_ADDR, BNO085_ADDR,
     INA219_ADDR, INA219_SHUNT_OHMS,
     HX711_SENSORS, HX711_REFERENCE_UNIT,
-    ESPCAM_PWR_PINS,
+    ESPCAM_PWR_PINS, ESPCAM_STATUS_PINS, ESPCAM_STATUS_BAUD,
     ESP_UART_PORT, ESP_UART_BAUD, ESP_SEND_INTERVAL_S,
     CAM_RECORD_DIR, CAM_PHOTO_W, CAM_PHOTO_H, CAM_PHOTO_QUALITY, CAM_CHUNK_INTERVAL_S,
     SDR_ENABLED, SDR_TARGET_FREQ, SDR_SAMPLE_RATE, SDR_GAIN,
     SDR_FREQ_CORRECTION, SDR_MEASURE_INTERVAL_S, SDR_NUM_SAMPLES, SDR_BIN_WINDOW,
 )
 from sensors import Bme280Sensor, Ms5611Sensor, Bno085Sensor, Ina219Sensor, Hx711Sensor
-from hardware import PowerSignal, EspUartSender, CameraModule, SdrReceiver, EspCamPower
+from hardware import PowerSignal, EspUartSender, CameraModule, SdrReceiver, EspCamPower, EspCamMonitor
 
 logging.basicConfig(
     level=logging.INFO,
@@ -46,8 +46,9 @@ def main():
         Hx711Sensor(s["dt"], s["sck"], HX711_REFERENCE_UNIT)
         for s in HX711_SENSORS
     ]
-    espcams = EspCamPower(ESPCAM_PWR_PINS)
-    esp     = EspUartSender(ESP_UART_PORT, ESP_UART_BAUD)
+    espcams    = EspCamPower(ESPCAM_PWR_PINS)
+    espcam_mon = EspCamMonitor(ESPCAM_STATUS_PINS, ESPCAM_STATUS_BAUD)
+    esp        = EspUartSender(ESP_UART_PORT, ESP_UART_BAUD)
     cam  = CameraModule(CAM_RECORD_DIR, CAM_PHOTO_W, CAM_PHOTO_H, CAM_PHOTO_QUALITY)
     sdr  = SdrReceiver(
         target_freq_hz  = SDR_TARGET_FREQ,
@@ -127,7 +128,8 @@ def main():
                 disk_used, disk_free = cam.disk_usage(CAM_RECORD_DIR)
                 esp.send(bme_d, ms_d, imu_d, pwr_d,
                          disk_used_gb=disk_used, disk_free_gb=disk_free,
-                         hf_dbfs=last_hf_dbfs, strains=strain_d)
+                         hf_dbfs=last_hf_dbfs, strains=strain_d,
+                         espcam_status=espcam_mon.compact())
                 log.info(
                     "→ESP32 temp=%.1f°C alt2=%.0fm vbat=%.2fV sg=[%.0f,%.0f,%.0f,%.0f]g",
                     bme_d.temperature_c, ms_d.altitude_m, pwr_d.voltage_v,
@@ -147,6 +149,7 @@ def main():
         esp.close()
         for s in strains:
             s.close()
+        espcam_mon.stop()
         espcams.close()
         power.close()
 

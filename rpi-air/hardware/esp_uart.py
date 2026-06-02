@@ -18,7 +18,8 @@ class EspUartSender:
     def send(self, bme: Bme280Data, ms: Ms5611Data, imu: Bno085Data, pwr: Ina219Data,
              disk_used_gb: float = 0.0, disk_free_gb: float = 0.0,
              hf_dbfs: float | None = None,
-             strains: list[Hx711Data] | None = None) -> None:
+             strains: list[Hx711Data] | None = None,
+             espcam_status: list[list] | None = None) -> None:
         payload = {
             "temp": bme.temperature_c,
             "hum":  bme.humidity_pct,
@@ -41,6 +42,9 @@ class EspUartSender:
         if strains:
             for i, s in enumerate(strains):
                 payload[f"sg{i}"] = s.strain_g
+        # espcam_status: [[ok, rec, frames, free_mb], ...]
+        if espcam_status:
+            payload["ec"] = espcam_status
         line = json.dumps(payload, separators=(",", ":")) + "\n"
         self._ser.write(line.encode())
 

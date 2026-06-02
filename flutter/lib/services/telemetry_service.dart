@@ -13,6 +13,21 @@ class TelemetryService extends ChangeNotifier {
   Telemetry? latest;
   bool connected = false;
 
+  // ── Auto-buzzer ───────────────────────────────────────────────────────────
+  /// Callback wywoływany raz gdy spełniony warunek: alt < 500 m i faza opadania.
+  /// Podpięty w main.dart do CommandService.sendBuzzerAuto().
+  void Function()? onAutoBuzzer;
+
+  double _peakAlt = 0.0;
+  bool _autoBuzzerFired = false;
+
+  /// Najwyższa zarejestrowana wysokość w tej sesji.
+  double get peakAlt => _peakAlt;
+
+  /// True gdy balon przekroczył apogeum i opada (peakAlt > 1000 m i climbRate < 0).
+  bool get isDescending =>
+      _peakAlt > 1000.0 && (climbRate ?? 0) < 0;
+
   WebSocketChannel? _ws;
   StreamSubscription? _sub;
   bool _disposed = false;
@@ -54,6 +69,19 @@ class TelemetryService extends ChangeNotifier {
           history.add(t);
           if (history.length > 500) history.removeAt(0);
           latest = t;
+
+          // ── Śledź peak altitude ──────────────────────────────────────────
+          if (t.alt != null && t.alt! > _peakAlt) _peakAlt = t.alt!;
+
+          // ── Auto-buzzer: alt < 500 m, faza opadania, jeszcze nie wysłano ─
+          if (!_autoBuzzerFired &&
+              t.alt != null &&
+              t.alt! < 500.0 &&
+              isDescending) {
+            _autoBuzzerFired = true;
+            onAutoBuzzer?.call();
+          }
+
           notifyListeners();
         },
         onDone: () {

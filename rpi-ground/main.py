@@ -42,6 +42,20 @@ def _post_hf_measurement(alt: float, dbfs: float) -> None:
             log.debug("HF measurement upload error: %s", e)
     threading.Thread(target=_send, daemon=True).start()
 
+
+def _post_espcam_status(ec: list) -> None:
+    def _send():
+        try:
+            requests.post(
+                f"{BACKEND_URL}/api/espcam/status",
+                json={"ec": ec},
+                headers=_HF_HEADERS,
+                timeout=5,
+            )
+        except requests.RequestException as e:
+            log.debug("EspCam status upload error: %s", e)
+    threading.Thread(target=_send, daemon=True).start()
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
@@ -125,6 +139,12 @@ def main():
                         free_gb=float(packet["dskf"]),
                     )
 
+                # ESP32-CAM status z beacona → backend
+                ec = packet.get("ec")
+                if ec and isinstance(ec, list):
+                    _post_espcam_status(ec)
+                    log.debug("EspCam status forwarded: %s", ec)
+
                 # HF SDR measurement z beacona → backend
                 hfdb = packet.get("hfdb")
                 if hfdb is not None and hfdb > -999.0:
@@ -138,6 +158,11 @@ def main():
                     (packet.get("gps") or {}).get("alt") or 0,
                 )
                 uplink.send(packet, rssi, snr)
+                # ESP32-CAM status w pakiecie RPi → backend
+                ec = packet.get("ec")
+                if ec and isinstance(ec, list):
+                    _post_espcam_status(ec)
+                    log.debug("EspCam status from RPi pkt: %s", ec)
 
             # ── Uplink window (tylko gdy pakiet pochodzi od RPi) ───────────────
             # ESP32 nie nasłuchuje — komendy tylko do RPi

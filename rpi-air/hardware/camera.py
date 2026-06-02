@@ -46,7 +46,7 @@ class CameraModule:
         os.makedirs(record_dir, exist_ok=True)
         self._cam = Picamera2()
         cfg = self._cam.create_video_configuration(
-            main={"size": (1280, 720), "format": "RGB888"},
+            main={"size": (3840, 2160), "format": "RGB888"},  # 4K UHD
         )
         self._cam.configure(cfg)
         self._cam.start()
@@ -61,14 +61,17 @@ class CameraModule:
     def is_recording(self) -> bool:
         return self._recording
 
+    # Bitrate H.264: 15 Mbps = ~54 GB / 8h przy 4K — wymaga karty 64 GB+
+    _H264_BITRATE = 15_000_000
+
     def start_recording(self) -> str | None:
         if not self._cam or self._recording:
             return None
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         path = os.path.join(self._record_dir, f"rec_{ts}.h264")
-        self._cam.start_recording(H264Encoder(), FileOutput(path))
+        self._cam.start_recording(H264Encoder(self._H264_BITRATE), FileOutput(path))
         self._recording = True
-        log.info("Recording → %s", path)
+        log.info("Recording → %s  bitrate=%d Mbps", path, self._H264_BITRATE // 1_000_000)
         return path
 
     def stop_recording(self) -> None:

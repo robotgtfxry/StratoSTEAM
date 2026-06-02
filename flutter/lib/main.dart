@@ -8,6 +8,7 @@ import 'services/rpi_power_service.dart';
 import 'services/terminal_service.dart';
 import 'services/camera_service.dart';
 import 'services/espcam_service.dart';
+import 'services/espcam_status_service.dart';
 import 'services/pin_service.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/map_screen.dart';
@@ -25,10 +26,6 @@ void main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider.value(value: settings),
-        ChangeNotifierProxyProvider<SettingsService, TelemetryService>(
-          create: (ctx) => TelemetryService(ctx.read<SettingsService>()),
-          update: (_, s, prev) => prev ?? TelemetryService(s),
-        ),
         ChangeNotifierProxyProvider<SettingsService, HfService>(
           create: (ctx) => HfService(ctx.read<SettingsService>()),
           update: (_, s, prev) => prev ?? HfService(s),
@@ -36,6 +33,21 @@ void main() async {
         ChangeNotifierProxyProvider<SettingsService, CommandService>(
           create: (ctx) => CommandService(ctx.read<SettingsService>()),
           update: (_, s, prev) => prev ?? CommandService(s),
+        ),
+        ChangeNotifierProxyProvider2<SettingsService, CommandService,
+            TelemetryService>(
+          create: (ctx) {
+            final tel = TelemetryService(ctx.read<SettingsService>());
+            tel.onAutoBuzzer =
+                () => ctx.read<CommandService>().sendBuzzerAuto();
+            return tel;
+          },
+          update: (ctx, s, cmd, prev) {
+            if (prev != null) {
+              prev.onAutoBuzzer = () => cmd.sendBuzzerAuto();
+            }
+            return prev ?? TelemetryService(s);
+          },
         ),
         ChangeNotifierProxyProvider<SettingsService, RpiPowerService>(
           create: (ctx) => RpiPowerService(ctx.read<SettingsService>()),
@@ -52,6 +64,10 @@ void main() async {
         ChangeNotifierProxyProvider<SettingsService, EspCamService>(
           create: (ctx) => EspCamService(ctx.read<SettingsService>()),
           update: (_, s, prev) => prev ?? EspCamService(s),
+        ),
+        ChangeNotifierProxyProvider<SettingsService, EspCamStatusService>(
+          create: (ctx) => EspCamStatusService(ctx.read<SettingsService>()),
+          update: (_, s, prev) => prev ?? EspCamStatusService(s),
         ),
         ChangeNotifierProxyProvider<SettingsService, PinService>(
           create: (ctx) => PinService(ctx.read<SettingsService>()),
