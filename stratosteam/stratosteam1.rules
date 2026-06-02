@@ -1,0 +1,74 @@
+
+(rules PCB stratosteam.dsn
+  (snap_angle 
+    fortyfive_degree
+  )
+  (rule
+    (width 200.0)
+    (clearance 200.0)
+    (clearance 100.0 (type smd_to_turn_gap))
+    (clearance 50.0 (type smd))
+    (clearance 200.0 (type "kicad_default"))
+  )
+  (padstack "Via[0-1]_600:300_um"
+    (shape
+      (circle F.Cu 600.0 0.0 0.0)
+    )
+    (shape
+      (circle B.Cu 600.0 0.0 0.0)
+    )
+    (attach off)
+  )
+  (via 
+    "Via[0-1]_600:300_um" "Via[0-1]_600:300_um" default
+  )
+  (via 
+    "Via[0-1]_600:300_um-kicad_default" "Via[0-1]_600:300_um" "kicad_default"
+  )
+  (via_rule
+    default "Via[0-1]_600:300_um"
+  )
+  (via_rule
+    "kicad_default" "Via[0-1]_600:300_um-kicad_default"
+  )
+  (class default
+    (clearance_class default)
+    (via_rule default)
+    (rule
+      (width 200.0)
+    )
+    (circuit 
+      (use_layer F.Cu B.Cu)
+    )
+  )
+  (class "kicad_default"
+    "3V3" "Net-(J1-Pin_32)" "Net-(J1-Pin_33)" "BAT-" "Net-(U3-EN)" "unconnected-(U5-SDO-Pad6)" "I2C_DATA" "I2C_CLK"
+    E23 BAT+W "Net-(Q9-B)" "Net-(J1-Pin_13)" "Net-(U4-BOOT)" "Net-(D4-K)" "Net-(U4-VSENSE)" "Net-(U9-BOOT)"
+    "Net-(U9-RT{slash}CLK)" "Net-(U9-FB)" "Net-(U9-COMP)" "Net-(D6-K)" E27 E28 E29 E30
+    E31 E32 E33 E34 E35 E36 E37 E38
+    "BATT_ADC" "unconnected-(U8-RESV_NC-Pad1)" "unconnected-(U8-RESV_NC-Pad7)" "unconnected-(U8-RESV_NC-Pad8)" "Net-(U8-CAP)" "unconnected-(U8-RESV_NC-Pad12)" "unconnected-(U8-RESV_NC-Pad13)" "unconnected-(U8-~{H_INT}-Pad14)"
+    "unconnected-(U8-ENV_SCL-Pad15)" "unconnected-(U8-ENV_SDA-Pad16)" "unconnected-(U8-SA0{slash}H_MOSI-Pad17)" "unconnected-(U8-~{H_CS}-Pad18)" "unconnected-(U8-RESV_NC-Pad21)" "unconnected-(U8-RESV_NC-Pad22)" "unconnected-(U8-RESV_NC-Pad23)" "unconnected-(U8-RESV_NC-Pad24)"
+    "Net-(U8-XOUT32{slash}CLKSEL1)" "Net-(U8-XIN32)" "Net-(J1-Pin_18)" "Net-(J1-Pin_22)" "Net-(U3-FB)" "Net-(Q3-G)" "Net-(Q7-C)" "Net-(Q7-B)"
+    "Net-(J1-Pin_15)" "UART_RX" E5 E6 E7 E8 E9 E10
+    E11 "LORA_RST" E13 E14 E15 E16 "LORA_DIO0" "SPI_CS_SX1278"
+    "SPI_MOSI" "SPI_SCLK" "SPI_MISO" E22 E24 E25 E26 "Net-(D7-A)"
+    "Net-(Q1-G)" "Net-(Q5-C)" "5V" "Net-(D5-K)" "unconnected-(U2-DIO1-Pad2)" "unconnected-(U2-DIO2-Pad3)" "unconnected-(U2-DIO3-Pad4)" "unconnected-(U2-AGND-Pad13)"
+    "unconnected-(U2-ANT-Pad14)" "Net-(D8-A)" "5VDOD" "unconnected-(U11-NC-Pad6)" "Net-(J10-Pin_1)" "unconnected-(U11-NO-Pad9)" "unconnected-(U11-NC-Pad11)" "unconnected-(U11-COM-Pad13)"
+    "Net-(Q10-B)" "Net-(J1-Pin_29)" "Net-(J1-Pin_35)" "Net-(J1-Pin_38)" "Net-(U4-EN)" "unconnected-(J1-Pin_1-Pad1)" "unconnected-(J1-Pin_7-Pad7)" "Net-(J1-Pin_11)"
+    "Net-(J1-Pin_12)" "unconnected-(J1-Pin_14-Pad14)" "Net-(J1-Pin_16)" "unconnected-(J1-Pin_17-Pad17)" "unconnected-(J1-Pin_19-Pad19)" "unconnected-(J1-Pin_20-Pad20)" "unconnected-(J1-Pin_21-Pad21)" "unconnected-(J1-Pin_23-Pad23)"
+    "unconnected-(J1-Pin_24-Pad24)" "unconnected-(J1-Pin_25-Pad25)" "unconnected-(J1-Pin_26-Pad26)" "unconnected-(J1-Pin_27-Pad27)" "unconnected-(J1-Pin_28-Pad28)" "unconnected-(J1-Pin_30-Pad30)" "unconnected-(J1-Pin_34-Pad34)" "Net-(J1-Pin_36)"
+    "unconnected-(J1-Pin_39-Pad39)" "Net-(J1-Pin_40)" "Net-(Q4-G)" "Net-(Q8-C)" "Net-(Q5-B)" "Net-(Q2-G)" "Net-(Q6-C)" "ESPCAM4_VCC"
+    "ESPCAM2_VCC" "Net-(C23-Pad1)" "ESPCAM3_VCC" "Net-(Q6-B)" "Net-(U3-RT{slash}CLK)" "Net-(U4-SS)" "unconnected-(U1-Pad0)" "unconnected-(U1-RX-Pad2)"
+    "Net-(C6-Pad2)" "ESPCAM1_VCC" "Net-(U4-COMP)" BAT+ "Net-(U3-BOOT)" "unconnected-(J2-VBUS-Pad1)" "unconnected-(J2-ID-Pad4)" "Net-(U3-COMP)"
+    "Net-(Q8-B)" "Net-(C18-Pad1)" "unconnected-(U10-NC-Pad6)" "Net-(J9-Pin_1)" "unconnected-(U10-NO-Pad9)" "unconnected-(U10-NC-Pad11)" "unconnected-(U10-COM-Pad13)" "unconnected-(TP1-Pad1)"
+    "unconnected-(TP2-Pad1)" "unconnected-(TP3-Pad1)" "unconnected-(TP4-Pad1)"
+    (clearance_class "kicad_default")
+    (via_rule "kicad_default")
+    (rule
+      (width 200.0)
+    )
+    (circuit 
+      (use_layer F.Cu B.Cu)
+    )
+  )
+)

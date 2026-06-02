@@ -243,6 +243,24 @@
 					)
 				)
 				(pin power_in line
+					(at 46.99 -26.67 0)
+					(length 2.54)
+					(name ""
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "0"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin power_in line
 					(at 46.99 -5.08 0)
 					(length 2.54)
 					(name "VCC"
@@ -252,7 +270,7 @@
 							)
 						)
 					)
-					(number ""
+					(number "1"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -270,7 +288,7 @@
 							)
 						)
 					)
-					(number ""
+					(number "2"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -288,7 +306,7 @@
 							)
 						)
 					)
-					(number ""
+					(number "3"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -306,7 +324,7 @@
 							)
 						)
 					)
-					(number ""
+					(number "4"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -587,7 +605,7 @@
 				)
 			)
 		)
-		(property "Footprint" ""
+		(property "Footprint" "RF_GPS:Untitled"
 			(at 102.87 43.18 0)
 			(hide yes)
 			(show_name no)
@@ -620,17 +638,20 @@
 				)
 			)
 		)
-		(pin ""
+		(pin "2"
 			(uuid "f8318eeb-3821-4a95-a143-7f2fd70373c0")
 		)
-		(pin ""
+		(pin "3"
 			(uuid "848e3a86-9e5d-4e52-9b77-585930e2385b")
 		)
-		(pin ""
+		(pin "1"
 			(uuid "4b2c4f9e-b4df-482a-b41a-3917c637ec71")
 		)
-		(pin ""
+		(pin "4"
 			(uuid "a073433a-5940-48fa-b958-0fe6a12715d3")
+		)
+		(pin "0"
+			(uuid "84e8b051-3e53-469d-b0a2-14fb8ed8c142")
 		)
 		(instances
 			(project "stratosteam"

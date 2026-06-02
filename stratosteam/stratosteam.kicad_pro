@@ -39,9 +39,9 @@
         "other_text_thickness": 0.15,
         "other_text_upright": false,
         "pads": {
-          "drill": 0.8,
-          "height": 1.27,
-          "width": 2.54
+          "drill": 3.0,
+          "height": 4.0,
+          "width": 4.0
         },
         "silk_line_width": 0.1,
         "silk_text_italic": false,
@@ -515,7 +515,7 @@
       "netlist": "",
       "plot": "",
       "pos_files": "",
-      "specctra_dsn": "",
+      "specctra_dsn": "stratosteam.dsn",
       "step": "",
       "svg": "",
       "vrml": ""
@@ -643,7 +643,7 @@
         "uuid": "98cd4534-940d-4619-ad23-aa145f5f580e"
       }
     ],
-    "used_designators": "U1-11,R1-29,BZ1,J1-14,Y1-2,Q1-10,C1-26,D1-8,BT1,SW1-2,F1,L1-3",
+    "used_designators": "U1-12,R1-29,BZ1,J1-17,Y1-2,Q1-10,C1-26,D1-8,BT1,SW1-2,F1,L1-3,TP1-4",
     "variants": []
   },
   "sheets": [
