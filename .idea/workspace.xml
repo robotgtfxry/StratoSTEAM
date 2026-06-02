@@ -4,9 +4,17 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="0789ed74-7e87-4383-a6c9-e483a33e2b02" name="Changes" comment="15">
+    <list default="true" id="0789ed74-7e87-4383-a6c9-e483a33e2b02" name="Changes" comment="17">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/HARDWARE.md" beforeDir="false" afterPath="$PROJECT_DIR$/HARDWARE.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/flutter/lib/main.dart" beforeDir="false" afterPath="$PROJECT_DIR$/flutter/lib/main.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/flutter/lib/screens/dashboard_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/flutter/lib/screens/dashboard_screen.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/flutter/lib/screens/settings_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/flutter/lib/screens/settings_screen.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/flutter/lib/screens/terminal_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/flutter/lib/screens/terminal_screen.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/flutter/lib/screens/transmitter_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/flutter/lib/screens/transmitter_screen.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/flutter/lib/services/settings_service.dart" beforeDir="false" afterPath="$PROJECT_DIR$/flutter/lib/services/settings_service.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/flutter/lib/widgets/camera_card.dart" beforeDir="false" afterPath="$PROJECT_DIR$/flutter/lib/widgets/camera_card.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/flutter/lib/widgets/control_panel.dart" beforeDir="false" afterPath="$PROJECT_DIR$/flutter/lib/widgets/control_panel.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/flutter/lib/widgets/espcam_card.dart" beforeDir="false" afterPath="$PROJECT_DIR$/flutter/lib/widgets/espcam_card.dart" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -14,7 +22,7 @@
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
   <component name="EmbeddingIndexingInfo">
-    <option name="cachedIndexableFilesCount" value="3543" />
+    <option name="cachedIndexableFilesCount" value="3623" />
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
@@ -264,7 +272,23 @@
       <option name="project" value="LOCAL" />
       <updated>1779292005024</updated>
     </task>
-    <option name="localTasksCounter" value="24" />
+    <task id="LOCAL-00024" summary="16">
+      <option name="closed" value="true" />
+      <created>1779389025985</created>
+      <option name="number" value="00024" />
+      <option name="presentableId" value="LOCAL-00024" />
+      <option name="project" value="LOCAL" />
+      <updated>1779389025985</updated>
+    </task>
+    <task id="LOCAL-00025" summary="17">
+      <option name="closed" value="true" />
+      <created>1779393293997</created>
+      <option name="number" value="00025" />
+      <option name="presentableId" value="LOCAL-00025" />
+      <option name="project" value="LOCAL" />
+      <updated>1779393293997</updated>
+    </task>
+    <option name="localTasksCounter" value="26" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -295,6 +319,8 @@
     <MESSAGE value="13" />
     <MESSAGE value="14" />
     <MESSAGE value="15" />
-    <option name="LAST_COMMIT_MESSAGE" value="15" />
+    <MESSAGE value="16" />
+    <MESSAGE value="17" />
+    <option name="LAST_COMMIT_MESSAGE" value="17" />
   </component>
 </project>

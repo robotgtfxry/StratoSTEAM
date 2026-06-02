@@ -10,7 +10,7 @@ import '../widgets/heading_indicator.dart';
 import '../widgets/control_panel.dart';
 import '../widgets/camera_card.dart';
 import '../widgets/espcam_card.dart';
-import '../widgets/balloon_simulation_card.dart';
+import '../screens/simulation_screen.dart' show ParachuteStatusChip;
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -166,10 +166,19 @@ class DashboardScreen extends StatelessWidget {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 8),
+                  // Parachute indicator
+                  Builder(builder: (_) {
+                    final sg2 = t?.strainG2 ?? 0.0;
+                    final sg3 = t?.strainG3 ?? 0.0;
+                    final deployed = (sg2 + sg3) > 200;
+                    return Align(
+                      alignment: Alignment.centerLeft,
+                      child: ParachuteStatusChip(deployed: deployed),
+                    );
+                  }),
                   const SizedBox(height: 12),
                   SizedBox(height: 200, child: AltitudeChart(history: svc.history)),
-                  const SizedBox(height: 12),
-                  const BalloonSimulationCard(),
                   const SizedBox(height: 12),
                   const CameraCard(),
                   const SizedBox(height: 12),

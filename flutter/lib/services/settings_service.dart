@@ -9,6 +9,7 @@ class SettingsService extends ChangeNotifier {
   static const _keyMinSats     = 'min_sats';
   static const _keyLoraFreq    = 'lora_freq';
   static const _keyLoraSf      = 'lora_sf';
+  static const _keyPin         = 'pin';
 
   String serverUrl  = 'http://frog02.mikr.us:21124';
   String apiKey     = 'change-me-in-production';
@@ -17,6 +18,7 @@ class SettingsService extends ChangeNotifier {
   int    minSats    = 4;
   double loraFreq   = 433.0;
   int    loraSf     = 10;
+  String pin        = '1234';
 
   String get wsUrl => serverUrl
       .replaceFirst('https://', 'wss://')
@@ -31,6 +33,7 @@ class SettingsService extends ChangeNotifier {
     minSats    = p.getInt(_keyMinSats)       ?? minSats;
     loraFreq   = p.getDouble(_keyLoraFreq)   ?? loraFreq;
     loraSf     = p.getInt(_keyLoraSf)        ?? loraSf;
+    pin        = p.getString(_keyPin)        ?? pin;
     notifyListeners();
   }
 
@@ -64,6 +67,14 @@ class SettingsService extends ChangeNotifier {
     minSats    = 4;
     loraFreq   = 433.0;
     loraSf     = 10;
+    // pin is intentionally not reset — user keeps their PIN
+    notifyListeners();
+  }
+
+  Future<void> setPin(String newPin) async {
+    final p = await SharedPreferences.getInstance();
+    pin = newPin;
+    await p.setString(_keyPin, newPin);
     notifyListeners();
   }
 }
