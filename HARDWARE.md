@@ -105,12 +105,12 @@
 
 Każdy ESP-CAM zasilany przez tranzystor N-MOSFET (np. BSS138) na linii GND (low-side switch).
 
-| Kanał   | RPi5 BCM         | MOSFET gate (przez 100 Ω) | ESP-CAM VCC | ESP-CAM GND      |
-|---------|------------------|---------------------------|-------------|------------------|
-| CAM 0   | GPIO17 (pin 11)  | Gate ← GPIO17             | 5V wspólne  | Drain → GND syst.|
-| CAM 1   | GPIO18 (pin 12)  | Gate ← GPIO18             | 5V wspólne  | Drain → GND syst.|
-| CAM 2   | GPIO22 (pin 15)  | Gate ← GPIO22             | 5V wspólne  | Drain → GND syst.|
-| CAM 3   | GPIO23 (pin 16)  | Gate ← GPIO23             | 5V wspólne  | Drain → GND syst.|
+| Kanał | RPi5 BCM (zasilanie) | MOSFET gate (przez 100 Ω) | ESP-CAM VCC | ESP-CAM GND       | RPi5 BCM (status RX) | ESP-CAM pin (TX) |
+|-------|----------------------|---------------------------|-------------|-------------------|----------------------|------------------|
+| CAM 0 | GPIO17 (pin 11)      | Gate ← GPIO17             | 5V wspólne  | Drain → GND syst. | GPIO4  (pin 7)       | GPIO1 (U0TX)     |
+| CAM 1 | GPIO18 (pin 12)      | Gate ← GPIO18             | 5V wspólne  | Drain → GND syst. | GPIO7  (pin 26)      | GPIO1 (U0TX)     |
+| CAM 2 | GPIO22 (pin 15)      | Gate ← GPIO22             | 5V wspólne  | Drain → GND syst. | GPIO8  (pin 24)      | GPIO1 (U0TX)     |
+| CAM 3 | GPIO23 (pin 16)      | Gate ← GPIO23             | 5V wspólne  | Drain → GND syst. | GPIO9  (pin 21)      | GPIO1 (U0TX)     |
 
 Schemat każdego kanału:
 ```
@@ -125,6 +125,36 @@ RPi GPIO ──[100Ω]──┬── Gate (BSS138)
 > BSS138: Vgs(th) ≤ 2V, kompatybilny z 3.3V GPIO. Alternatywa: IRLZ44N, 2N7000.  
 > Pull-down 10 kΩ na gate gwarantuje wyłączenie podczas restartu RPi.  
 > Komenda LoRa: `{"cmd":"espcam_pwr","cam":0-3,"on":true/false}` (cam=-1 = wszystkie).
+
+### Oprogramowanie ESP32-CAM (`espcam/src/main.cpp`)
+
+Każda kamera uruchamia kod PlatformIO który:
+- Ciągle przechwytuje klatki JPEG (800×600, ~2 fps) i zapisuje na kartę SD
+- Organizuje pliki w katalogach: `/C{cam_index}/S{numer_sesji}/{numer_klatki}.jpg`
+- Przy każdym starcie tworzy nowy katalog sesji — pliki z poprzednich sesji są bezpieczne
+- Zamyka plik po każdej klatce (`close()` = natychmiastowy flush) — odporne na utratę zasilania
+- **Bez WiFi** — tylko zapis na SD, zero zakłóceń i minimalny pobór prądu
+- Blink LED (GPIO4): 1× co 2s = nagrywa OK, 2× = błąd SD, 3× = błąd kamery, 5× = fatal
+
+**Wgrywanie przez PlatformIO** (osobno dla każdej kamery):
+```bash
+pio run -e cam0 -t upload   # kamera 0
+pio run -e cam1 -t upload   # kamera 1
+pio run -e cam2 -t upload   # kamera 2
+pio run -e cam3 -t upload   # kamera 3
+```
+`CAM_INDEX` jest ustawiany automatycznie przez środowisko — nie trzeba nic zmieniać w kodzie.
+
+**Status przez UART (bez WiFi):**  
+Każda kamera wysyła co 5 s przez GPIO1 (U0TX, 9600 baud) linię JSON:
+```
+{"c":0,"ok":1,"rec":1,"n":1234,"mb":7800}
+```
+RPi5 odbiera przez pigpio bit-bang serial na GPIO4/7/8/9.  
+`EspCamMonitor` parsuje linie i dołącza compact status do pakietu UART → ESP32-S3 → LoRa → backend → Flutter.  
+Flutter pokazuje: status OK/REC, liczbę klatek, wolne MB na SD.
+
+> Napięcia zgodne: ESP32-CAM GPIO1 = 3.3V, RPi5 GPIO = 3.3V — bezpośrednie połączenie bez level-shiftera.
 
 ---
 

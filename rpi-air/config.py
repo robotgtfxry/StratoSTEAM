@@ -22,6 +22,12 @@ INA219_SHUNT_OHMS = 0.1
 # ESP32-CAM — 4× kamera, zasilanie przełączane przez MOSFET (low-side, GPIO → gate 100Ω)
 ESPCAM_PWR_PINS = [17, 18, 22, 23]   # GPIO BCM dla CAM 0-3
 
+# ESP32-CAM — odczyt statusu przez UART (bit-bang pigpio 9600 baud)
+# Każda kamera: ESP32-CAM GPIO1 (U0TX) → RPi GPIO poniżej
+# Poziomy napięć zgodne: ESP32-CAM 3.3V = RPi 3.3V (bez level-shiftera)
+ESPCAM_STATUS_PINS = [4, 7, 8, 9]    # GPIO BCM dla CAM 0-3
+ESPCAM_STATUS_BAUD = 115200
+
 # HX711 — 4× czujnik siły (tensometry, zawieszenie ładunku)
 # Każdy HX711 na osobnych pinach GPIO (DT + SCK)
 HX711_SENSORS = [

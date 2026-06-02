@@ -47,6 +47,14 @@ class CommandService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Automatycznie włącza buzzer i wysyła komendę — wywoływane przez TelemetryService
+  /// gdy balon opada poniżej 500 m. Nie wymaga interakcji użytkownika.
+  Future<void> sendBuzzerAuto() async {
+    buzzer = true;
+    notifyListeners();
+    await send();
+  }
+
   void setColor(int r, int g, int b) {
     ledR = r;
     ledG = g;
