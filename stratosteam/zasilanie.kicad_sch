@@ -163,6 +163,193 @@
 			)
 			(embedded_fonts no)
 		)
+		(symbol "Connector_Generic:Conn_01x03"
+			(pin_names
+				(offset 1.016)
+				(hide yes)
+			)
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(in_pos_files yes)
+			(duplicate_pin_numbers_are_jumpers no)
+			(property "Reference" "J"
+				(at 0 5.08 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Value" "Conn_01x03"
+				(at 0 -5.08 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Footprint" ""
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Datasheet" ""
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Description" "Generic connector, single row, 01x03, script generated (kicad-library-utils/schlib/autogen/connector/)"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "ki_keywords" "connector"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "ki_fp_filters" "Connector*:*_1x??_*"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(symbol "Conn_01x03_1_1"
+				(rectangle
+					(start -1.27 3.81)
+					(end 1.27 -3.81)
+					(stroke
+						(width 0.254)
+						(type default)
+					)
+					(fill
+						(type background)
+					)
+				)
+				(rectangle
+					(start -1.27 2.667)
+					(end 0 2.413)
+					(stroke
+						(width 0.1524)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(rectangle
+					(start -1.27 0.127)
+					(end 0 -0.127)
+					(stroke
+						(width 0.1524)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(rectangle
+					(start -1.27 -2.413)
+					(end 0 -2.667)
+					(stroke
+						(width 0.1524)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(pin passive line
+					(at -5.08 2.54 0)
+					(length 3.81)
+					(name "Pin_1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at -5.08 0 0)
+					(length 3.81)
+					(name "Pin_2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at -5.08 -2.54 0)
+					(length 3.81)
+					(name "Pin_3"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "3"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
 		(symbol "Device:C"
 			(pin_numbers
 				(hide yes)
@@ -1701,6 +1888,12 @@
 		(uuid "2c16127a-cf92-4b43-a3bc-7a3c283d9b6b")
 	)
 	(junction
+		(at 58.42 152.4)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "2eacbf6c-18b4-4b52-87da-7e52b91816cb")
+	)
+	(junction
 		(at 135.89 67.31)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -1819,12 +2012,6 @@
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "86979972-1d3a-468f-800d-e9c29c53cfb2")
-	)
-	(junction
-		(at 59.69 152.4)
-		(diameter 0)
-		(color 0 0 0 0)
-		(uuid "870a3acc-7bff-46d5-8998-346fc5616f5a")
 	)
 	(junction
 		(at 134.62 52.07)
@@ -2042,7 +2229,7 @@
 	)
 	(wire
 		(pts
-			(xy 59.69 132.08) (xy 40.64 132.08)
+			(xy 40.64 132.08) (xy 76.2 132.08)
 		)
 		(stroke
 			(width 0)
@@ -2079,6 +2266,16 @@
 			(type default)
 		)
 		(uuid "034b4da6-9c8c-4f77-a8b9-864c542d175c")
+	)
+	(wire
+		(pts
+			(xy 59.69 142.24) (xy 76.2 142.24)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "036c5005-f44b-4144-adf8-7fa6f010b0b8")
 	)
 	(wire
 		(pts
@@ -2482,7 +2679,7 @@
 	)
 	(wire
 		(pts
-			(xy 57.15 137.16) (xy 59.69 137.16)
+			(xy 57.15 137.16) (xy 76.2 137.16)
 		)
 		(stroke
 			(width 0)
@@ -2532,13 +2729,13 @@
 	)
 	(wire
 		(pts
-			(xy 40.64 152.4) (xy 59.69 152.4)
+			(xy 59.69 154.94) (xy 76.2 154.94)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "3f74ab51-1abe-4c8e-bb09-24db449f8b80")
+		(uuid "3fc91acd-fb45-466b-ac1f-f7622ea042e1")
 	)
 	(wire
 		(pts
@@ -2582,6 +2779,16 @@
 	)
 	(wire
 		(pts
+			(xy 74.93 139.7) (xy 76.2 139.7)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "45ca0243-7a5b-4273-acf3-b0be3c002a24")
+	)
+	(wire
+		(pts
 			(xy 194.31 27.94) (xy 229.87 27.94)
 		)
 		(stroke
@@ -2612,6 +2819,16 @@
 	)
 	(wire
 		(pts
+			(xy 59.69 139.7) (xy 59.69 142.24)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "4958cb1b-fc2d-4c82-8b90-a874a59001ae")
+	)
+	(wire
+		(pts
 			(xy 161.29 10.16) (xy 161.29 27.94)
 		)
 		(stroke
@@ -2619,6 +2836,16 @@
 			(type default)
 		)
 		(uuid "4c048eaf-d309-4e7b-9c8a-e4f27a68d84b")
+	)
+	(wire
+		(pts
+			(xy 76.2 143.51) (xy 76.2 146.05)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "4cab5225-57f7-4418-8e61-613009adc322")
 	)
 	(wire
 		(pts
@@ -2639,6 +2866,16 @@
 			(type default)
 		)
 		(uuid "4f79d8fc-d8d3-4310-8e33-07c6924d8e89")
+	)
+	(wire
+		(pts
+			(xy 59.69 127) (xy 76.2 127)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "50688674-66ed-4445-88a0-26697b073bc9")
 	)
 	(wire
 		(pts
@@ -2672,7 +2909,17 @@
 	)
 	(wire
 		(pts
-			(xy 57.15 143.51) (xy 59.69 143.51)
+			(xy 60.96 148.59) (xy 60.96 151.13)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "522c940d-c648-4912-ad34-f7585266801c")
+	)
+	(wire
+		(pts
+			(xy 57.15 143.51) (xy 76.2 143.51)
 		)
 		(stroke
 			(width 0)
@@ -2892,6 +3139,16 @@
 	)
 	(wire
 		(pts
+			(xy 58.42 152.4) (xy 110.49 152.4)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "6ca8a06d-c8e8-4d07-a7b2-d9665609a0bf")
+	)
+	(wire
+		(pts
 			(xy 153.67 40.64) (xy 161.29 40.64)
 		)
 		(stroke
@@ -3002,6 +3259,16 @@
 	)
 	(wire
 		(pts
+			(xy 59.69 129.54) (xy 59.69 127)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "7b04a8de-428f-4c83-8bed-ef9dbca73a80")
+	)
+	(wire
+		(pts
 			(xy 223.52 15.24) (xy 223.52 16.51)
 		)
 		(stroke
@@ -3009,6 +3276,16 @@
 			(type default)
 		)
 		(uuid "7c42ba55-ad35-4b1a-9234-a6bedecfca59")
+	)
+	(wire
+		(pts
+			(xy 59.69 149.86) (xy 59.69 154.94)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "7dd7d1cf-8817-4ce2-8ac5-f6254bd01098")
 	)
 	(wire
 		(pts
@@ -3132,6 +3409,16 @@
 	)
 	(wire
 		(pts
+			(xy 59.69 148.59) (xy 60.96 148.59)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "90e408a6-e9fe-499b-88ec-ca49fdc7cd4a")
+	)
+	(wire
+		(pts
 			(xy 85.09 45.72) (xy 85.09 39.37)
 		)
 		(stroke
@@ -3172,6 +3459,16 @@
 	)
 	(wire
 		(pts
+			(xy 74.93 148.59) (xy 76.2 148.59)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "9a5a82d6-257b-4b47-8e84-9c4b3281e001")
+	)
+	(wire
+		(pts
 			(xy 109.22 41.91) (xy 109.22 45.72)
 		)
 		(stroke
@@ -3202,7 +3499,7 @@
 	)
 	(wire
 		(pts
-			(xy 59.69 152.4) (xy 110.49 152.4)
+			(xy 40.64 152.4) (xy 58.42 152.4)
 		)
 		(stroke
 			(width 0)
@@ -3249,6 +3546,16 @@
 			(type default)
 		)
 		(uuid "a8b7f99d-5bfe-4105-9597-bfd4d461fcfb")
+	)
+	(wire
+		(pts
+			(xy 59.69 146.05) (xy 59.69 148.59)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "aad0c2b0-7b09-4957-b852-9e5229c38e7e")
 	)
 	(wire
 		(pts
@@ -3472,6 +3779,16 @@
 	)
 	(wire
 		(pts
+			(xy 60.96 151.13) (xy 76.2 151.13)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "cc0fb63c-6a4d-4988-a1ec-2a21cd0364f3")
+	)
+	(wire
+		(pts
 			(xy 166.37 17.78) (xy 166.37 19.05)
 		)
 		(stroke
@@ -3559,6 +3876,16 @@
 			(type default)
 		)
 		(uuid "d2c6fcc7-7249-4396-82f2-9037306f36d9")
+	)
+	(wire
+		(pts
+			(xy 74.93 129.54) (xy 76.2 129.54)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "d4acc7e4-700b-471e-9c83-5b7eedc0144b")
 	)
 	(wire
 		(pts
@@ -3672,6 +3999,16 @@
 	)
 	(wire
 		(pts
+			(xy 58.42 160.02) (xy 58.42 152.4)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "df950dc7-07d4-4243-a4b8-dc1039a6ad28")
+	)
+	(wire
+		(pts
 			(xy 115.57 88.9) (xy 115.57 86.36)
 		)
 		(stroke
@@ -3689,6 +4026,16 @@
 			(type default)
 		)
 		(uuid "e2ead984-14ae-4297-bc39-bee76f1e8589")
+	)
+	(wire
+		(pts
+			(xy 76.2 160.02) (xy 58.42 160.02)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "e2f76c71-8f01-4dc4-8d8c-5ba9ec0e8df8")
 	)
 	(wire
 		(pts
@@ -3779,6 +4126,16 @@
 			(type default)
 		)
 		(uuid "e9f1c8dd-58d4-4815-aa95-9d766219eb92")
+	)
+	(wire
+		(pts
+			(xy 74.93 157.48) (xy 76.2 157.48)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "eac7e965-2113-4f3f-97e6-f01c28d4cdfe")
 	)
 	(wire
 		(pts
@@ -3972,6 +4329,30 @@
 			)
 		)
 	)
+	(global_label "ESPCAM1_COM"
+		(shape input)
+		(at 74.93 129.54 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "23f31d76-20ec-4532-afa0-6ea068e34df6")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 58.2773 129.54 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
 	(global_label "BAT-"
 		(shape input)
 		(at 53.34 39.37 90)
@@ -4017,6 +4398,30 @@
 					(size 1.27 1.27)
 				)
 				(justify left)
+			)
+		)
+	)
+	(global_label "ESPCAM2_COM"
+		(shape input)
+		(at 74.93 139.7 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "6924e79a-c039-48f6-b157-3fc12ced4d3f")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 58.2773 139.7 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
 			)
 		)
 	)
@@ -4113,6 +4518,54 @@
 					(size 1.27 1.27)
 				)
 				(justify left)
+			)
+		)
+	)
+	(global_label "ESPCAM3_COM"
+		(shape input)
+		(at 74.93 148.59 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "b0077440-3291-4c43-ab6e-13e9e7eacc0d")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 58.2773 148.59 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "ESPCAM4_COM"
+		(shape input)
+		(at 74.93 157.48 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "bf787e57-b980-41b5-b52d-d5237cf568a4")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 58.2773 157.48 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
 			)
 		)
 	)
@@ -4265,88 +4718,6 @@
 			(project "stratosteam"
 				(path "/98cd4534-940d-4619-ad23-aa145f5f580e/34c569b8-9646-4655-8c94-de4817bb9f6b"
 					(reference "R10")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Connector_Generic:Conn_01x02")
-		(at 64.77 137.16 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "05fd6edc-b016-4199-80a7-a705acb05743")
-		(property "Reference" "J6"
-			(at 67.31 137.1599 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "ESPCAM-2"
-			(at 67.31 139.6999 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "Connector_JST:JST_XH_B2B-XH-AM_1x02_P2.50mm_Vertical"
-			(at 64.77 137.16 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 64.77 137.16 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Generic connector, single row, 01x02, script generated (kicad-library-utils/schlib/autogen/connector/)"
-			(at 64.77 137.16 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "2"
-			(uuid "38c7d197-6b85-479e-a0a2-ed4ed3615958")
-		)
-		(pin "1"
-			(uuid "b3c9b8e5-2e9f-4557-8b78-d0422dfeb8d6")
-		)
-		(instances
-			(project "stratosteam"
-				(path "/98cd4534-940d-4619-ad23-aa145f5f580e/34c569b8-9646-4655-8c94-de4817bb9f6b"
-					(reference "J6")
 					(unit 1)
 				)
 			)
@@ -5087,6 +5458,91 @@
 		)
 	)
 	(symbol
+		(lib_id "Connector_Generic:Conn_01x03")
+		(at 81.28 148.59 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "27e6e5a7-040d-413c-83c4-98b9f22aae8a")
+		(property "Reference" "J7"
+			(at 83.82 147.3199 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "ESPCAM3"
+			(at 83.82 149.8599 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Connector_JST:JST_XH_B3B-XH-A_1x03_P2.50mm_Vertical"
+			(at 81.28 148.59 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 81.28 148.59 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Generic connector, single row, 01x03, script generated (kicad-library-utils/schlib/autogen/connector/)"
+			(at 81.28 148.59 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "8359fb0d-7ead-4cbe-b73a-633f84fc17a7")
+		)
+		(pin "2"
+			(uuid "7ec9e356-e85f-41bb-aa0f-4a1079d0cebe")
+		)
+		(pin "3"
+			(uuid "732e04af-a4a0-4140-8a2d-8018444fd8bf")
+		)
+		(instances
+			(project "stratosteam"
+				(path "/98cd4534-940d-4619-ad23-aa145f5f580e/34c569b8-9646-4655-8c94-de4817bb9f6b"
+					(reference "J7")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Device:R")
 		(at 139.7 64.77 0)
 		(unit 1)
@@ -5163,6 +5619,91 @@
 			(project "stratosteam"
 				(path "/98cd4534-940d-4619-ad23-aa145f5f580e/34c569b8-9646-4655-8c94-de4817bb9f6b"
 					(reference "R12")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Connector_Generic:Conn_01x03")
+		(at 81.28 157.48 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "2d0931d0-f571-44c3-8d2f-8a6f96c9efb3")
+		(property "Reference" "J8"
+			(at 83.82 156.2099 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "ESPCAM4"
+			(at 83.82 158.7499 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Connector_JST:JST_XH_B3B-XH-A_1x03_P2.50mm_Vertical"
+			(at 81.28 157.48 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 81.28 157.48 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Generic connector, single row, 01x03, script generated (kicad-library-utils/schlib/autogen/connector/)"
+			(at 81.28 157.48 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "0f9a0001-96c1-4917-a558-df56e6cba863")
+		)
+		(pin "2"
+			(uuid "04095bb7-2ccf-4db9-b985-3dd4166c6bfb")
+		)
+		(pin "3"
+			(uuid "219a97b0-0b74-4252-b4aa-5d2059e3eecf")
+		)
+		(instances
+			(project "stratosteam"
+				(path "/98cd4534-940d-4619-ad23-aa145f5f580e/34c569b8-9646-4655-8c94-de4817bb9f6b"
+					(reference "J8")
 					(unit 1)
 				)
 			)
@@ -5598,88 +6139,6 @@
 		)
 	)
 	(symbol
-		(lib_id "Connector_Generic:Conn_01x02")
-		(at 64.77 149.86 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "559f276a-6462-429f-b374-08234c3492c1")
-		(property "Reference" "J8"
-			(at 67.31 149.8599 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "ESPCAM-4"
-			(at 67.31 152.3999 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "Connector_JST:JST_XH_B2B-XH-AM_1x02_P2.50mm_Vertical"
-			(at 64.77 149.86 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 64.77 149.86 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Generic connector, single row, 01x02, script generated (kicad-library-utils/schlib/autogen/connector/)"
-			(at 64.77 149.86 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "2"
-			(uuid "2e77d07c-a9fe-417a-b31f-f78f0f033940")
-		)
-		(pin "1"
-			(uuid "05d2e557-9145-4d8f-ab56-b38470a526ae")
-		)
-		(instances
-			(project "stratosteam"
-				(path "/98cd4534-940d-4619-ad23-aa145f5f580e/34c569b8-9646-4655-8c94-de4817bb9f6b"
-					(reference "J8")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "Device:C")
 		(at 139.7 74.93 0)
 		(unit 1)
@@ -5838,88 +6297,6 @@
 			(project "stratosteam"
 				(path "/98cd4534-940d-4619-ad23-aa145f5f580e/34c569b8-9646-4655-8c94-de4817bb9f6b"
 					(reference "R15")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Connector_Generic:Conn_01x02")
-		(at 64.77 129.54 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "6133acae-a3dc-4376-a5fd-be8349429a77")
-		(property "Reference" "J5"
-			(at 67.31 129.5399 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "ESPCAM-1"
-			(at 67.31 132.0799 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "Connector_JST:JST_XH_B2B-XH-AM_1x02_P2.50mm_Vertical"
-			(at 64.77 129.54 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 64.77 129.54 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Generic connector, single row, 01x02, script generated (kicad-library-utils/schlib/autogen/connector/)"
-			(at 64.77 129.54 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "2"
-			(uuid "751c8e19-beb2-4d51-b027-0a0c7eaa7e53")
-		)
-		(pin "1"
-			(uuid "d969b327-02d1-41ef-a4d4-166961eaa070")
-		)
-		(instances
-			(project "stratosteam"
-				(path "/98cd4534-940d-4619-ad23-aa145f5f580e/34c569b8-9646-4655-8c94-de4817bb9f6b"
-					(reference "J5")
 					(unit 1)
 				)
 			)
@@ -7022,88 +7399,6 @@
 		)
 	)
 	(symbol
-		(lib_id "Connector_Generic:Conn_01x02")
-		(at 64.77 143.51 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "b299ff60-3933-432d-b8e6-32a122efe16a")
-		(property "Reference" "J7"
-			(at 67.31 143.5099 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "ESPCAM-3"
-			(at 67.31 146.0499 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "Connector_JST:JST_XH_B2B-XH-AM_1x02_P2.50mm_Vertical"
-			(at 64.77 143.51 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 64.77 143.51 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Generic connector, single row, 01x02, script generated (kicad-library-utils/schlib/autogen/connector/)"
-			(at 64.77 143.51 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "2"
-			(uuid "aaa3ecef-5622-4adb-8b83-471612950773")
-		)
-		(pin "1"
-			(uuid "bf3c7f65-3caa-4248-acf5-5e1ef5837d1d")
-		)
-		(instances
-			(project "stratosteam"
-				(path "/98cd4534-940d-4619-ad23-aa145f5f580e/34c569b8-9646-4655-8c94-de4817bb9f6b"
-					(reference "J7")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "Device:R")
 		(at 166.37 22.86 0)
 		(unit 1)
@@ -7340,6 +7635,91 @@
 			(project "stratosteam"
 				(path "/98cd4534-940d-4619-ad23-aa145f5f580e/34c569b8-9646-4655-8c94-de4817bb9f6b"
 					(reference "L3")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Connector_Generic:Conn_01x03")
+		(at 81.28 129.54 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "bbecd84a-f6e3-4236-90ac-77a7a6a1dc3c")
+		(property "Reference" "J5"
+			(at 83.82 128.2699 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "ESPCAM1"
+			(at 83.82 130.8099 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Connector_JST:JST_XH_B3B-XH-A_1x03_P2.50mm_Vertical"
+			(at 81.28 129.54 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 81.28 129.54 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Generic connector, single row, 01x03, script generated (kicad-library-utils/schlib/autogen/connector/)"
+			(at 81.28 129.54 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "990ac074-9491-4a38-86d3-088eef415dfa")
+		)
+		(pin "2"
+			(uuid "747f5645-a1bf-4bdb-a2d8-f6f537847598")
+		)
+		(pin "3"
+			(uuid "42643183-ab96-4929-a6a5-d6e7768ef3f5")
+		)
+		(instances
+			(project "stratosteam"
+				(path "/98cd4534-940d-4619-ad23-aa145f5f580e/34c569b8-9646-4655-8c94-de4817bb9f6b"
+					(reference "J5")
 					(unit 1)
 				)
 			)
@@ -7993,6 +8373,91 @@
 			(project "stratosteam"
 				(path "/98cd4534-940d-4619-ad23-aa145f5f580e/34c569b8-9646-4655-8c94-de4817bb9f6b"
 					(reference "C16")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Connector_Generic:Conn_01x03")
+		(at 81.28 139.7 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "eabc3520-cd9f-4b45-b299-6173f634aee3")
+		(property "Reference" "J6"
+			(at 83.82 138.4299 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "ESPCAM2"
+			(at 83.82 140.9699 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Connector_JST:JST_XH_B3B-XH-A_1x03_P2.50mm_Vertical"
+			(at 81.28 139.7 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 81.28 139.7 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Generic connector, single row, 01x03, script generated (kicad-library-utils/schlib/autogen/connector/)"
+			(at 81.28 139.7 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "58a0a920-f034-43b1-a84f-e878a76ef977")
+		)
+		(pin "2"
+			(uuid "38e87f27-8b1b-433f-978c-8e06c5874228")
+		)
+		(pin "3"
+			(uuid "3a380534-f1f3-4156-94d1-a6bcd1cc56e8")
+		)
+		(instances
+			(project "stratosteam"
+				(path "/98cd4534-940d-4619-ad23-aa145f5f580e/34c569b8-9646-4655-8c94-de4817bb9f6b"
+					(reference "J6")
 					(unit 1)
 				)
 			)
