@@ -30592,7 +30592,7 @@
 		(layer "Edge.Cuts")
 		(uuid "0222d3dc-a23b-4894-9161-e7ce83f63f6a")
 	)
-	(gr_text "Creators: Michał Szabat, Michał Jaksan\nContributors: Bartłomiej Koszelnik, Maciej Bogusz, Karol Krupa"
+	(gr_text "Creators: Michał Jaksan, Michał Szabat\nContributors: Bartłomiej Koszelnik, Maciej Bogusz, Karol Krupa"
 		(at 111.5 42 0)
 		(layer "F.SilkS")
 		(uuid "c4a18e9d-1131-42f1-8ad0-30b7b305b4c5")
@@ -30613,6 +30613,18 @@
 				(thickness 0.15)
 			)
 			(justify bottom)
+		)
+	)
+	(gr_text "Электронное техническое училище \n№ 6 - худшее учебное заведение."
+		(at 102.5 71 0)
+		(layer "F.SilkS")
+		(uuid "5c758ace-9194-4a08-bc8b-395b7cdc24ca")
+		(effects
+			(font
+				(size 3 3)
+				(thickness 0.6)
+				(bold yes)
+			)
 		)
 	)
 	(segment
