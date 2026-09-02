@@ -1,13 +1,11 @@
 // StratoSTEAM — ESP32-CAM konfiguracja
-// PlatformIO: indeks ustawiany przez środowisko (pio run -e cam0/cam1/cam2/cam3)
-// Arduino IDE: zmień CAM_INDEX ręcznie przed wgraniem
+// Na balonie pracuje jedna kamera ESP32-CAM: pio run -t upload
 
 #pragma once
 
-// ─── Identyfikator kamery (0-3) ───────────────────────────────────────────────
-#ifndef CAM_INDEX
-#define CAM_INDEX 0
-#endif
+// ─── Katalog nagrań na karcie SD ─────────────────────────────────────────────
+// Każdy start tworzy nowy katalog sesji: /CAM/S000, /CAM/S001, …
+#define SESSION_ROOT         "/CAM"
 
 // ─── Nagrywanie MJPEG AVI ────────────────────────────────────────────────────
 // OV2640 stabilnie daje ~10 fps przy VGA

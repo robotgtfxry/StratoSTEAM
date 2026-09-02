@@ -1,6 +1,6 @@
 """
-Polls the backend for pending ESP-CAM power commands.
-rpi-ground reads them before the next LoRa uplink window.
+Polls the backend for a pending ESP32-CAM power command.
+rpi-ground reads it before the next LoRa uplink window.
 """
 import logging
 import threading
@@ -15,7 +15,7 @@ _HEADERS = {"X-API-Key": BACKEND_API_KEY}
 class EspCamStore:
     def __init__(self):
         self._lock    = threading.Lock()
-        self._pending: tuple[int, bool] | None = None  # (cam, on)
+        self._pending: bool | None = None      # żądany stan zasilania kamery
         self._thread  = threading.Thread(target=self._poll, daemon=True)
 
     def start(self):
@@ -33,13 +33,13 @@ class EspCamStore:
                     data = r.json()
                     if data.get("pending"):
                         with self._lock:
-                            self._pending = (int(data["cam"]), bool(data["on"]))
+                            self._pending = bool(data["on"])
             except requests.RequestException as e:
                 log.debug("EspCam poll error: %s", e)
             time.sleep(1.0)
 
-    def pop(self) -> tuple[int, bool] | None:
-        """Returns (cam, on) if a command is pending, else None."""
+    def pop(self) -> bool | None:
+        """Zwraca żądany stan zasilania jeśli czeka komenda, inaczej None."""
         with self._lock:
             val = self._pending
             self._pending = None

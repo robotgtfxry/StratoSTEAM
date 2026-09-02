@@ -208,11 +208,10 @@ def main():
                         log.info("Camera rec cmd on=%s sent ok=%s", rec, ok)
 
                 # ── ESP-CAM power ─────────────────────────────────────────────
-                espcam_cmd = espcam_s.pop()
-                if espcam_cmd is not None:
-                    cam_i, cam_on = espcam_cmd
-                    ok = lora.send_command(build_espcam_power_command(cam_i, cam_on))
-                    log.info("EspCam power cmd cam=%d on=%s ok=%s", cam_i, cam_on, ok)
+                cam_on = espcam_s.pop()
+                if cam_on is not None:
+                    ok = lora.send_command(build_espcam_power_command(cam_on))
+                    log.info("EspCam power cmd on=%s ok=%s", cam_on, ok)
 
             else:
                 # ESP32 beacon — możemy wysłać tylko rpi_power (ESP32 słucha)

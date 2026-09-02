@@ -5,11 +5,11 @@
  * Plik dzielony co FILE_SPLIT_S sekund — przy utracie zasilania
  * tracisz max jeden segment, poprzednie pliki są kompletne.
  *
- * Płytka: AI-Thinker ESP32-CAM
- * PlatformIO: pio run -e cam0 -t upload
+ * Płytka: AI-Thinker ESP32-CAM (na balonie jest jedna sztuka)
+ * PlatformIO: pio run -t upload
  *
  * Status wysyłany przez GPIO1 (U0TX) co 5s, format:
- *   $S{"c":0,"ok":1,"rec":1,"n":1234,"mb":7800}
+ *   $S{"ok":1,"rec":1,"n":1234,"mb":7800}
  * RPi parsuje tylko linie zaczynające się od "$S".
  */
 
@@ -271,8 +271,7 @@ bool initSD() {
 }
 
 bool createSessionDir() {
-  char base[16];
-  snprintf(base, sizeof(base), "/C%d", CAM_INDEX);
+  const char *base = SESSION_ROOT;
   SD_MMC.mkdir(base);
   for (int i = 0; i < 1000; i++) {
     snprintf(g_sessionDir, sizeof(g_sessionDir), "%s/S%03d", base, i);
@@ -297,8 +296,7 @@ bool openNextFile() {
 // ─── Status → RPi ────────────────────────────────────────────────────────────
 void sendStatus() {
   uint64_t free_mb = (SD_MMC.totalBytes() - SD_MMC.usedBytes()) / (1024 * 1024);
-  Serial.printf("$S{\"c\":%d,\"ok\":%d,\"rec\":%d,\"n\":%lu,\"mb\":%llu}\n",
-    CAM_INDEX,
+  Serial.printf("$S{\"ok\":%d,\"rec\":%d,\"n\":%lu,\"mb\":%llu}\n",
     (g_cam_ok && g_sd_ok) ? 1 : 0,
     g_recording ? 1 : 0,
     g_totalFrames,
@@ -309,7 +307,7 @@ void sendStatus() {
 // ─── Setup ───────────────────────────────────────────────────────────────────
 void setup() {
   Serial.begin(SERIAL_BAUD);
-  Serial.printf("\n[BOOT] StratoSTEAM ESP32-CAM #%d\n", CAM_INDEX);
+  Serial.println("\n[BOOT] StratoSTEAM ESP32-CAM");
 
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, !LED_ACTIVE);

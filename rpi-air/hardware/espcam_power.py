@@ -1,5 +1,5 @@
 """
-4× ESP32-CAM power control via N-MOSFET low-side switches.
+ESP32-CAM power control via an N-MOSFET low-side switch.
 RPi5 GPIO HIGH → MOSFET open → ESP-CAM powered.
 """
 import logging
@@ -9,29 +9,19 @@ log = logging.getLogger(__name__)
 
 
 class EspCamPower:
-    def __init__(self, pins: list[int]):
-        self._pins = pins
+    def __init__(self, pin: int):
+        self._pin = pin
         GPIO.setmode(GPIO.BCM)
-        for p in self._pins:
-            GPIO.setup(p, GPIO.OUT, initial=GPIO.LOW)
-        log.info("EspCamPower ready, pins=%s (all OFF)", self._pins)
+        GPIO.setup(self._pin, GPIO.OUT, initial=GPIO.LOW)
+        log.info("EspCamPower ready, pin=GPIO%d (OFF)", self._pin)
 
-    def set(self, cam: int, on: bool) -> None:
-        """Power cam on/off. cam=-1 affects all cameras."""
-        if cam == -1:
-            for p in self._pins:
-                GPIO.output(p, GPIO.HIGH if on else GPIO.LOW)
-            log.info("EspCam ALL %s", "ON" if on else "OFF")
-        elif 0 <= cam < len(self._pins):
-            GPIO.output(self._pins[cam], GPIO.HIGH if on else GPIO.LOW)
-            log.info("EspCam %d %s", cam, "ON" if on else "OFF")
-        else:
-            log.warning("EspCam invalid index: %d", cam)
+    def set(self, on: bool) -> None:
+        GPIO.output(self._pin, GPIO.HIGH if on else GPIO.LOW)
+        log.info("EspCam %s", "ON" if on else "OFF")
 
-    def state(self) -> list[bool]:
-        return [bool(GPIO.input(p)) for p in self._pins]
+    def state(self) -> bool:
+        return bool(GPIO.input(self._pin))
 
     def close(self) -> None:
-        for p in self._pins:
-            GPIO.output(p, GPIO.LOW)
-        GPIO.cleanup(self._pins)
+        GPIO.output(self._pin, GPIO.LOW)
+        GPIO.cleanup(self._pin)

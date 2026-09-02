@@ -83,6 +83,10 @@ struct RpiData {
     float dsku = 0.0f;        // disk used GB
     float dskf = 0.0f;        // disk free GB
     float hfdb = -999.0f;     // SDR pomiar dBFS (-999 = brak pomiaru)
+    // ESP32-CAM: [ok, rec, klatki, wolne MB] — pole "ec" z telemetrii RPi
+    bool  ecValid = false;
+    int   ecOk = 0, ecRec = 0;
+    long  ecFrames = 0, ecFreeMb = 0;
     bool  fresh = false;
 } rpi;
 
@@ -150,6 +154,17 @@ void parseRpiLine(const String& line) {
     rpi.dsku = doc["dsku"] | 0.0f;
     rpi.dskf = doc["dskf"] | 0.0f;
     rpi.hfdb = doc["hfdb"] | -999.0f;
+
+    // Status ESP32-CAM: "ec":[ok, rec, klatki, wolne MB]
+    JsonArrayConst ec = doc["ec"];
+    if (!ec.isNull() && ec.size() >= 4) {
+        rpi.ecOk     = ec[0] | 0;
+        rpi.ecRec    = ec[1] | 0;
+        rpi.ecFrames = ec[2] | 0L;
+        rpi.ecFreeMb = ec[3] | 0L;
+        rpi.ecValid  = true;
+    }
+
     rpi.fresh = true;
     rpiLastRx = millis();
 
@@ -215,6 +230,13 @@ void sendBeacon() {
         doc["dsku"] = rpi.dsku;
         doc["dskf"] = rpi.dskf;
         if (rpi.hfdb > -999.0f) doc["hfdb"] = rpi.hfdb;
+        if (rpi.ecValid) {
+            JsonArray ec = doc["ec"].to<JsonArray>();
+            ec.add(rpi.ecOk);
+            ec.add(rpi.ecRec);
+            ec.add(rpi.ecFrames);
+            ec.add(rpi.ecFreeMb);
+        }
     } else {
         // RPi5 nieosiągalna — tylko napięcie z ADC
         doc["vbat"] = readBattAdc();
@@ -278,6 +300,15 @@ void handleIncoming() {
         bool on = doc["on"] | false;
         Serial.printf("[ESP32] cam_rec on=%d → RPi\n", on);
         String fwd = String("{\"cmd\":\"cam_rec\",\"on\":") + (on ? "true" : "false") + "}";
+        rpiSerial.println(fwd);
+        return;
+    }
+
+    // Zasilanie ESP32-CAM — steruje nim RPi (MOSFET na GPIO17)
+    if (strcmp(cmd, "espcam_pwr") == 0) {
+        bool on = doc["on"] | false;
+        Serial.printf("[ESP32] espcam_pwr on=%d → RPi\n", on);
+        String fwd = String("{\"cmd\":\"espcam_pwr\",\"on\":") + (on ? "true" : "false") + "}";
         rpiSerial.println(fwd);
         return;
     }

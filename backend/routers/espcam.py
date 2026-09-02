@@ -1,8 +1,8 @@
 """
-ESP-CAM power control routes.
-  POST /api/espcam/power          — Flutter sets power state for one/all cameras
-  GET  /api/espcam/power/pending  — rpi-ground polls for pending command
-  GET  /api/espcam/power/state    — Flutter reads current known state
+ESP32-CAM power control routes (jedna kamera na balonie).
+  POST /api/espcam/power          — Flutter ustawia stan zasilania kamery
+  GET  /api/espcam/power/pending  — rpi-ground odpytuje o oczekującą komendę
+  GET  /api/espcam/power/state    — Flutter czyta ostatni znany stan
 """
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel
@@ -18,38 +18,32 @@ def _verify_key(x_api_key: str = Header(...)):
 
 # ── In-memory state ───────────────────────────────────────────────────────────
 
-_pending: dict | None = None          # {"cam": int, "on": bool}
-_state: list[bool] = [False] * 4      # last known power state per camera
+_pending: bool | None = None    # oczekujący stan zasilania
+_state: bool = False            # ostatni znany stan kamery
 
 
 class PowerIn(BaseModel):
-    cam: int   # 0-3 for single, -1 for all
     on: bool
 
 
 @router.post("/power", status_code=status.HTTP_202_ACCEPTED)
 async def set_power(body: PowerIn, _: None = Depends(_verify_key)):
-    global _pending
-    if body.cam not in (-1, 0, 1, 2, 3):
-        raise HTTPException(status_code=422, detail="cam must be -1..3")
-    _pending = {"cam": body.cam, "on": body.on}
-    # Optimistically update state
-    idxs = range(4) if body.cam == -1 else [body.cam]
-    for i in idxs:
-        _state[i] = body.on
-    return {"queued": True, "cam": body.cam, "on": body.on}
+    global _pending, _state
+    _pending = body.on
+    _state = body.on          # optymistyczna aktualizacja
+    return {"queued": True, "on": body.on}
 
 
 @router.get("/power/pending")
 async def power_pending(_: None = Depends(_verify_key)):
     global _pending
     if _pending is None:
-        return {"pending": False, "cam": 0, "on": False}
+        return {"pending": False, "on": False}
     val = _pending
     _pending = None
-    return {"pending": True, "cam": val["cam"], "on": val["on"]}
+    return {"pending": True, "on": val}
 
 
 @router.get("/power/state")
 async def power_state():
-    return {"state": _state}
+    return {"on": _state}

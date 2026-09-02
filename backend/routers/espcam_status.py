@@ -1,7 +1,7 @@
 """
-ESP32-CAM status routes.
-  POST /api/espcam/status   — rpi-ground wrzuca status (z pola "ec" w telemetrii)
-  GET  /api/espcam/status   — Flutter odczytuje status wszystkich kamer
+ESP32-CAM status routes (jedna kamera na balonie).
+  POST /api/espcam/status   — rpi-ground wrzuca status (pole "ec" z telemetrii)
+  GET  /api/espcam/status   — Flutter odczytuje status kamery
 """
 import time
 from fastapi import APIRouter, Depends, Header, HTTPException, status
@@ -17,37 +17,35 @@ def _verify_key(x_api_key: str = Header(...)):
 
 
 # ── In-memory state ───────────────────────────────────────────────────────────
-# Lista 4 statusów kamer, aktualizowana przez rpi-ground przy każdym pakiecie telemetrii
-_cam_statuses: list[dict] = [
-    {"cam": i, "ok": False, "recording": False, "frames": 0,
-     "free_mb": 0, "reachable": False, "updated_at": None}
-    for i in range(4)
-]
+# Status kamery, aktualizowany przez rpi-ground przy każdym pakiecie telemetrii
+_cam_status: dict = {
+    "ok": False, "recording": False, "frames": 0,
+    "free_mb": 0, "reachable": False, "updated_at": None,
+}
 
 
 class EspCamStatusIn(BaseModel):
-    # ec: [[ok, recording, frames, free_mb], ...] — kompaktowy format z pakietu LoRa
-    ec: list[list]
+    # ec: [ok, recording, frames, free_mb] — kompaktowy format z pakietu LoRa
+    ec: list
 
 
 @router.post("/status", status_code=status.HTTP_200_OK)
 async def update_status(body: EspCamStatusIn, _: None = Depends(_verify_key)):
-    global _cam_statuses
-    now = time.time()
-    for i, cam_data in enumerate(body.ec[:4]):
-        if len(cam_data) >= 4:
-            _cam_statuses[i] = {
-                "cam":       i,
-                "ok":        bool(cam_data[0]),
-                "recording": bool(cam_data[1]),
-                "frames":    int(cam_data[2]),
-                "free_mb":   int(cam_data[3]),
-                "reachable": bool(cam_data[0]) or bool(cam_data[1]),
-                "updated_at": now,
-            }
-    return {"updated": len(body.ec)}
+    global _cam_status
+    if len(body.ec) < 4:
+        raise HTTPException(status_code=422, detail="ec must be [ok, rec, frames, free_mb]")
+    ok, rec, frames, free_mb = body.ec[:4]
+    _cam_status = {
+        "ok":        bool(ok),
+        "recording": bool(rec),
+        "frames":    int(frames),
+        "free_mb":   int(free_mb),
+        "reachable": bool(ok) or bool(rec),
+        "updated_at": time.time(),
+    }
+    return {"updated": True}
 
 
 @router.get("/status")
 async def get_status():
-    return {"cameras": _cam_statuses, "ts": time.time()}
+    return {"camera": _cam_status, "ts": time.time()}

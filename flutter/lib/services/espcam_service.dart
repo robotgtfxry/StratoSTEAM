@@ -4,10 +4,11 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'settings_service.dart';
 
+/// Sterowanie zasilaniem jedynej kamery ESP32-CAM na balonie.
 class EspCamService extends ChangeNotifier {
   final SettingsService _settings;
 
-  List<bool> state = [false, false, false, false];
+  bool state = false;
   bool loading = false;
 
   EspCamService(this._settings) {
@@ -22,14 +23,13 @@ class EspCamService extends ChangeNotifier {
           .timeout(const Duration(seconds: 3));
       if (r.statusCode == 200) {
         final j = jsonDecode(r.body);
-        final list = (j['state'] as List).cast<bool>();
-        state = list;
+        state = j['on'] == true;
         notifyListeners();
       }
     } catch (_) {}
   }
 
-  Future<void> setPower(int cam, bool on) async {
+  Future<void> setPower(bool on) async {
     loading = true;
     notifyListeners();
     try {
@@ -39,14 +39,9 @@ class EspCamService extends ChangeNotifier {
           'Content-Type': 'application/json',
           'X-API-Key': _settings.apiKey,
         },
-        body: jsonEncode({'cam': cam, 'on': on}),
+        body: jsonEncode({'on': on}),
       ).timeout(const Duration(seconds: 5));
-      // Optimistic update
-      if (cam == -1) {
-        state = List.filled(4, on);
-      } else if (cam >= 0 && cam < 4) {
-        state = List.from(state)..[cam] = on;
-      }
+      state = on; // Optimistic update
       notifyListeners();
     } catch (_) {
     } finally {

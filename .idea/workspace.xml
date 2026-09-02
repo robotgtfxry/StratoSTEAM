@@ -6,7 +6,28 @@
   <component name="ChangeListManager">
     <list default="true" id="919a31d3-6523-42ef-a254-fe33fcc2962f" name="Changes" comment="sdf">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/stratosteam/stratosteam.kicad_pcb" beforeDir="false" afterPath="$PROJECT_DIR$/stratosteam/stratosteam.kicad_pcb" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/HARDWARE.md" beforeDir="false" afterPath="$PROJECT_DIR$/HARDWARE.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/routers/espcam.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/routers/espcam.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/routers/espcam_status.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/routers/espcam_status.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/esp32/src/main.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/esp32/src/main.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/espcam/include/config.h" beforeDir="false" afterPath="$PROJECT_DIR$/espcam/include/config.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/espcam/platformio.ini" beforeDir="false" afterPath="$PROJECT_DIR$/espcam/platformio.ini" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/espcam/src/main.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/espcam/src/main.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/flutter/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/flutter/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/flutter/lib/services/espcam_service.dart" beforeDir="false" afterPath="$PROJECT_DIR$/flutter/lib/services/espcam_service.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/flutter/lib/services/espcam_status_service.dart" beforeDir="false" afterPath="$PROJECT_DIR$/flutter/lib/services/espcam_status_service.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/flutter/lib/widgets/espcam_card.dart" beforeDir="false" afterPath="$PROJECT_DIR$/flutter/lib/widgets/espcam_card.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gen_instrukcja.js" beforeDir="false" afterPath="$PROJECT_DIR$/gen_instrukcja.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rpi-air/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/rpi-air/config.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rpi-air/hardware/esp_uart.py" beforeDir="false" afterPath="$PROJECT_DIR$/rpi-air/hardware/esp_uart.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rpi-air/hardware/espcam_monitor.py" beforeDir="false" afterPath="$PROJECT_DIR$/rpi-air/hardware/espcam_monitor.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rpi-air/hardware/espcam_power.py" beforeDir="false" afterPath="$PROJECT_DIR$/rpi-air/hardware/espcam_power.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rpi-air/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/rpi-air/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rpi-ground/espcam_store.py" beforeDir="false" afterPath="$PROJECT_DIR$/rpi-ground/espcam_store.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rpi-ground/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/rpi-ground/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rpi-ground/packet.py" beforeDir="false" afterPath="$PROJECT_DIR$/rpi-ground/packet.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/stratosteam/stratosteam.kicad_pro" beforeDir="false" afterPath="$PROJECT_DIR$/stratosteam/stratosteam.kicad_pro" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/stratosteam/~stratosteam.kicad_pro.lck" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -14,7 +35,7 @@
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
   <component name="EmbeddingIndexingInfo">
-    <option name="cachedIndexableFilesCount" value="4111" />
+    <option name="cachedIndexableFilesCount" value="4120" />
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
@@ -44,19 +65,20 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;ASKED_MARK_IGNORED_FILES_AS_EXCLUDED&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.MCP Project settings loaded&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
-    &quot;junie.onboarding.icon.badge.shown&quot;: &quot;true&quot;,
-    &quot;to.speed.mode.migration.done&quot;: &quot;true&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ASKED_MARK_IGNORED_FILES_AS_EXCLUDED": "true",
+    "Python.main.executor": "Run",
+    "RunOnceActivity.MCP Project settings loaded": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
+    "git-widget-placeholder": "main",
+    "junie.onboarding.icon.badge.shown": "true",
+    "to.speed.mode.migration.done": "true"
   }
-}</component>
+}]]></component>
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
@@ -96,7 +118,15 @@
       <option name="project" value="LOCAL" />
       <updated>1781090385042</updated>
     </task>
-    <option name="localTasksCounter" value="4" />
+    <task id="LOCAL-00004" summary="sdf">
+      <option name="closed" value="true" />
+      <created>1781091247232</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1781091247232</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">

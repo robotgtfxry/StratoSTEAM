@@ -5,7 +5,6 @@ import 'package:http/http.dart' as http;
 import 'settings_service.dart';
 
 class EspCamStatusEntry {
-  final int cam;
   final bool ok;
   final bool recording;
   final int frames;
@@ -14,7 +13,6 @@ class EspCamStatusEntry {
   final DateTime? updatedAt;
 
   const EspCamStatusEntry({
-    required this.cam,
     required this.ok,
     required this.recording,
     required this.frames,
@@ -23,8 +21,7 @@ class EspCamStatusEntry {
     this.updatedAt,
   });
 
-  factory EspCamStatusEntry.empty(int cam) => EspCamStatusEntry(
-        cam: cam,
+  factory EspCamStatusEntry.empty() => const EspCamStatusEntry(
         ok: false,
         recording: false,
         frames: 0,
@@ -34,7 +31,6 @@ class EspCamStatusEntry {
 
   factory EspCamStatusEntry.fromJson(Map<String, dynamic> j) =>
       EspCamStatusEntry(
-        cam:       j['cam'] ?? 0,
         ok:        j['ok']        == true || j['ok']        == 1,
         recording: j['recording'] == true || j['recording'] == 1,
         frames:    j['frames']    ?? 0,
@@ -53,11 +49,11 @@ class EspCamStatusEntry {
   }
 }
 
+/// Status jedynej kamery ESP32-CAM (nagrywanie, klatki, wolne MB na karcie).
 class EspCamStatusService extends ChangeNotifier {
   final SettingsService _settings;
 
-  List<EspCamStatusEntry> cameras = List.generate(
-      4, (i) => EspCamStatusEntry.empty(i));
+  EspCamStatusEntry camera = EspCamStatusEntry.empty();
 
   Timer? _timer;
   bool _disposed = false;
@@ -75,16 +71,10 @@ class EspCamStatusService extends ChangeNotifier {
           .timeout(const Duration(seconds: 5));
       if (res.statusCode == 200) {
         final j = jsonDecode(res.body) as Map<String, dynamic>;
-        final list = (j['cameras'] as List?) ?? [];
-        cameras = List.generate(4, (i) {
-          final match = list.firstWhere(
-            (e) => (e['cam'] ?? -1) == i,
-            orElse: () => <String, dynamic>{},
-          );
-          return match.isEmpty
-              ? EspCamStatusEntry.empty(i)
-              : EspCamStatusEntry.fromJson(match as Map<String, dynamic>);
-        });
+        final cam = j['camera'] as Map<String, dynamic>?;
+        camera = cam == null
+            ? EspCamStatusEntry.empty()
+            : EspCamStatusEntry.fromJson(cam);
         if (!_disposed) notifyListeners();
       }
     } catch (_) {}

@@ -13,7 +13,7 @@ from config import (
     BME280_ADDR, MS5611_ADDR, BNO085_ADDR,
     INA219_ADDR, INA219_SHUNT_OHMS,
     HX711_SENSORS, HX711_REFERENCE_UNIT,
-    ESPCAM_PWR_PINS, ESPCAM_STATUS_PINS, ESPCAM_STATUS_BAUD,
+    ESPCAM_PWR_PIN, ESPCAM_STATUS_PIN, ESPCAM_STATUS_BAUD,
     ESP_UART_PORT, ESP_UART_BAUD, ESP_SEND_INTERVAL_S,
     CAM_RECORD_DIR, CAM_PHOTO_W, CAM_PHOTO_H, CAM_PHOTO_QUALITY, CAM_CHUNK_INTERVAL_S,
     SDR_ENABLED, SDR_TARGET_FREQ, SDR_SAMPLE_RATE, SDR_GAIN,
@@ -46,8 +46,8 @@ def main():
         Hx711Sensor(s["dt"], s["sck"], HX711_REFERENCE_UNIT)
         for s in HX711_SENSORS
     ]
-    espcams    = EspCamPower(ESPCAM_PWR_PINS)
-    espcam_mon = EspCamMonitor(ESPCAM_STATUS_PINS, ESPCAM_STATUS_BAUD)
+    espcam     = EspCamPower(ESPCAM_PWR_PIN)
+    espcam_mon = EspCamMonitor(ESPCAM_STATUS_PIN, ESPCAM_STATUS_BAUD)
     esp        = EspUartSender(ESP_UART_PORT, ESP_UART_BAUD)
     cam  = CameraModule(CAM_RECORD_DIR, CAM_PHOTO_W, CAM_PHOTO_H, CAM_PHOTO_QUALITY)
     sdr  = SdrReceiver(
@@ -100,7 +100,7 @@ def main():
                         cam.stop_recording()
 
                 elif c == "espcam_pwr":
-                    espcams.set(int(cmd.get("cam", -1)), bool(cmd.get("on", False)))
+                    espcam.set(bool(cmd.get("on", False)))
 
             # ── Wysyłaj chunki obrazu do ESP32 (po jednym co CAM_CHUNK_INTERVAL_S) ──
             if pending_chunks and (now - last_chunk_sent >= CAM_CHUNK_INTERVAL_S):
@@ -150,7 +150,7 @@ def main():
         for s in strains:
             s.close()
         espcam_mon.stop()
-        espcams.close()
+        espcam.close()
         power.close()
 
 
