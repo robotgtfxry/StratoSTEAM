@@ -57,7 +57,7 @@ def run_console(only: str | None = None) -> int:
         devices = [dev]
     else:
         devices = [d for d in catalog.DEVICES if not d.confirm]
-        print("Testy wykonujące fizyczne akcje (przekaźniki, nadajnik HF) są pomijane —\n"
+        print("Test wykonujący fizyczną akcję (przekaźniki zwalniania linek) jest pomijany —\n"
               "uruchom je pojedynczo: python3 testy/main.py --test relays\n")
 
     print(f"Płytka: {pi_model() or 'brak Raspberry Pi'}\n")

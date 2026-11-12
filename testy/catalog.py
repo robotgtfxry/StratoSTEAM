@@ -5,7 +5,8 @@ i jakim testem to sprawdzić.
 To jest jedyne miejsce z opisami podłączeń. GUI tylko je wyświetla,
 a piny bierze stąd do podświetlenia na rysunku złącza 40-pin.
 
-Źródło danych: HARDWARE.md + rpi-air/config.py + rpi-ground/config.py.
+Źródło danych: sprzęt, który faktycznie mamy (BME280, GY-87, INA226, kamera CSI,
+RTL-SDR, ESP32-CAM, ESP32-S3, przekaźniki, GPS) + rpi-air/config.py.
 """
 from __future__ import annotations
 
@@ -15,7 +16,7 @@ from typing import Callable
 
 import hw_tests as T
 from pinout import gpio_label, pin_of
-from repo import air, ground
+from repo import air
 
 # rodzaje linii (kolor na rysunku złącza)
 K_3V3, K_5V, K_GND, K_SIG, K_OTHER = "3v3", "5v", "gnd", "gpio", "other"
@@ -80,8 +81,7 @@ def w_i2c() -> list[Wire]:
 
 
 GRUPA_BALON = "Raspberry Pi 5 — balon"
-GRUPA_ZIEMIA = "Raspberry Pi 5 — stacja naziemna"
-GRUPA_STOL = "Moduły ESP32 — test na stole"
+GRUPA_STOL = "Moduły ESP32-S3 — test na stole"
 
 I2C_STEPS = [
     "Wyłącz Raspberry Pi i odłącz zasilanie — czujniki podpinamy na zimno.",
@@ -94,20 +94,31 @@ I2C_STEPS = [
 
 I2C_LIBS = ["python3-smbus2 (apt) lub smbus2 (pip)"]
 
+# GY-87: jedna płytka, trzy układy (MPU-6050 + magnetometr + BMP180) na wspólnym I2C
+GY87_WIRING = [
+    Wire("VCC_IN", "3.3 V — pin 1", (1,), K_3V3, "płytka ma stabilizator — przyjmie też 5 V"),
+    w_gnd(),
+    w_gpio("SDA", 2, "magistrala wspólna dla wszystkich czujników I2C"),
+    w_gpio("SCL", 3, "magistrala wspólna dla wszystkich czujników I2C"),
+    Wire("3.3V (wyjście)", "niepodłączony", (), K_OTHER, "to wyjście stabilizatora płytki"),
+    Wire("FSYNC / INTA / DRDY", "niepodłączone", (), K_OTHER, "nie są potrzebne"),
+]
+GY87_STEPS = [
+    "Wyłącz Raspberry Pi i odłącz zasilanie — czujniki podpinamy na zimno.",
+    "VCC_IN płytki GY-87 → pin 1 (3.3 V). Pin „3.3V” na płytce zostaw wolny.",
+    "GND → pin 6.",
+    "SDA → pin 3 (GPIO2), SCL → pin 5 (GPIO3) — te same co BME280.",
+    "Włącz Raspberry Pi, uruchom „Skan magistrali I2C” — muszą być 0x68 i 0x77.",
+]
+
 
 def build_devices() -> list[Device]:
-    hx = air("HX711_SENSORS", T._HX711_DEFAULT)
     espcam_pwr = air("ESPCAM_PWR_PIN", 17)
-    espcam_st = air("ESPCAM_STATUS_PIN", 4)
     espcam_baud = air("ESPCAM_STATUS_BAUD", 115200)
     alive = air("RPI_ALIVE_PIN", 26)
     shtdn = air("ESP32_SHTDN_PIN", 6)
     uart_port = air("ESP_UART_PORT", "/dev/ttyAMA0")
     uart_baud = air("ESP_UART_BAUD", 115200)
-    lora_dio0 = ground("LORA_DIO0_PIN", 25)
-    lora_freq = ground("LORA_FREQ", 433.0)
-    hf_freq = ground("HF_DEFAULT_FREQ_HZ", 7_100_000)
-    hf_ptt = ground("HF_PTT_PIN", 24)
 
     devices: list[Device] = [
         Device(
@@ -121,8 +132,10 @@ def build_devices() -> list[Device]:
             wiring=w_i2c(),
             steps=I2C_STEPS,
             notes=[
-                "Cztery czujniki dzielą tę samą parę przewodów: BME280 (0x76), "
-                "MS5611 (0x77), BNO085 (0x4A), INA219 (0x40).",
+                "Wszystkie czujniki dzielą tę samą parę przewodów: BME280 (0x76), "
+                "GY-87 = MPU-6050 (0x68) + BMP180 (0x77) + magnetometr (0x0D), INA226 (0x44).",
+                "Magnetometr GY-87 pojawia się w skanie dopiero po teście MPU-6050 "
+                "albo magnetometru (bypass I2C).",
                 "Dwa moduły pod tym samym adresem = żaden nie zadziała.",
                 "Rezystory podciągające są już na modułach.",
             ],
@@ -140,115 +153,111 @@ def build_devices() -> list[Device]:
             wiring=w_i2c(),
             steps=I2C_STEPS,
             notes=[
-                "Adres 0x76. Moduł ze zworką SDO na 3.3 V ma 0x77 — wtedy koliduje z MS5611.",
+                "Adres 0x76. Moduł ze zworką SDO na 3.3 V ma 0x77 — wtedy koliduje z BMP180 "
+                "na GY-87.",
                 "Temperatura mierzona jest wewnątrz obudowy modułu — na balonie "
                 "będzie kilka stopni wyżej niż powietrze.",
             ],
-            libs=I2C_LIBS + ["bme280 (pip)"],
+            libs=I2C_LIBS + ["pimoroni-bme280 (pip)"],
             test=T.test_bme280,
         ),
         Device(
-            id="ms5611",
-            name="MS5611 — ciśnienie precyzyjne / wysokość",
+            id="mpu6050",
+            name="GY-87: MPU-6050 — akcelerometr i żyroskop",
             group=GRUPA_BALON,
-            bus=f"I2C 0x{air('MS5611_ADDR', 0x77):02X}",
-            summary="Barometr o dużej rozdzielczości — z niego liczymy wysokość lotu "
-                    "(pola p2 / alt2).",
-            wiring=w_i2c(),
-            steps=I2C_STEPS,
+            bus=f"I2C 0x{T.MPU6050_ADDR:02X}",
+            summary="Przyspieszenie i prędkość obrotu w 3 osiach — pokazuje, jak ładunek "
+                    "się kołysze i kręci pod balonem. Z akcelerometru liczymy też roll / pitch.",
+            wiring=GY87_WIRING,
+            steps=GY87_STEPS + [
+                "Połóż moduł nieruchomo na stole — test sprawdza, czy widzi 1 g w dół.",
+            ],
             notes=[
-                "Adres 0x77 (pin CSB niepodłączony). CSB na masę → 0x76, czyli kolizja z BME280.",
+                "Adres 0x68 (pin AD0 na masie), 0x69 gdy AD0 na 3.3 V.",
+                "Po włączeniu MPU-6050 śpi — test go budzi i przy okazji włącza bypass I2C, "
+                "żeby był widoczny magnetometr.",
+                "Akcelerometr ±2 g, żyroskop ±250 °/s. Kilka °/s offsetu żyroskopu na stole "
+                "to norma — kalibruje się programowo.",
+                "Yaw (obrót wokół pionu) da się policzyć dopiero z magnetometrem.",
+            ],
+            libs=I2C_LIBS,
+            test=T.test_mpu6050,
+            duration="ok. 1 s",
+        ),
+        Device(
+            id="magnetometr",
+            name="GY-87: QMC5883L / HMC5883L — magnetometr (kompas)",
+            group=GRUPA_BALON,
+            bus=f"I2C 0x{T.QMC5883L_ADDR:02X} (QMC5883L) lub 0x{T.HMC5883L_ADDR:02X} (HMC5883L)",
+            summary="Mierzy pole magnetyczne Ziemi — z niego liczymy kierunek (yaw), w którą "
+                    "stronę obrócony jest ładunek.",
+            wiring=GY87_WIRING,
+            steps=GY87_STEPS + [
+                "Odsuń moduł od magnesów, głośników i metalowych narzędzi.",
+            ],
+            notes=[
+                "Na GY-87 magnetometr jest podpięty za MPU-6050. Widać go na magistrali "
+                "dopiero po włączeniu bypassu I2C w MPU — test robi to sam.",
+                "Tańsze klony GY-87 mają QMC5883L (0x0D) zamiast oryginalnego HMC5883L (0x1E) — "
+                "test rozpoznaje oba.",
+                "Pole Ziemi w Polsce to ok. 50 µT. Dużo więcej = magnes lub metal obok.",
+                "Do prawdziwego kompasu potrzebna kalibracja (obracanie modułem w każdej osi).",
+            ],
+            libs=I2C_LIBS,
+            test=T.test_magnetometer,
+            duration="ok. 1 s",
+        ),
+        Device(
+            id="bmp180",
+            name="GY-87: BMP180 — ciśnienie i temperatura",
+            group=GRUPA_BALON,
+            bus=f"I2C 0x{T.BMP180_ADDR:02X}",
+            summary="Drugi barometr (obok BME280) — z niego liczymy wysokość barometryczną. "
+                    "Dwa czujniki ciśnienia pozwalają wychwycić, gdy jeden zacznie kłamać.",
+            wiring=GY87_WIRING,
+            steps=GY87_STEPS,
+            notes=[
+                "Adres 0x77 jest stały. BME280 musi zostać na 0x76, inaczej będzie kolizja.",
+                "Zakres 300–1100 hPa, czyli do ok. 9 km. Wyżej czujnik przestaje mierzyć — "
+                "w stratosferze wysokość bierzemy z GPS.",
                 "Wysokość liczona wzorem ISA względem 1013.25 hPa — to nie jest wysokość GPS.",
                 "Czujnik nie lubi przeciągu i światła — na balonie osłonić.",
             ],
             libs=I2C_LIBS,
-            test=T.test_ms5611,
+            test=T.test_bmp180,
         ),
         Device(
-            id="bno085",
-            name="BNO085 — IMU 9-DOF (orientacja)",
+            id="ina226",
+            name="INA226 — napięcie i prąd baterii",
             group=GRUPA_BALON,
-            bus=f"I2C 0x{air('BNO085_ADDR', 0x4A):02X}",
-            summary="Roll / pitch / yaw i akcelerometr — pokazuje jak ładunek się kołysze "
-                    "i kręci pod balonem.",
-            wiring=w_i2c(),
-            steps=I2C_STEPS + [
-                "Połóż moduł nieruchomo na stole — test sprawdza, czy widzi 1 g w dół.",
-            ],
-            notes=[
-                "Adres 0x4A (0x4B przy podciągniętym pinie ADR).",
-                "Układ rozciąga zegar I2C. Przy błędach dopisz w /boot/firmware/config.txt: "
-                "dtparam=i2c_arm_baudrate=50000",
-                "Po włączeniu potrzebuje 2-3 s zanim fuzja czujników poda orientację.",
-            ],
-            libs=["adafruit-circuitpython-bno08x", "adafruit-blinka"],
-            test=T.test_bno085,
-            duration="ok. 1 s",
-        ),
-        Device(
-            id="ina219",
-            name="INA219 — napięcie i prąd baterii",
-            group=GRUPA_BALON,
-            bus=f"I2C 0x{air('INA219_ADDR', 0x40):02X}, bocznik "
-                f"{air('INA219_SHUNT_OHMS', 0.1)} Ω",
-            summary="Monitor zasilania: napięcie pakietu, pobór prądu, moc "
-                    "(pola vbat / imA). Po tym poznasz, ile jeszcze polecimy.",
+            bus=f"I2C 0x{T.INA226_ADDR:02X}, bocznik {T.INA226_SHUNT_OHMS} Ω",
+            summary="Monitor zasilania: napięcie pakietu, pobór prądu, moc. "
+                    "Po tym poznasz, ile jeszcze polecimy.",
             wiring=w_i2c() + [
-                Wire("Vin+", "biegun + baterii", (), K_OTHER, "nie na złącze RPi"),
-                Wire("Vin−", "zasilanie odbiornika", (), K_OTHER,
-                     "cały mierzony prąd płynie przez te dwa zaciski"),
+                Wire("VIN+", "biegun + baterii", (), K_OTHER, "nie na złącze RPi"),
+                Wire("VIN− / VBUS", "zasilanie odbiornika", (), K_OTHER,
+                     "cały mierzony prąd płynie przez bocznik"),
             ],
             steps=I2C_STEPS + [
-                "Bocznik wepnij szeregowo w linię zasilania: bateria → Vin+, Vin− → odbiornik.",
+                "Bocznik wepnij szeregowo w linię zasilania: bateria → VIN+, VIN− → odbiornik.",
+                "Masa baterii musi być wspólna z masą Raspberry Pi.",
                 "VCC (3.3 V z pinu 1) zasila tylko elektronikę pomiarową modułu.",
             ],
             notes=[
-                "Adres zależy od zworek A0/A1 — domyślnie 0x40.",
-                "Bocznik 0.1 Ω: maksymalny mierzalny prąd ok. 3.2 A.",
+                "Adres zależy od zworek A0/A1 — nasz moduł ma 0x44 (możliwe 0x40…0x4F); "
+                "test sam przeszuka cały zakres, jeśli pod ustawionym adresem go nie ma.",
+                f"Bocznik {T.INA226_SHUNT_OHMS} Ω (oznaczenie R100): zakres INA226 to ±81.92 mV, "
+                f"czyli najwyżej ok. {81.92 / T.INA226_SHUNT_OHMS:.0f} mA. "
+                "Przy większym poborze trzeba mniejszego bocznika.",
+                "Napięcie mierzone do 36 V.",
                 "Zero prądu przy poprawnym napięciu = bocznik wpięty równolegle zamiast szeregowo.",
+                "Inną wartość bocznika lub adres ustawisz w rpi-air/config.py: "
+                "INA226_SHUNT_OHMS, INA226_ADDR.",
             ],
-            libs=I2C_LIBS + ["pi-ina219 (pip)"],
-            test=T.test_ina219,
+            libs=I2C_LIBS,
+            test=T.test_ina226,
         ),
     ]
-
-    for i in range(4):
-        pins = hx[i] if i < len(hx) else T._HX711_DEFAULT[i]
-        dt, sck = pins["dt"], pins["sck"]
-        devices.append(Device(
-            id=f"hx711_{i}",
-            name=f"HX711 #{i} — tensometr ({T.HX711_LABELS[i]})",
-            group=GRUPA_BALON,
-            bus=f"GPIO bit-bang, DT GPIO{dt} / SCK GPIO{sck}",
-            summary="24-bitowy przetwornik siły w narożniku ramy zawieszenia. Cztery sztuki "
-                    "razem mówią, jak rozkłada się masa ładunku (pola sg0…sg3).",
-            wiring=[w_3v3(), w_gnd(),
-                    w_gpio("DT (data)", dt, "wyjście danych z HX711"),
-                    w_gpio("SCK (clock)", sck, "zegar z Raspberry Pi"),
-                    Wire("E+ / E−", "mostek tensometryczny — zasilanie", (), K_OTHER,
-                         "czerwony / czarny przewód belki"),
-                    Wire("A+ / A−", "mostek tensometryczny — sygnał", (), K_OTHER,
-                         "zielony / biały przewód belki")],
-            steps=[
-                "Wyłącz Raspberry Pi.",
-                "VCC modułu → pin 1 (3.3 V), GND → pin 6.",
-                f"DT → {gpio_label(dt)}.",
-                f"SCK → {gpio_label(sck)}.",
-                "Tensometr do zacisków: E+ E− (zasilanie mostka), A+ A− (sygnał).",
-                "Bez podpiętego mostka HX711 nie zgłosi gotowości — test to wykryje.",
-                "Włącz RPi i uruchom test. Naciśnij belkę palcem — wskazanie musi drgnąć.",
-            ],
-            notes=[
-                "Moduł tarowany jest przy starcie — waga startuje od zera.",
-                f"reference_unit = {air('HX711_REFERENCE_UNIT', 1.0)} — do prawdziwych gramów "
-                "trzeba kalibracji odważnikiem (osobno dla każdego kanału).",
-                "Zamienione A+ / A− dają wskazania ujemne — to nie awaria.",
-                "Każdy kanał ma własne piny — cztery HX711 nie mogą dzielić DT/SCK.",
-            ],
-            libs=["RPi.GPIO — na RPi 5: python3-rpi-lgpio"],
-            test=partial(T.test_hx711, i),
-            duration="ok. 2 s",
-        ))
 
     devices += [
         Device(
@@ -337,27 +346,29 @@ def build_devices() -> list[Device]:
             id="espcam_status",
             name="ESP32-CAM — status po UART",
             group=GRUPA_BALON,
-            bus=f"bit-bang serial {espcam_baud} baud",
+            bus=f"UART3 {T.ESPCAM_STATUS_PORT} @ {espcam_baud} baud",
             summary="Kamera co 5 s wypluwa linię JSON ze swoim stanem: czy nagrywa, "
                     "ile klatek, ile wolnego miejsca na karcie.",
-            wiring=[w_gpio("TX kamery (GPIO1 / U0TX)", espcam_st, "wejście, poziom 3.3 V"),
+            wiring=[w_gpio("TX kamery (GPIO1 / U0TX)", 9, "UART3 RX, poziom 3.3 V"),
                     w_gnd("Masa wspólna z kamerą")],
             steps=[
+                "Włącz UART3: dopisz dtoverlay=uart3-pi5 w /boot/firmware/config.txt i zrestartuj.",
                 "Najpierw włącz zasilanie kamery (poprzedni test).",
-                f"GPIO1 (U0TX) kamery → {gpio_label(espcam_st)}.",
+                f"GPIO1 (U0TX) kamery → {gpio_label(9)}.",
                 "Masa kamery musi być wspólna z masą Raspberry Pi.",
-                "Uruchom test — nasłuchuje 8 s, kamera raportuje co ~5 s.",
+                "Uruchom test — nasłuchuje do 8 s, kamera raportuje co ~5 s.",
             ],
             notes=[
                 f"Prędkość {espcam_baud} baud — tyle ustawia espcam/include/config.h "
                 "(SERIAL_BAUD).",
                 "Format linii: $S{\"ok\":1,\"rec\":1,\"n\":1234,\"mb\":7800} — linie bez "
                 "prefiksu $S (debug, boot) są ignorowane.",
-                "Odczyt idzie przez pigpio, a pigpio nie wspiera Raspberry Pi 5 — "
-                "na RPi 5 ten kanał trzeba przepisać na lgpio albo sprzętowy UART.",
+                "pigpio (bit-bang na GPIO4) nie wspiera Raspberry Pi 5 — dlatego tester czyta "
+                "status sprzętowym UART3 (/dev/ttyAMA3, RX = GPIO9). Port zmienisz w "
+                "rpi-air/config.py: ESPCAM_STATUS_PORT.",
                 "Poziomy napięć są zgodne (3.3 V ↔ 3.3 V), konwerter nie jest potrzebny.",
             ],
-            libs=["pigpio + demon pigpiod"],
+            libs=["pyserial"],
             test=T.test_espcam_status,
             duration="ok. 8 s",
             live=False,
@@ -445,103 +456,6 @@ def build_devices() -> list[Device]:
             live=False,
         ),
         Device(
-            id="lora",
-            name="LoRa SX1278 — obecność modułu",
-            group=GRUPA_ZIEMIA,
-            bus=f"SPI{ground('LORA_SPI_BUS', 0)}.{ground('LORA_SPI_CS', 0)}, {lora_freq} MHz",
-            summary="Sprawdza, czy stacja naziemna widzi radio: rejestr wersji SX1278 "
-                    "musi zwrócić 0x12.",
-            wiring=[w_3v3(), w_gnd(),
-                    w_gpio("SCK", 11, "SPI0 SCLK"),
-                    w_gpio("MOSI", 10, "SPI0 MOSI"),
-                    w_gpio("MISO", 9, "SPI0 MISO"),
-                    w_gpio("NSS / CS", 8, "SPI0 CE0"),
-                    w_gpio("DIO0", lora_dio0, "zgłoszenie odebrania pakietu"),
-                    Wire("RST", "niepodłączony", (), K_OTHER,
-                         "moduł ma własne podciągnięcie; opcjonalnie na wolny GPIO"),
-                    Wire("ANT", "antena 433 MHz", (), K_OTHER,
-                         "nigdy nie nadawaj bez anteny")],
-            steps=[
-                "Wyłącz Raspberry Pi.",
-                "VCC → pin 1 (3.3 V) — 5 V zniszczy moduł. GND → pin 6.",
-                "SCK → pin 23, MOSI → pin 19, MISO → pin 21, NSS → pin 24.",
-                f"DIO0 → {gpio_label(lora_dio0)}.",
-                "Przykręć antenę 433 MHz.",
-                "Włącz SPI w raspi-config, zrestartuj i uruchom test.",
-            ],
-            notes=[
-                "Odpowiedź 0x00 albo 0xFF to najczęściej zamienione MISO z MOSI.",
-                "Na balonie LoRa wisi na ESP32 — po stronie Raspberry Pi jest tylko "
-                "na stacji naziemnej.",
-                f"Ustawienia z rpi-ground/config.py: {lora_freq} MHz, SF{ground('LORA_SF', 10)}, "
-                f"BW {ground('LORA_BW', 125000) // 1000} kHz, CR 4:{ground('LORA_CR', 5)}.",
-            ],
-            libs=["spidev"],
-            test=T.test_lora_present,
-        ),
-        Device(
-            id="lora_rx",
-            name="LoRa SX1278 — nasłuch pakietu z balonu",
-            group=GRUPA_ZIEMIA,
-            bus=f"{lora_freq} MHz, SF{ground('LORA_SF', 10)}",
-            summary="Prawdziwy test łącza: 12 s nasłuchu. Jeśli ESP32 nadaje, zobaczysz "
-                    "RSSI, SNR i początek pakietu.",
-            wiring=[w_3v3(), w_gnd(),
-                    w_gpio("SCK", 11), w_gpio("MOSI", 10), w_gpio("MISO", 9),
-                    w_gpio("NSS / CS", 8), w_gpio("DIO0", lora_dio0),
-                    Wire("ANT", "antena 433 MHz", (), K_OTHER)],
-            steps=[
-                "Podłączenie identyczne jak w teście obecności modułu.",
-                "Włącz ESP32 na balonie — nadaje pakiet co ok. 5 s.",
-                "Uruchom test i poczekaj 12 s.",
-            ],
-            notes=[
-                "Obie strony muszą mieć te same: częstotliwość, SF, BW, CR i sync word 0x12.",
-                "RSSI powyżej −100 dBm na stole to dobry wynik; przy słabym sygnale "
-                "spada w stronę −120 dBm.",
-                "Błąd CRC = sygnał na granicy czułości albo niedopasowane ustawienia.",
-            ],
-            libs=["spidev"],
-            test=T.test_lora_rx,
-            duration="ok. 12 s",
-            live=False,
-        ),
-        Device(
-            id="hf_tx",
-            name="AD9833 + RD06HHF1 — nadajnik HF",
-            group=GRUPA_ZIEMIA,
-            bus=f"SPI{ground('AD9833_SPI_BUS', 1)}.{ground('AD9833_SPI_CS', 1)}, "
-                f"{hf_freq / 1e6:.3f} MHz",
-            summary="Generator sygnału do eksperymentu jonosferycznego. Test tylko ustawia "
-                    "częstotliwość — NIE kluczuje PTT, więc nic nie idzie w eter.",
-            wiring=[w_3v3(), w_gnd(),
-                    w_gpio("SCLK", 21, "SPI1 SCLK"),
-                    w_gpio("MOSI / SDATA", 20, "SPI1 MOSI"),
-                    w_gpio("FSYNC / CS", 17, "SPI1 CE1"),
-                    w_gpio("PTT (kluczowanie PA)", hf_ptt, "stan wysoki = wzmacniacz nadaje"),
-                    Wire("OUT", "filtr LPF → RD06HHF1", (), K_OTHER),
-                    Wire("ANT", "antena 40 m albo sztuczne obciążenie", (), K_OTHER)],
-            steps=[
-                "Włącz SPI1: dopisz dtoverlay=spi1-3cs w /boot/firmware/config.txt i zrestartuj.",
-                "SCLK → pin 40, MOSI → pin 38, FSYNC → pin 11.",
-                f"PTT → {gpio_label(hf_ptt)}.",
-                "Wyjście AD9833 → filtr dolnoprzepustowy → wzmacniacz RD06HHF1.",
-                "Podłącz antenę albo sztuczne obciążenie ZANIM zaczniesz nadawać.",
-                "Uruchom test — zapisze rejestry generatora, PTT zostanie w stanie niskim.",
-            ],
-            notes=[
-                "AD9833 nie ma odczytu rejestrów — sam sygnał sprawdzisz oscyloskopem na OUT.",
-                "Nadawanie w paśmie 40 m wymaga uprawnień krótkofalarskich.",
-                "Praca wzmacniacza bez obciążenia niszczy stopień mocy.",
-            ],
-            libs=["spidev"],
-            test=T.test_hf_tx,
-            confirm="Test zapisze rejestry generatora AD9833.\n\n"
-                    "PTT nie będzie kluczowane (brak emisji), ale sprawdź, czy do wyjścia "
-                    "podłączona jest antena albo sztuczne obciążenie.\n\nKontynuować?",
-            live=False,
-        ),
-        Device(
             id="gps",
             name="GPS NEO-M8N — pozycja, wysokość, prędkość",
             group=GRUPA_STOL,
@@ -579,4 +493,4 @@ def build_devices() -> list[Device]:
 
 DEVICES: list[Device] = build_devices()
 BY_ID: dict[str, Device] = {d.id: d for d in DEVICES}
-GROUPS: list[str] = [GRUPA_BALON, GRUPA_ZIEMIA, GRUPA_STOL]
+GROUPS: list[str] = [GRUPA_BALON, GRUPA_STOL]

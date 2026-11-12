@@ -1,9 +1,10 @@
-RPi.GPIO
+rpi-lgpio  # na RPi 5 (systemowo: python3-rpi-lgpio)
 spidev
 smbus2
 pyserial
 pynmea2
-bme280
+pimoroni-bme280
 pi-ina219
 adafruit-circuitpython-bno08x
 adafruit-blinka
+pyrtlsdr

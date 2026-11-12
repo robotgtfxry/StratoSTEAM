@@ -55,7 +55,7 @@ SDR_NUM_SAMPLES      = 256 * 1024  # próbki na pomiar (~1 s)
 SDR_BIN_WINDOW       = 15          # ±bin wokół nośnej w FFT
 
 # Camera (RPi cam0)
-CAM_RECORD_DIR     = "/home/pi/stratosteam-video"
+CAM_RECORD_DIR     = "/home/admin/stratosteam-video"
 CAM_PHOTO_W        = 160    # szerokość zdjęcia wysyłanego przez LoRa
 CAM_PHOTO_H        = 120    # wysokość
 CAM_PHOTO_QUALITY  = 25     # jakość JPEG (1-95); niższa = mniejszy plik = mniej chunków

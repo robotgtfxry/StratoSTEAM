@@ -11,34 +11,22 @@
 # albo środowiska wirtualnego:
 #     pip install --break-system-packages -r testy/requirements.txt
 
-# I2C: BME280, MS5611, INA219
+# I2C: BME280 (sterownik z rpi-air), GY-87 (MPU-6050, QMC5883L, BMP180), INA226
 smbus2
-bme280
-pi-ina219
+pimoroni-bme280
 
-# IMU BNO085
-adafruit-circuitpython-bno08x
-adafruit-blinka
-
-# GPS NEO-M8N + UART do ESP32
+# GPS NEO-M8N, UART do ESP32-S3, status ESP32-CAM (UART3)
 pyserial
 pynmea2
 
-# LoRa SX1278 i nadajnik HF AD9833 (SPI)
-spidev
-
-# HX711, przekaźniki, zasilanie ESP32-CAM, sygnały GPIO
+# Przekaźniki, zasilanie ESP32-CAM, sygnały GPIO
 # UWAGA: na Raspberry Pi 5 klasyczne RPi.GPIO NIE działa — zamiast niego:
 #     sudo apt install python3-rpi-lgpio
-RPi.GPIO
+rpi-lgpio
 
 # RTL-SDR (odbiornik HF)
 pyrtlsdr
 numpy
-
-# Status ESP32-CAM (bit-bang serial). pigpio nie wspiera Raspberry Pi 5.
-#     sudo apt install pigpio python3-pigpio && sudo systemctl enable --now pigpiod
-pigpio
 
 # Kamera CSI — tylko z apt, nie z pip:
 #     sudo apt install python3-picamera2

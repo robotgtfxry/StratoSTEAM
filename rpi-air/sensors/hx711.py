@@ -21,6 +21,7 @@ class Hx711Sensor:
         self._sck = sck_pin
         self._ref = reference_unit if reference_unit != 0 else 1.0
         self._offset = 0.0
+        self._ok = False
 
         GPIO.setmode(GPIO.BCM)
         GPIO.setup(self._sck, GPIO.OUT, initial=GPIO.LOW)
@@ -63,10 +64,13 @@ class Hx711Sensor:
             try:
                 readings.append(self._read_raw())
             except TimeoutError:
-                pass
+                break   # brak HX711 — nie czekaj 2 s × samples
+        self._ok = bool(readings)
         self._offset = sum(readings) / len(readings) if readings else 0.0
 
     def read(self) -> Hx711Data:
+        if not self._ok:
+            return Hx711Data()
         try:
             raw = self._read_raw()
             grams = (raw - self._offset) / self._ref

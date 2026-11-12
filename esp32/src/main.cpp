@@ -60,6 +60,9 @@
 #define LORA_TAKEOVER_DELAY_MS 4000
 #define RPI_AUTO_RESTART_MS    1800000UL
 #define RPI_DATA_TIMEOUT_MS    15000    // dane starsze niż 15s = RPi5 nieosiągalna
+#define LORA_RETRY_MS          30000    // co ile ponawiać init LoRa, gdy modułu brak
+#define STATUS_INTERVAL_MS     5000     // status ESP → RPi przez UART
+#define NOLORA_BLINK_MS        2000     // okres mrugania LED gdy brak LoRa
 #define BATT_DIV_RATIO         2.0f
 #define BATT_VREF              3.3f
 
@@ -91,6 +94,15 @@ struct RpiData {
 } rpi;
 
 uint32_t rpiLastRx   = 0;
+uint32_t rpiRxLines  = 0;
+uint32_t rpiRxBytes  = 0;     // surowe bajty z UART RPi
+uint32_t rpiRxBad    = 0;     // linie, których nie dało się sparsować     // licznik poprawnych linii z RPi (diagnostyka UART)
+
+// Stan LoRa — gdy moduł nie odpowiada, ESP działa dalej bez radia
+bool     loraOk        = false;
+uint32_t lastLoraRetry = 0;
+uint32_t lastStatus    = 0;
+bool     ledOverride   = false; // LED ustawiony komendą z ziemi
 String   rpiLineBuf  = "";
 
 // Kolejka chunków obrazu — max 1 oczekujący (RPi wysyła co 3s, więc 1 wystarczy)
@@ -129,7 +141,11 @@ void setLed(int r, int g, int b) {
 void parseRpiLine(const String& line) {
     if (line.length() < 5) return;
     JsonDocument doc;
-    if (deserializeJson(doc, line) != DeserializationError::Ok) return;
+    if (deserializeJson(doc, line) != DeserializationError::Ok) {
+        rpiRxBad++;
+        Serial.printf("[RPi5] zła linia (%u B): %.60s\n", line.length(), line.c_str());
+        return;
+    }
 
     // chunk obrazu — odłóż do głównej pętli, nie blokuj tutaj
     if (strcmp(doc["type"] | "", "img") == 0) {
@@ -167,6 +183,7 @@ void parseRpiLine(const String& line) {
 
     rpi.fresh = true;
     rpiLastRx = millis();
+    rpiRxLines++;
 
     Serial.printf("[RPi5] temp=%.1f hum=%.1f pres=%.1f alt2=%.0f vbat=%.2f\n",
                   rpi.temp, rpi.hum, rpi.pres, rpi.alt2, rpi.vbat);
@@ -176,6 +193,7 @@ void parseRpiLine(const String& line) {
 void readRpiSerial() {
     while (rpiSerial.available()) {
         char c = (char)rpiSerial.read();
+        rpiRxBytes++;
         if (c == '\n') {
             parseRpiLine(rpiLineBuf);
             rpiLineBuf = "";
@@ -245,13 +263,16 @@ void sendBeacon() {
     char buf[300];
     serializeJson(doc, buf);
 
-    LoRa.beginPacket();
-    LoRa.print(buf);
-    LoRa.endPacket();
-    LoRa.receive();
+    if (loraOk) {
+        LoRa.beginPacket();
+        LoRa.print(buf);
+        LoRa.endPacket();
+        LoRa.receive();
+    }
 
-    Serial.printf("[LoRa] seq=%lu rpi=%s fix=%d lat=%.5f lon=%.5f alt=%.0f\n",
-                  beaconSeq - 1, rpi.fresh ? "OK" : "—",
+    Serial.printf("%s seq=%lu rpi=%s rx=%lu fix=%d lat=%.5f lon=%.5f alt=%.0f\n",
+                  loraOk ? "[LoRa]" : "[NO-LoRa] (nie nadano)",
+                  beaconSeq - 1, rpi.fresh ? "OK" : "—", (unsigned long)rpiRxLines,
                   gps.location.isValid(),
                   doc["lat"].as<float>(), doc["lon"].as<float>(),
                   doc["alt"].as<float>());
@@ -259,6 +280,7 @@ void sendBeacon() {
 
 // ── Obsługa odebranego pakietu ────────────────────────────────────────────────
 void handleIncoming() {
+    if (!loraOk) return;
     int pktSize = LoRa.parsePacket();
     if (pktSize == 0) return;
 
@@ -277,6 +299,7 @@ void handleIncoming() {
         int  b   = doc["led_b"] | 0;
         setBuzzer(buz);
         setLed(r, g, b);
+        ledOverride = true;
         Serial.printf("[ESP32] buzzer=%d led=(%d,%d,%d)\n", buz, r, g, b);
         return;
     }
@@ -311,6 +334,59 @@ void handleIncoming() {
         String fwd = String("{\"cmd\":\"espcam_pwr\",\"on\":") + (on ? "true" : "false") + "}";
         rpiSerial.println(fwd);
         return;
+    }
+}
+
+// ── Chunk obrazu → LoRa (lub odrzucenie gdy brak LoRa) ────────────────────────
+void sendImgChunk() {
+    JsonDocument dbg;
+    deserializeJson(dbg, pendingImgLine);
+    int id = dbg["id"] | 0, seq = dbg["seq"] | 0, tot = dbg["tot"] | 0;
+    if (loraOk) {
+        Serial.printf("[LoRa] img id=%d seq=%d/%d\n", id, seq, tot);
+        LoRa.beginPacket();
+        LoRa.print(pendingImgLine);
+        LoRa.endPacket();
+        LoRa.receive();
+    } else {
+        Serial.printf("[NO-LoRa] img id=%d seq=%d/%d odrzucony\n", id, seq, tot);
+    }
+    lastImgChunk  = millis();
+    imgChunkReady = false;
+}
+
+// ── Status ESP → RPi (UART) ───────────────────────────────────────────────────
+// {"type":"esp_status","lora":false,"rx":123,"fix":false,"sat":0}
+void sendStatusToRpi() {
+    JsonDocument st;
+    st["type"] = "esp_status";
+    st["lora"] = loraOk;
+    st["rx"]   = rpiRxLines;
+    st["rxb"]  = rpiRxBytes;
+    st["bad"]  = rpiRxBad;
+    st["fix"]  = gps.location.isValid();
+    st["sat"]  = gps.satellites.isValid() ? (int)gps.satellites.value() : 0;
+    char buf[128];
+    serializeJson(st, buf);
+    rpiSerial.println(buf);
+}
+
+// ── Sygnalizacja braku LoRa: krótkie czerwone mignięcie co 2 s ────────────────
+void updateNoLoraLed(uint32_t now) {
+    if (loraOk || ledOverride) return;
+    setLed((now % NOLORA_BLINK_MS) < 150 ? 255 : 0, 0, 0);
+}
+
+// ── Ponawianie inicjalizacji LoRa ─────────────────────────────────────────────
+void retryLoRa(uint32_t now) {
+    if (loraOk || now - lastLoraRetry < LORA_RETRY_MS) return;
+    lastLoraRetry = now;
+    loraOk = initLoRa();
+    if (loraOk) {
+        Serial.println("[ESP32] LoRa OK (moduł wykryty po ponowieniu)");
+        if (!ledOverride) setLed(0, 0, 0);
+    } else {
+        Serial.println("[ESP32] LoRa nadal niedostępna — praca bez radia");
     }
 }
 
@@ -362,10 +438,12 @@ void setup() {
     digitalWrite(RPI_PWR_PIN,   LOW);
     digitalWrite(RPI_SHTDN_PIN, LOW);
 
-    if (initLoRa()) {
+    loraOk = initLoRa();
+    lastLoraRetry = millis();
+    if (loraOk) {
         Serial.println("[ESP32] LoRa OK");
     } else {
-        Serial.println("[ESP32] LoRa FAILED");
+        Serial.println("[ESP32] LoRa FAILED — praca BEZ radia (UART/GPS/RPi działają), ponawiam co 30 s");
     }
 
     rpiPowerOn();
@@ -378,6 +456,13 @@ void loop() {
 
     bool     rpiAlive = (digitalRead(RPI_ALIVE_PIN) == HIGH);
     uint32_t now      = millis();
+
+    retryLoRa(now);
+    updateNoLoraLed(now);
+    if (now - lastStatus >= STATUS_INTERVAL_MS) {
+        lastStatus = now;
+        sendStatusToRpi();
+    }
 
     if (firstBoot && rpiAlive) firstBoot = false;
 
@@ -423,17 +508,7 @@ void loop() {
     if (!firstBoot && (now - lastBeacon >= BEACON_INTERVAL_MS)) {
         // chunk obrazu ma pierwszeństwo jeśli jest gotowy i minął min. odstęp
         if (imgChunkReady && (now - lastImgChunk >= IMG_CHUNK_DELAY_MS)) {
-            JsonDocument dbg;
-            deserializeJson(dbg, pendingImgLine);
-            Serial.printf("[LoRa] img id=%d seq=%d/%d\n",
-                          (int)(dbg["id"] | 0), (int)(dbg["seq"] | 0),
-                          (int)(dbg["tot"] | 0));
-            LoRa.beginPacket();
-            LoRa.print(pendingImgLine);
-            LoRa.endPacket();
-            LoRa.receive();
-            lastImgChunk  = millis();
-            imgChunkReady = false;
+            sendImgChunk();
             // nie aktualizuj lastBeacon — beacon wyśle się przy następnej iteracji
         } else {
             delay(random(0, 100));
@@ -442,16 +517,6 @@ void loop() {
         }
     } else if (imgChunkReady && (now - lastImgChunk >= IMG_CHUNK_DELAY_MS)) {
         // Chunk gotowy, a beacon jeszcze nie — wyślij chunk między beaconami
-        JsonDocument dbg;
-        deserializeJson(dbg, pendingImgLine);
-        Serial.printf("[LoRa] img id=%d seq=%d/%d\n",
-                      (int)(dbg["id"] | 0), (int)(dbg["seq"] | 0),
-                      (int)(dbg["tot"] | 0));
-        LoRa.beginPacket();
-        LoRa.print(pendingImgLine);
-        LoRa.endPacket();
-        LoRa.receive();
-        lastImgChunk  = millis();
-        imgChunkReady = false;
+        sendImgChunk();
     }
 }

@@ -22,5 +22,5 @@ class Ina219Sensor:
                 current_ma=round(self._ina.current(), 2),
                 power_mw=round(self._ina.power(), 2),
             )
-        except DeviceRangeError:
+        except (DeviceRangeError, OSError):
             return Ina219Data()

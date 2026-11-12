@@ -16,7 +16,7 @@ import subprocess
 import time
 from dataclasses import dataclass, field
 
-from repo import air, ground, is_pi5, load_repo_module
+from repo import air, is_pi5, load_repo_module
 
 # ── statusy wyników ──────────────────────────────────────────────────────────
 OK = "OK"            # czujnik odpowiada, wartości sensowne
@@ -50,10 +50,6 @@ HINT_I2C = [
     "Sprawdź czy urządzenie jest widoczne: i2cdetect -y 1",
     "SDA = pin 3 (GPIO2), SCL = pin 5 (GPIO3), VCC = 3.3 V (pin 1), GND = pin 6",
     "Rezystory podciągające są już na modułach — nie dodawaj własnych",
-]
-HINT_SPI = [
-    "Włącz SPI: sudo raspi-config → Interface Options → SPI → Yes, potem reboot",
-    "Sprawdź urządzenia: ls /dev/spidev*",
 ]
 HINT_UART = [
     "sudo raspi-config → Interface Options → Serial Port:",
@@ -100,37 +96,114 @@ def _dev_exists(path: str) -> bool:
     return os.path.exists(path)
 
 
+# ── I2C: wspólne ─────────────────────────────────────────────────────────────
+MPU6050_ADDR = air("MPU6050_ADDR", 0x68)
+BMP180_ADDR = air("BMP180_ADDR", 0x77)
+INA226_ADDR = air("INA226_ADDR", 0x44)
+INA226_SHUNT_OHMS = air("INA226_SHUNT_OHMS", 0.1)
+QMC5883L_ADDR = 0x0D
+HMC5883L_ADDR = 0x1E
+
+HINT_GY87 = [
+    "GY-87 to jedna płytka: MPU-6050 (0x68) + BMP180 (0x77) + magnetometr",
+    "VCC_IN modułu → 3.3 V (pin 1) albo 5 V — płytka ma własny stabilizator",
+]
+
+
+def _i2c_bus():
+    """Otwiera I2C-1. Rzuca ImportError (brak smbus2) albo OSError (brak magistrali)."""
+    import smbus2
+    return smbus2.SMBus(1)
+
+
+def _i2c_open() -> tuple[object | None, Result | None]:
+    """(bus, None) albo (None, gotowy Result z błędem) — do użycia na początku testu."""
+    if not _dev_exists("/dev/i2c-1"):
+        return None, Result(MISSING, "Brak /dev/i2c-1 — magistrala I2C jest wyłączona",
+                            hints=HINT_I2C)
+    try:
+        return _i2c_bus(), None
+    except ImportError as e:
+        return None, _missing(e, ["pip install smbus2", "lub: sudo apt install python3-smbus2"])
+    except OSError as e:
+        return None, _fail(e, HINT_I2C)
+
+
+def _u16be(hi: int, lo: int) -> int:
+    return (hi << 8) | lo
+
+
+def _s16be(hi: int, lo: int) -> int:
+    v = (hi << 8) | lo
+    return v - 0x10000 if v & 0x8000 else v
+
+
+def _s16le(lo: int, hi: int) -> int:
+    return _s16be(hi, lo)
+
+
+def _reg(bus, addr: int, reg: int) -> int | None:
+    """Jeden bajt rejestru albo None, gdy układ nie odpowiada."""
+    try:
+        return bus.read_byte_data(addr, reg)
+    except OSError:
+        return None
+
+
+def _gy87_bypass(bus) -> None:
+    """Budzi MPU-6050 i włącza bypass I2C — magnetometr GY-87 staje się widoczny na magistrali."""
+    bus.write_byte_data(MPU6050_ADDR, 0x6B, 0x00)   # PWR_MGMT_1: wybudź
+    time.sleep(0.05)
+    bus.write_byte_data(MPU6050_ADDR, 0x6A, 0x00)   # USER_CTRL: wyłącz tryb I2C master
+    bus.write_byte_data(MPU6050_ADDR, 0x37, 0x02)   # INT_PIN_CFG: I2C_BYPASS_EN
+    time.sleep(0.01)
+
+
 # ── I2C: skan magistrali ─────────────────────────────────────────────────────
 I2C_KNOWN = {
-    0x40: "INA219 (prąd/napięcie baterii)",
-    0x41: "INA219 — adres alternatywny",
-    0x4A: "BNO085 (IMU 9-DOF)",
-    0x4B: "BNO085 — adres alternatywny",
+    0x0D: "QMC5883L (magnetometr GY-87)",
+    0x1E: "HMC5883L (magnetometr GY-87)",
+    0x40: "INA226 (prąd/napięcie baterii)",
+    0x41: "INA226 — adres alternatywny",
+    0x44: "INA226 — adres alternatywny",
+    0x45: "INA226 — adres alternatywny",
+    0x68: "MPU-6050 (akcelerometr/żyroskop GY-87)",
+    0x69: "MPU-6050 — adres alternatywny (AD0 = 1)",
     0x76: "BME280 (temperatura/wilgotność/ciśnienie)",
-    0x77: "MS5611 (ciśnienie precyzyjne)",
+    0x77: "BMP180 (ciśnienie GY-87)",
 }
+
+# rejestr ID układów Boscha (0xD0) i MPU (0x75) — żeby skan mówił, co NAPRAWDĘ siedzi pod adresem
+_BOSCH_ID = {0x55: "BMP180", 0x58: "BMP280", 0x60: "BME280", 0x61: "BME680"}
+_MPU_ID = {0x68: "MPU-6050", 0x70: "MPU-6500", 0x71: "MPU-9250", 0x73: "MPU-9255",
+           0x72: "MPU-6050 (klon)", 0x98: "MPU-6050 (klon)"}
+
+
+def _identify(bus, addr: int) -> str:
+    if 0x40 <= addr <= 0x4F and _is_ina226(bus, addr):
+        return "INA226 (manufacturer ID 0x5449)"
+    if addr in (0x76, 0x77):
+        cid = _reg(bus, addr, 0xD0)
+        if cid in _BOSCH_ID:
+            return f"{_BOSCH_ID[cid]} (chip ID 0x{cid:02X})"
+    if addr in (0x68, 0x69):
+        who = _reg(bus, addr, 0x75)
+        if who in _MPU_ID:
+            return f"{_MPU_ID[who]} (WHO_AM_I 0x{who:02X})"
+    return I2C_KNOWN.get(addr, "nieznany układ")
 
 
 def test_i2c_scan() -> Result:
     """Odpowiednik i2cdetect -y 1 — pokazuje wszystkie układy na magistrali."""
     if SIMULATE:
-        found = [0x40, 0x4A, 0x76, 0x77]
-        return Result(OK, f"Symulacja: znaleziono {len(found)} układy na I2C-1",
+        found = [0x0D, 0x44, 0x68, 0x76, 0x77]
+        return Result(OK, f"Symulacja: znaleziono {len(found)} układów na I2C-1",
                       {f"0x{a:02X}": I2C_KNOWN.get(a, "nieznany") for a in found})
 
-    if not _dev_exists("/dev/i2c-1"):
-        return Result(MISSING, "Brak /dev/i2c-1 — magistrala I2C jest wyłączona",
-                      hints=HINT_I2C)
-    try:
-        import smbus2
-    except ImportError as e:
-        return _missing(e, ["pip install smbus2", "lub: sudo apt install python3-smbus2"])
-
+    bus, err = _i2c_open()
+    if err:
+        return err
     found: list[int] = []
-    try:
-        bus = smbus2.SMBus(1)
-    except OSError as e:
-        return _fail(e, HINT_I2C)
     try:
         for addr in range(0x03, 0x78):
             try:
@@ -147,20 +220,27 @@ def test_i2c_scan() -> Result:
                 found.append(addr)
             except OSError:
                 pass
+        values = {f"0x{a:02X}": _identify(bus, a) for a in found}
     finally:
         bus.close()
 
-    values = {f"0x{a:02X}": I2C_KNOWN.get(a, "nieznany układ") for a in found}
     if not found:
         return Result(FAIL, "Magistrala I2C pusta — żaden układ nie odpowiada",
                       hints=HINT_I2C + ["Sprawdź zasilanie modułów (3.3 V, nie 5 V!)"])
-    expected = {0x76: "BME280", 0x77: "MS5611", 0x4A: "BNO085", 0x40: "INA219"}
+    expected = {0x76: "BME280", 0x68: "MPU-6050", 0x77: "BMP180"}
     brak = [n for a, n in expected.items() if a not in found]
+    # INA226 może siedzieć pod dowolnym adresem 0x40…0x4F (zworki A0/A1)
+    if not any(v.startswith("INA226 (") for v in values.values()):
+        brak.append("INA226")
+    hints = []
+    if 0x68 in found and not ({QMC5883L_ADDR, HMC5883L_ADDR} & set(found)):
+        hints.append("Magnetometr GY-87 jest schowany za MPU-6050 — pokaże się "
+                     "po teście magnetometru (włącza bypass I2C)")
     if brak:
         return Result(WARN, f"Znaleziono {len(found)} adresów, brakuje: {', '.join(brak)}",
                       values,
-                      ["Każdy brakujący układ sprawdź osobno na liście po lewej"] + HINT_I2C)
-    return Result(OK, f"Wszystkie 4 układy I2C odpowiadają ({len(found)} adresów)", values)
+                      ["Każdy brakujący układ sprawdź osobno na liście po lewej"] + hints + HINT_I2C)
+    return Result(OK, f"Wszystkie układy I2C odpowiadają ({len(found)} adresów)", values, hints)
 
 
 # ── BME280 ───────────────────────────────────────────────────────────────────
@@ -174,7 +254,8 @@ def test_bme280() -> Result:
     try:
         mod = load_repo_module("air_sensor_bme280", "rpi-air/sensors/bme280.py")
     except (ImportError, FileNotFoundError) as e:
-        return _missing(e, ["pip install smbus2 bme280", "lub: sudo apt install python3-smbus2"])
+        return _missing(e, ["pip install smbus2 pimoroni-bme280",
+                            "lub: sudo apt install python3-smbus2"])
     try:
         sensor = mod.Bme280Sensor(addr, 1)
         sensor.read()          # pierwszy odczyt tylko budzi przetwornik
@@ -182,7 +263,8 @@ def test_bme280() -> Result:
         d = sensor.read()
     except Exception as e:
         return _fail(e, [f"Czujnik nie odpowiada pod adresem 0x{addr:02X}",
-                         "Część modułów ma adres 0x77 (zworka SDO/ADDR)"] + HINT_I2C)
+                         "Część modułów ma adres 0x77 (zworka SDO/ADDR) — "
+                         "wtedy koliduje z BMP180 na GY-87"] + HINT_I2C)
 
     values = {
         "Temperatura": f"{d.temperature_c} °C",
@@ -197,177 +279,325 @@ def test_bme280() -> Result:
     return Result(OK, "Odczyt poprawny", values)
 
 
-# ── MS5611 ───────────────────────────────────────────────────────────────────
-def test_ms5611() -> Result:
-    addr = air("MS5611_ADDR", 0x77)
+# ── GY-87: MPU-6050 (akcelerometr + żyroskop) ────────────────────────────────
+def test_mpu6050() -> Result:
+    addr = MPU6050_ADDR
+    if SIMULATE:
+        return Result(OK, "Symulacja — MPU-6050 odpowiada", {
+            "WHO_AM_I": "0x68 (MPU-6050)",
+            "Akcelerometr": f"x={_jitter(0.02, 0.02)} y={_jitter(-0.01, 0.02)} "
+                            f"z={_jitter(1.0, 0.02)} g",
+            "Wektor przyspieszenia": "1.00 g (czujnik leży nieruchomo)",
+            "Roll / Pitch": f"{_jitter(0.8, 0.5, 1)}° / {_jitter(-1.1, 0.5, 1)}°",
+            "Żyroskop": f"x={_jitter(0.4, 0.3)} y={_jitter(-0.6, 0.3)} z={_jitter(0.2, 0.3)} °/s",
+            "Temperatura układu": f"{_jitter(27.5, 0.3, 1)} °C"})
+    bus, err = _i2c_open()
+    if err:
+        return err
+    try:
+        who = bus.read_byte_data(addr, 0x75)
+        bus.write_byte_data(addr, 0x6B, 0x01)     # wybudź, zegar z PLL żyroskopu X
+        time.sleep(0.1)
+        bus.write_byte_data(addr, 0x1A, 0x03)     # filtr DLPF ~44 Hz
+        bus.write_byte_data(addr, 0x1B, 0x00)     # żyroskop ±250 °/s → 131 LSB/(°/s)
+        bus.write_byte_data(addr, 0x1C, 0x00)     # akcelerometr ±2 g → 16384 LSB/g
+        time.sleep(0.05)
+        n = 20
+        acc = [0.0, 0.0, 0.0]
+        gyr = [0.0, 0.0, 0.0]
+        temp = 0.0
+        for _ in range(n):
+            b = bus.read_i2c_block_data(addr, 0x3B, 14)
+            raw = [_s16be(b[i], b[i + 1]) for i in range(0, 14, 2)]
+            for k in range(3):
+                acc[k] += raw[k] / 16384.0 / n
+                gyr[k] += raw[4 + k] / 131.0 / n
+            temp += (raw[3] / 340.0 + 36.53) / n
+            time.sleep(0.01)
+        _gy87_bypass(bus)                          # przy okazji odsłoń magnetometr
+    except OSError as e:
+        return _fail(e, [f"MPU-6050 nie odpowiada pod adresem 0x{addr:02X}",
+                         "Pin AD0 na masę → 0x68, na 3.3 V → 0x69"] + HINT_GY87 + HINT_I2C)
+    finally:
+        bus.close()
+
+    g = math.sqrt(sum(a * a for a in acc))
+    roll = math.degrees(math.atan2(acc[1], acc[2]))
+    pitch = math.degrees(math.atan2(-acc[0], math.hypot(acc[1], acc[2])))
+    values = {
+        "WHO_AM_I": f"0x{who:02X} ({_MPU_ID.get(who, 'nieznany układ')})",
+        "Akcelerometr": f"x={acc[0]:.2f} y={acc[1]:.2f} z={acc[2]:.2f} g",
+        "Wektor przyspieszenia": f"{g:.2f} g (powinno być ~1.00)",
+        "Roll / Pitch": f"{roll:.1f}° / {pitch:.1f}°",
+        "Żyroskop": f"x={gyr[0]:.1f} y={gyr[1]:.1f} z={gyr[2]:.1f} °/s",
+        "Temperatura układu": f"{temp:.1f} °C",
+    }
+    if all(a == 0 for a in acc) and all(w == 0 for w in gyr):
+        return Result(FAIL, "MPU-6050 odpowiada, ale zwraca same zera", values,
+                      ["Układ w uśpieniu albo uszkodzony — odłącz zasilanie na kilka sekund"])
+    if not 0.8 <= g <= 1.2:
+        return Result(WARN, "Akcelerometr odpowiada, ale przyspieszenie ≠ 1 g", values,
+                      ["Połóż moduł nieruchomo na stole i powtórz test"])
+    if max(abs(w) for w in gyr) > 10:
+        return Result(WARN, "Żyroskop pokazuje obrót, choć moduł powinien leżeć", values,
+                      ["Nie ruszaj modułu podczas testu",
+                       "Stałe przesunięcie kilku °/s to normalny offset — kalibruje się "
+                       "w oprogramowaniu"])
+    if who not in (0x68, 0x72, 0x98):
+        return Result(WARN, "Odczyt poprawny, ale to nie jest MPU-6050", values,
+                      ["Na płytce siedzi inny układ z rodziny MPU — rejestry danych są te same"])
+    return Result(OK, "Odczyt poprawny, czujnik widzi 1 g", values)
+
+
+# ── GY-87: magnetometr (QMC5883L albo HMC5883L) ──────────────────────────────
+def _read_qmc5883l(bus) -> tuple[float, float, float]:
+    """Pole w µT. Zakres 8 G → 3000 LSB/G."""
+    bus.write_byte_data(QMC5883L_ADDR, 0x0A, 0x80)    # soft reset
+    time.sleep(0.01)
+    bus.write_byte_data(QMC5883L_ADDR, 0x0B, 0x01)    # okres SET/RESET (wg noty)
+    bus.write_byte_data(QMC5883L_ADDR, 0x09, 0x1D)    # OSR 512, 8 G, 200 Hz, ciągły
+    deadline = time.time() + 0.5
+    while time.time() < deadline and not (bus.read_byte_data(QMC5883L_ADDR, 0x06) & 0x01):
+        time.sleep(0.01)
+    b = bus.read_i2c_block_data(QMC5883L_ADDR, 0x00, 6)
+    x, y, z = (_s16le(b[i], b[i + 1]) / 3000.0 * 100.0 for i in (0, 2, 4))
+    return x, y, z
+
+
+def _read_hmc5883l(bus) -> tuple[float, float, float]:
+    """Pole w µT. Wzmocnienie ±1.3 G → 1090 LSB/G. Kolejność rejestrów: X, Z, Y."""
+    bus.write_byte_data(HMC5883L_ADDR, 0x00, 0x70)    # 8 uśrednień, 15 Hz
+    bus.write_byte_data(HMC5883L_ADDR, 0x01, 0x20)    # ±1.3 G
+    bus.write_byte_data(HMC5883L_ADDR, 0x02, 0x00)    # pomiar ciągły
+    time.sleep(0.1)
+    b = bus.read_i2c_block_data(HMC5883L_ADDR, 0x03, 6)
+    x, z, y = (_s16be(b[i], b[i + 1]) / 1090.0 * 100.0 for i in (0, 2, 4))
+    return x, y, z
+
+
+def test_magnetometer() -> Result:
+    if SIMULATE:
+        return Result(OK, "Symulacja — magnetometr odpowiada", {
+            "Układ": "QMC5883L (0x0D)",
+            "Pole": f"x={_jitter(18.0, 1.0, 1)} y={_jitter(-4.0, 1.0, 1)} "
+                    f"z={_jitter(-42.0, 1.0, 1)} µT",
+            "Natężenie": f"{_jitter(46.0, 1.0, 1)} µT (Ziemia ok. 50 µT)",
+            "Kierunek (kompas)": f"{_jitter(347.0, 2.0, 0):.0f}°"})
+    bus, err = _i2c_open()
+    if err:
+        return err
+    chip = None
+    try:
+        try:
+            _gy87_bypass(bus)
+        except OSError:
+            pass    # brak MPU-6050 — magnetometr może być osobnym modułem
+        if _reg(bus, QMC5883L_ADDR, 0x0D) == 0xFF:
+            chip, (x, y, z) = f"QMC5883L (0x{QMC5883L_ADDR:02X})", _read_qmc5883l(bus)
+        elif _reg(bus, HMC5883L_ADDR, 0x0A) == ord("H"):     # ID: "H43"
+            chip, (x, y, z) = f"HMC5883L (0x{HMC5883L_ADDR:02X})", _read_hmc5883l(bus)
+    except OSError as e:
+        return _fail(e, HINT_GY87 + HINT_I2C)
+    finally:
+        bus.close()
+
+    if chip is None:
+        return Result(FAIL, "Nie znaleziono magnetometru (ani QMC5883L 0x0D, ani HMC5883L 0x1E)",
+                      hints=["Na GY-87 magnetometr wisi za MPU-6050 — najpierw musi działać "
+                             "test MPU-6050",
+                             "Po teście sprawdź: i2cdetect -y 1 → powinien być 0x0D albo 0x1E"]
+                      + HINT_GY87 + HINT_I2C)
+
+    total = math.sqrt(x * x + y * y + z * z)
+    heading = (math.degrees(math.atan2(y, x)) + 360.0) % 360.0
+    values = {
+        "Układ": chip,
+        "Pole": f"x={x:.1f} y={y:.1f} z={z:.1f} µT",
+        "Natężenie": f"{total:.1f} µT (Ziemia ok. 50 µT, bez kalibracji ± kilkadziesiąt)",
+        "Kierunek (kompas)": f"{heading:.0f}° (bez kalibracji, moduł poziomo)",
+    }
+    if total == 0:
+        return Result(FAIL, "Magnetometr odpowiada, ale zwraca same zera", values,
+                      ["Odłącz zasilanie modułu na kilka sekund i powtórz"])
+    if not 10 <= total <= 100:
+        return Result(WARN, "Natężenie pola nietypowe — magnes lub metal w pobliżu?", values,
+                      ["Odsuń moduł od głośników, silników, śrubokrętów i przewodów z prądem",
+                       "Przed lotem zrób kalibrację (obracanie modułem we wszystkich osiach)"])
+    return Result(OK, "Odczyt poprawny", values,
+                  ["Kierunek jest orientacyjny — kompas wymaga kalibracji hard/soft-iron"])
+
+
+# ── GY-87: BMP180 (ciśnienie + temperatura) ──────────────────────────────────
+def _tdiv(a: int, b: int) -> int:
+    """Dzielenie całkowite z obcięciem do zera — jak w C (algorytm z noty BMP180)."""
+    q = abs(a) // abs(b)
+    return q if (a >= 0) == (b >= 0) else -q
+
+
+def _bmp180_read(bus, addr: int, oss: int = 3) -> tuple[float, float]:
+    """(temperatura °C, ciśnienie hPa) — algorytm z noty katalogowej Boscha."""
+    c = bus.read_i2c_block_data(addr, 0xAA, 22)
+    w = [_u16be(c[i], c[i + 1]) for i in range(0, 22, 2)]
+    s = [v - 0x10000 if v & 0x8000 else v for v in w]
+    ac1, ac2, ac3 = s[0], s[1], s[2]
+    ac4, ac5, ac6 = w[3], w[4], w[5]
+    b1, b2, _mb, mc, md = s[6], s[7], s[8], s[9], s[10]
+    if 0 in (ac5, ac6, md) or 0xFFFF in w:
+        raise OSError("nieprawidłowe dane kalibracyjne BMP180 (EEPROM)")
+
+    bus.write_byte_data(addr, 0xF4, 0x2E)
+    time.sleep(0.005)
+    b = bus.read_i2c_block_data(addr, 0xF6, 2)
+    ut = _u16be(b[0], b[1])
+    bus.write_byte_data(addr, 0xF4, 0x34 + (oss << 6))
+    time.sleep(0.026)
+    b = bus.read_i2c_block_data(addr, 0xF6, 3)
+    up = ((b[0] << 16) | (b[1] << 8) | b[2]) >> (8 - oss)
+
+    x1 = ((ut - ac6) * ac5) >> 15
+    x2 = _tdiv(mc << 11, x1 + md)
+    b5 = x1 + x2
+    temp_c = ((b5 + 8) >> 4) / 10.0
+
+    b6 = b5 - 4000
+    x1 = (b2 * ((b6 * b6) >> 12)) >> 11
+    x2 = (ac2 * b6) >> 11
+    x3 = x1 + x2
+    b3 = _tdiv(((ac1 * 4 + x3) << oss) + 2, 4)
+    x1 = (ac3 * b6) >> 13
+    x2 = (b1 * ((b6 * b6) >> 12)) >> 16
+    x3 = (x1 + x2 + 2) >> 2
+    b4 = (ac4 * (x3 + 32768)) >> 15
+    b7 = (up - b3) * (50000 >> oss)
+    p = _tdiv(b7 * 2, b4) if b7 < 0x80000000 else _tdiv(b7, b4) * 2
+    x1 = ((p >> 8) * (p >> 8) * 3038) >> 16
+    x2 = (-7357 * p) >> 16
+    p += (x1 + x2 + 3791) >> 4
+    return temp_c, p / 100.0
+
+
+def test_bmp180() -> Result:
+    addr = BMP180_ADDR
     if SIMULATE:
         p = _jitter(1002.9, 0.3)
-        return Result(OK, "Symulacja — czujnik odpowiada", {
-            "Ciśnienie": f"{p} hPa", "Temperatura": f"{_jitter(21.8, 0.2)} °C",
-            "Wysokość": f"{_altitude_m(p):.1f} m"})
+        return Result(OK, "Symulacja — BMP180 odpowiada", {
+            "Chip ID": "0x55 (BMP180)", "Ciśnienie": f"{p} hPa",
+            "Temperatura": f"{_jitter(22.1, 0.2)} °C", "Wysokość": f"{_altitude_m(p):.1f} m"})
+    bus, err = _i2c_open()
+    if err:
+        return err
     try:
-        mod = load_repo_module("air_sensor_ms5611", "rpi-air/sensors/ms5611.py")
-    except (ImportError, FileNotFoundError) as e:
-        return _missing(e, ["pip install smbus2"])
-    try:
-        sensor = mod.Ms5611Sensor(addr, 1)
-        d = sensor.read()
-    except Exception as e:
-        return _fail(e, [f"Brak odpowiedzi pod adresem 0x{addr:02X}",
-                         "MS5611 na module GY-63/GY-86 bywa pod 0x76 (pin CSB)"] + HINT_I2C)
+        cid = bus.read_byte_data(addr, 0xD0)
+        if cid != 0x55:
+            name = _BOSCH_ID.get(cid, "nieznany układ")
+            return Result(FAIL, f"Pod 0x{addr:02X} nie ma BMP180 (chip ID 0x{cid:02X} = {name})",
+                          {"Chip ID": f"0x{cid:02X}"},
+                          ["BME280 ze zworką SDO na 3.3 V też ma adres 0x77 — kolizja z GY-87",
+                           "Przełącz BME280 na 0x76"])
+        temp_c, p = _bmp180_read(bus, addr)
+    except OSError as e:
+        return _fail(e, [f"BMP180 nie odpowiada pod adresem 0x{addr:02X}"] + HINT_GY87 + HINT_I2C)
+    finally:
+        bus.close()
 
     values = {
-        "Ciśnienie": f"{d.pressure_hpa} hPa",
-        "Temperatura": f"{d.temperature_c} °C",
-        "Wysokość": f"{d.altitude_m} m",
+        "Chip ID": "0x55 (BMP180)",
+        "Ciśnienie": f"{p:.2f} hPa",
+        "Temperatura": f"{temp_c:.1f} °C",
+        "Wysokość": f"{_altitude_m(p):.1f} m",
     }
-    if not (200 <= d.pressure_hpa <= 1200):
-        return Result(WARN, "Czujnik odpowiada, ale ciśnienie jest poza zakresem", values,
-                      ["Sprawdź kalibrację PROM — możliwe zakłócenia na I2C",
-                       "Zwolnij magistralę: dtparam=i2c_arm_baudrate=100000"])
-    if abs(d.pressure_hpa - 1013.25) > 200:
-        return Result(WARN, "Ciśnienie mocno odbiega od normalnego (1013 hPa)", values)
-    return Result(OK, "Odczyt poprawny", values)
+    if not (300 <= p <= 1100) or not (-40 <= temp_c <= 85):
+        return Result(WARN, "Czujnik odpowiada, ale wartości są poza zakresem", values,
+                      ["BMP180 mierzy 300–1100 hPa — powyżej ~9 km wysokości kończy mu się zakres",
+                       "Na stole wynik poza zakresem = uszkodzony moduł lub zakłócenia I2C"])
+    return Result(OK, "Odczyt poprawny", values,
+                  ["BMP180 mierzy tylko do 300 hPa (~9 km) — w stratosferze wysokość "
+                   "bierz z GPS"])
 
 
-# ── BNO085 (IMU) ─────────────────────────────────────────────────────────────
-def test_bno085() -> Result:
-    if SIMULATE:
-        return Result(OK, "Symulacja — IMU odpowiada", {
-            "Roll": f"{_jitter(1.2, 0.8)} °", "Pitch": f"{_jitter(-0.7, 0.8)} °",
-            "Yaw": f"{_jitter(128.4, 1.5)} °",
-            "Akcelerometr":
-                f"x={_jitter(0.1, 0.2)} y={_jitter(0.0, 0.2)} z={_jitter(9.81, 0.1)} m/s²",
-            "Wektor przyspieszenia": "9.81 m/s² (≈ 1 g — czujnik leży poziomo)"})
+# ── INA226 (bateria) ─────────────────────────────────────────────────────────
+def _ina_read(bus, addr: int, reg: int) -> int:
+    b = bus.read_i2c_block_data(addr, reg, 2)
+    return _u16be(b[0], b[1])
+
+
+def _is_ina226(bus, addr: int) -> bool:
     try:
-        mod = load_repo_module("air_sensor_bno085", "rpi-air/sensors/bno085.py")
-    except (ImportError, FileNotFoundError) as e:
-        return _missing(e, ["pip install adafruit-circuitpython-bno08x adafruit-blinka"])
-    try:
-        sensor = mod.Bno085Sensor()
-        time.sleep(0.5)        # BNO085 potrzebuje chwili po włączeniu raportów
-        d = sensor.read()
-    except Exception as e:
-        return _fail(e, [
-            "BNO085 rozciąga zegar I2C — przy błędach zwolnij magistralę:",
-            "   /boot/firmware/config.txt →  dtparam=i2c_arm_baudrate=50000",
-            "Adres domyślny 0x4A (0x4B gdy pin ADR podciągnięty do 3.3 V)",
-        ] + HINT_I2C)
-
-    g = math.sqrt(d.accel_x ** 2 + d.accel_y ** 2 + d.accel_z ** 2)
-    values = {
-        "Roll": f"{d.roll_deg} °", "Pitch": f"{d.pitch_deg} °", "Yaw": f"{d.yaw_deg} °",
-        "Akcelerometr": f"x={d.accel_x} y={d.accel_y} z={d.accel_z} m/s²",
-        "Wektor przyspieszenia": f"{g:.2f} m/s² (powinno być ~9.81)",
-    }
-    if g < 5 or g > 15:
-        return Result(WARN, "IMU odpowiada, ale przyspieszenie ≠ 1 g", values,
-                      ["Połóż czujnik nieruchomo i powtórz test",
-                       "Jeśli dalej źle — czujnik nie zdążył się zainicjalizować"])
-    if d.roll_deg == 0 and d.pitch_deg == 0 and d.yaw_deg == 0:
-        return Result(WARN, "IMU odpowiada, ale nie ma jeszcze wektora obrotu", values,
-                      ["Poczekaj 2-3 s i powtórz test (fuzja czujników się kalibruje)"])
-    return Result(OK, "Odczyt poprawny", values)
+        return _ina_read(bus, addr, 0xFE) == 0x5449
+    except OSError:
+        return False
 
 
-# ── INA219 (bateria) ─────────────────────────────────────────────────────────
-def test_ina219() -> Result:
-    addr = air("INA219_ADDR", 0x40)
-    shunt = air("INA219_SHUNT_OHMS", 0.1)
+def _find_ina226(bus) -> int | None:
+    """Najpierw adres z konfiguracji, potem cały zakres zworek A0/A1 (0x40…0x4F)."""
+    for addr in [INA226_ADDR] + [a for a in range(0x40, 0x50) if a != INA226_ADDR]:
+        if _is_ina226(bus, addr):
+            return addr
+    return None
+
+
+def test_ina226() -> Result:
+    addr = INA226_ADDR
+    shunt = INA226_SHUNT_OHMS
     if SIMULATE:
         v, i = _jitter(7.82, 0.05, 3), _jitter(430.0, 25.0)
-        return Result(OK, "Symulacja — czujnik odpowiada", {
-            "Napięcie": f"{v} V", "Prąd": f"{i} mA", "Moc": f"{round(v * i, 1)} mW"})
+        return Result(OK, "Symulacja — INA226 odpowiada", {
+            "Napięcie": f"{v} V", "Prąd": f"{i} mA", "Moc": f"{round(v * i, 1)} mW",
+            "Bocznik": f"{shunt} Ω"})
+    bus, err = _i2c_open()
+    if err:
+        return err
     try:
-        mod = load_repo_module("air_sensor_ina219", "rpi-air/sensors/ina219.py")
-    except (ImportError, FileNotFoundError) as e:
-        return _missing(e, ["pip install pi-ina219"])
-    try:
-        sensor = mod.Ina219Sensor(shunt, addr)
-        d = sensor.read()
-    except Exception as e:
+        found = _find_ina226(bus)
+        if found is None:
+            return Result(FAIL, "Nie znaleziono INA226 pod żadnym adresem 0x40…0x4F",
+                          hints=["Sprawdź skan I2C — czy coś odpowiada w zakresie 0x40…0x4F?",
+                                 "INA219 nie ma rejestru ID (0xFE) — sprawdź, czy to na pewno INA226"]
+                                + HINT_I2C)
+        addr = found
+        die = _ina_read(bus, addr, 0xFF)
+        # uśrednianie 16, czas konwersji 1.1 ms, pomiar ciągły bocznika i szyny
+        bus.write_i2c_block_data(addr, 0x00, [0x45, 0x27])
+        time.sleep(0.1)
+        raw_shunt = _ina_read(bus, addr, 0x01)
+        raw_bus = _ina_read(bus, addr, 0x02)
+    except OSError as e:
         return _fail(e, [f"Brak odpowiedzi pod adresem 0x{addr:02X}",
-                         "Adres zależy od zworek A0/A1 (0x40…0x45)"] + HINT_I2C)
-
-    values = {
-        "Napięcie": f"{d.voltage_v} V", "Prąd": f"{d.current_ma} mA",
-        "Moc": f"{d.power_mw} mW", "Bocznik": f"{shunt} Ω",
-    }
-    if d.voltage_v < 1.0:
-        return Result(WARN, "Układ odpowiada, ale nie widzi napięcia na wejściu", values,
-                      ["Bateria idzie przez zaciski Vin+ / Vin− (bocznik), nie przez VCC",
-                       "VCC modułu (3.3 V) zasila tylko elektronikę pomiarową"])
-    if d.current_ma < 1.0:
-        return Result(WARN, "Napięcie OK, ale prąd ≈ 0 — brak obciążenia?", values,
-                      ["Sprawdź czy odbiornik jest podłączony za bocznikiem (Vin−)"])
-    return Result(OK, "Odczyt poprawny", values)
-
-
-# ── HX711 (tensometry) ───────────────────────────────────────────────────────
-HX711_LABELS = ["przód lewy", "przód prawy", "tył lewy", "tył prawy"]
-_HX711_DEFAULT = [{"dt": 16, "sck": 21}, {"dt": 19, "sck": 20},
-                  {"dt": 12, "sck": 13}, {"dt": 24, "sck": 25}]
-
-
-def hx711_pins(index: int) -> dict:
-    pins = air("HX711_SENSORS", _HX711_DEFAULT)
-    return pins[index] if index < len(pins) else _HX711_DEFAULT[index]
-
-
-def test_hx711(index: int) -> Result:
-    pins = hx711_pins(index)
-    ref = air("HX711_REFERENCE_UNIT", 1.0)
-    dt, sck = pins["dt"], pins["sck"]
-    if SIMULATE:
-        raws = [random.randint(128_000, 128_400) for _ in range(5)]
-        return Result(OK, "Symulacja — przetwornik odpowiada", {
-            "Kanał": f"#{index} ({HX711_LABELS[index]})",
-            "Surowe ADC": f"min {min(raws)}  max {max(raws)}  rozrzut {max(raws) - min(raws)}",
-            "Waga": f"{_jitter(0.0, 3.0, 1)} g", "reference_unit": f"{ref}"})
-    try:
-        mod = load_repo_module("air_sensor_hx711", "rpi-air/sensors/hx711.py")
-    except (ImportError, FileNotFoundError) as e:
-        return _missing(e, _gpio_hints())
-    sensor = None
-    try:
-        sensor = mod.Hx711Sensor(dt, sck, ref)
-        raws = [sensor._read_raw() for _ in range(5)]   # surowe ADC — do diagnostyki
-        grams = sensor.read().strain_g
-    except TimeoutError:
-        return Result(FAIL, "HX711 nie zgłasza gotowości (linia DT stale w stanie wysokim)",
-                      hints=[f"DT = GPIO{dt}, SCK = GPIO{sck}",
-                             "Sprawdź zasilanie modułu: VCC = 3.3 V, GND wspólna z RPi",
-                             "Zamienione DT ↔ SCK to najczęstszy błąd",
-                             "Bez podłączonego mostka tensometrycznego HX711 też milczy"])
-    except Exception as e:
-        return _fail(e, _gpio_hints([f"DT = GPIO{dt}, SCK = GPIO{sck}"]))
+                         "Adres zależy od zworek A0/A1 (0x40…0x4F) — zobacz skan I2C"] + HINT_I2C)
     finally:
-        if sensor is not None:
-            try:
-                sensor.close()
-            except Exception:
-                pass
+        bus.close()
 
-    spread = max(raws) - min(raws)
+    v_shunt_mv = (raw_shunt - 0x10000 if raw_shunt & 0x8000 else raw_shunt) * 0.0025
+    voltage = raw_bus * 0.00125
+    current_ma = v_shunt_mv / shunt
     values = {
-        "Kanał": f"#{index} ({HX711_LABELS[index]})",
-        "Piny": f"DT = GPIO{dt}, SCK = GPIO{sck}",
-        "Surowe ADC": f"min {min(raws)}  max {max(raws)}  rozrzut {spread}",
-        "Waga (po tarowaniu)": f"{grams} g",
-        "reference_unit": f"{ref}",
+        "Napięcie": f"{voltage:.3f} V",
+        "Prąd": f"{current_ma:.1f} mA",
+        "Moc": f"{voltage * current_ma:.0f} mW",
+        "Napięcie na boczniku": f"{v_shunt_mv:.3f} mV",
+        "Bocznik": f"{shunt} Ω (max {81.92 / shunt:.0f} mA)",
+        "Die ID": f"0x{die:04X}",
+        "Adres": f"0x{addr:02X}",
     }
-    if all(r in (0, -1, 0x7FFFFF, -0x800000) for r in raws):
-        return Result(FAIL, "Przetwornik zwraca wartość skrajną — brak sygnału z mostka", values,
-                      ["Sprawdź tensometr: E+ / E− (zasilanie mostka), A+ / A− (sygnał)",
-                       "Zamienione A+ / A− dają ujemne wskazania — to nie awaria"])
-    if spread == 0:
-        return Result(WARN, "Odczyt się nie zmienia — podejrzanie stabilnie", values,
-                      ["Naciśnij lekko tensometr i powtórz test — wartość musi drgnąć"])
-    if spread > 50_000:
-        return Result(WARN, "Bardzo duży szum odczytu", values,
-                      ["Skróć przewody DT/SCK, odsuń je od przewodów zasilania",
-                       "Sprawdź wspólną masę modułu i RPi"])
-    return Result(OK, "Przetwornik odpowiada, odczyt stabilny", values)
+    hints = []
+    if addr != INA226_ADDR:
+        hints.append(f"INA226 znaleziony pod 0x{addr:02X}, a w konfiguracji jest 0x{INA226_ADDR:02X} — "
+                     f"ustaw INA226_ADDR = 0x{addr:02X} w rpi-air/config.py")
+    if voltage < 1.0:
+        return Result(WARN, "Układ odpowiada, ale nie widzi napięcia na wejściu", values,
+                      ["Bateria idzie przez zaciski VIN+ / VIN− (bocznik), nie przez VCC",
+                       "VCC modułu (3.3 V) zasila tylko elektronikę pomiarową"] + hints)
+    if abs(v_shunt_mv) >= 81.9:
+        return Result(WARN, "Przekroczony zakres bocznika — prąd za duży", values,
+                      [f"Przy {shunt} Ω INA226 mierzy najwyżej {81.92 / shunt:.0f} mA",
+                       "Wymień bocznik na mniejszy (np. 0.01 Ω) i zmień INA226_SHUNT_OHMS"] + hints)
+    if abs(current_ma) < 1.0:
+        return Result(WARN, "Napięcie OK, ale prąd ≈ 0 — brak obciążenia?", values,
+                      ["Sprawdź czy odbiornik jest podłączony za bocznikiem (VIN−)"] + hints)
+    if current_ma < 0:
+        return Result(WARN, "Prąd ujemny — zamienione VIN+ z VIN−", values,
+                      ["Bateria → VIN+, VIN− → odbiornik"] + hints)
+    return Result(OK, "Odczyt poprawny", values, hints)
 
 
 # ── GPS NEO-M8N ──────────────────────────────────────────────────────────────
@@ -455,173 +685,6 @@ def test_gps(seconds: float = 5.0) -> Result:
                          "Prędkość NEO-M8N: 9600 baud (domyślnie)",
                          "W locie GPS jest podłączony do ESP32 (GPIO4), nie do RPi —",
                          "   ten test służy do sprawdzenia modułu na stole"] + HINT_UART)
-
-
-# ── LoRa SX1278 (SPI) ────────────────────────────────────────────────────────
-_SX_REG_OP_MODE = 0x01
-_SX_REG_FRF_MSB = 0x06
-_SX_REG_MODEM_CONFIG1 = 0x1D
-_SX_REG_MODEM_CONFIG2 = 0x1E
-_SX_REG_MODEM_CONFIG3 = 0x26
-_SX_REG_FIFO = 0x00
-_SX_REG_FIFO_ADDR_PTR = 0x0D
-_SX_REG_FIFO_RX_BASE = 0x0F
-_SX_REG_FIFO_RX_CURRENT = 0x10
-_SX_REG_IRQ_FLAGS = 0x12
-_SX_REG_RX_NB_BYTES = 0x13
-_SX_REG_PKT_SNR = 0x19
-_SX_REG_PKT_RSSI = 0x1A
-_SX_REG_SYNC_WORD = 0x39
-_SX_REG_DIO_MAPPING1 = 0x40
-_SX_REG_VERSION = 0x42
-_SX_MODE_SLEEP, _SX_MODE_STDBY, _SX_MODE_RX_CONT = 0x00, 0x01, 0x05
-_SX_MODE_LORA = 0x80
-_SX_IRQ_RX_DONE, _SX_IRQ_CRC_ERR = 0x40, 0x20
-
-_BW_MAP = {7800: 0, 10400: 1, 15600: 2, 20800: 3, 31250: 4,
-           41700: 5, 62500: 6, 125000: 7, 250000: 8, 500000: 9}
-
-
-def _sx_open():
-    """Otwiera SPI do SX1278 wg rpi-ground/config.py. Zwraca (spi, opis)."""
-    import spidev
-    bus = ground("LORA_SPI_BUS", 0)
-    cs = ground("LORA_SPI_CS", 0)
-    spi = spidev.SpiDev()
-    spi.open(bus, cs)
-    spi.max_speed_hz = 1_000_000
-    return spi, f"/dev/spidev{bus}.{cs}"
-
-
-def _sx_read(spi, reg: int) -> int:
-    return spi.xfer2([reg & 0x7F, 0x00])[1]
-
-
-def _sx_write(spi, reg: int, val: int) -> None:
-    spi.xfer2([reg | 0x80, val & 0xFF])
-
-
-def test_lora_present() -> Result:
-    """Sprawdza obecność SX1278 na SPI — rejestr wersji musi zwrócić 0x12."""
-    if SIMULATE:
-        return Result(OK, "Symulacja — SX1278 odpowiada", {
-            "Port SPI": "/dev/spidev0.0", "RegVersion": "0x12 (SX1276/77/78)",
-            "Częstotliwość": f"{ground('LORA_FREQ', 433.0)} MHz",
-            "SF / BW / CR": "SF10 / 125 kHz / 4:5"})
-    if not any(_dev_exists(f"/dev/spidev0.{i}") or _dev_exists(f"/dev/spidev1.{i}")
-               for i in range(3)):
-        return Result(MISSING, "Brak urządzeń /dev/spidev* — SPI jest wyłączone",
-                      hints=HINT_SPI)
-    try:
-        spi, portname = _sx_open()
-    except ImportError as e:
-        return _missing(e, ["pip install spidev"] + HINT_SPI)
-    except Exception as e:
-        return _fail(e, HINT_SPI)
-    try:
-        ver = _sx_read(spi, _SX_REG_VERSION)
-        mode = _sx_read(spi, _SX_REG_OP_MODE)
-    except Exception as e:
-        return _fail(e, HINT_SPI)
-    finally:
-        spi.close()
-
-    values = {
-        "Port SPI": portname,
-        "RegVersion (0x42)": f"0x{ver:02X}",
-        "RegOpMode (0x01)": f"0x{mode:02X}",
-        "Częstotliwość z configu": f"{ground('LORA_FREQ', 433.0)} MHz",
-        "DIO0": f"GPIO{ground('LORA_DIO0_PIN', 25)}",
-    }
-    if ver == 0x12:
-        return Result(OK, "SX1278 odpowiada poprawnie (0x12)", values)
-    if ver in (0x00, 0xFF):
-        return Result(FAIL, f"Brak odpowiedzi modułu (0x{ver:02X})", values,
-                      ["Sprawdź MISO/MOSI — zamiana tych dwóch daje dokładnie ten objaw",
-                       "NSS/CS musi iść do CE0 (pin 24), RST podciągnięty lub do GPIO",
-                       "Moduł zasilany 3.3 V — 5 V go zniszczy",
-                       "Antena MUSI być podłączona przed nadawaniem"] + HINT_SPI)
-    return Result(WARN, f"Odpowiedź jest, ale wersja nietypowa: 0x{ver:02X}", values,
-                  ["SX1276/77/78 zwracają 0x12 — inna wartość = inny układ lub zakłócenia"])
-
-
-def test_lora_rx(seconds: float = 12.0) -> Result:
-    """Nasłuch pakietu z balonu — ustawienia z rpi-ground/config.py."""
-    freq = ground("LORA_FREQ", 433.0)
-    sf = ground("LORA_SF", 10)
-    bw = ground("LORA_BW", 125000)
-    cr = ground("LORA_CR", 5)
-    if SIMULATE:
-        return Result(OK, "Symulacja — odebrano pakiet", {
-            "Częstotliwość": f"{freq} MHz", "SF / BW / CR": f"SF{sf} / {bw // 1000} kHz / 4:{cr}",
-            "RSSI": f"{random.randint(-115, -60)} dBm", "SNR": f"{_jitter(8.0, 3.0, 1)} dB",
-            "Długość pakietu": f"{random.randint(80, 200)} B"})
-    try:
-        spi, portname = _sx_open()
-    except ImportError as e:
-        return _missing(e, ["pip install spidev"] + HINT_SPI)
-    except Exception as e:
-        return _fail(e, HINT_SPI)
-    try:
-        if _sx_read(spi, _SX_REG_VERSION) != 0x12:
-            return Result(FAIL, "SX1278 nie odpowiada — najpierw zrób test obecności modułu",
-                          hints=HINT_SPI)
-        # konfiguracja identyczna jak w rpi-ground/radio/lora_rx.py
-        _sx_write(spi, _SX_REG_OP_MODE, _SX_MODE_LORA | _SX_MODE_SLEEP)
-        time.sleep(0.01)
-        frf = int((freq * 1e6) / 61.03515625)
-        _sx_write(spi, _SX_REG_FRF_MSB, (frf >> 16) & 0xFF)
-        _sx_write(spi, _SX_REG_FRF_MSB + 1, (frf >> 8) & 0xFF)
-        _sx_write(spi, _SX_REG_FRF_MSB + 2, frf & 0xFF)
-        _sx_write(spi, _SX_REG_MODEM_CONFIG1, (_BW_MAP.get(bw, 7) << 4) | ((cr - 4) << 1))
-        _sx_write(spi, _SX_REG_MODEM_CONFIG2, (sf << 4) | 0x04)
-        _sx_write(spi, _SX_REG_MODEM_CONFIG3, 0x04)
-        _sx_write(spi, _SX_REG_SYNC_WORD, 0x12)
-        _sx_write(spi, _SX_REG_FIFO_RX_BASE, 0x00)
-        _sx_write(spi, _SX_REG_FIFO_ADDR_PTR, 0x00)
-        _sx_write(spi, _SX_REG_DIO_MAPPING1, 0x00)
-        _sx_write(spi, _SX_REG_IRQ_FLAGS, 0xFF)
-        _sx_write(spi, _SX_REG_OP_MODE, _SX_MODE_LORA | _SX_MODE_RX_CONT)
-
-        deadline = time.time() + seconds
-        while time.time() < deadline:
-            irq = _sx_read(spi, _SX_REG_IRQ_FLAGS)
-            if irq & _SX_IRQ_RX_DONE:
-                crc_err = bool(irq & _SX_IRQ_CRC_ERR)
-                length = _sx_read(spi, _SX_REG_RX_NB_BYTES)
-                _sx_write(spi, _SX_REG_FIFO_ADDR_PTR, _sx_read(spi, _SX_REG_FIFO_RX_CURRENT))
-                payload = bytes(_sx_read(spi, _SX_REG_FIFO) for _ in range(length))
-                rssi = _sx_read(spi, _SX_REG_PKT_RSSI) - 157
-                snr_raw = _sx_read(spi, _SX_REG_PKT_SNR)
-                snr = (snr_raw - 256 if snr_raw > 127 else snr_raw) / 4.0
-                _sx_write(spi, _SX_REG_IRQ_FLAGS, 0xFF)
-                preview = payload[:60].decode("utf-8", errors="replace")
-                values = {
-                    "Częstotliwość": f"{freq} MHz",
-                    "SF / BW / CR": f"SF{sf} / {bw // 1000} kHz / 4:{cr}",
-                    "RSSI": f"{rssi} dBm", "SNR": f"{snr:.1f} dB",
-                    "Długość pakietu": f"{length} B", "Początek pakietu": preview,
-                }
-                if crc_err:
-                    return Result(WARN, "Pakiet odebrany, ale z błędem CRC", values,
-                                  ["Sygnał za słaby albo nadajnik ma inne SF/BW/CR"])
-                return Result(OK, "Pakiet odebrany poprawnie", values)
-            time.sleep(0.02)
-    except Exception as e:
-        return _fail(e, HINT_SPI)
-    finally:
-        try:
-            _sx_write(spi, _SX_REG_OP_MODE, _SX_MODE_LORA | _SX_MODE_STDBY)
-            spi.close()
-        except Exception:
-            pass
-
-    return Result(WARN, f"Cisza w eterze przez {seconds:.0f} s — brak pakietów", {
-        "Częstotliwość": f"{freq} MHz",
-        "SF / BW / CR": f"SF{sf} / {bw // 1000} kHz / 4:{cr}",
-    }, ["Nadajnik (ESP32 na balonie) musi być włączony — nadaje co ~5 s",
-        "Obie strony muszą mieć TE SAME: częstotliwość, SF, BW, CR i sync word 0x12",
-        "Sprawdź antenę 433 MHz po obu stronach"])
 
 
 # ── RTL-SDR (odbiornik HF) ───────────────────────────────────────────────────
@@ -780,55 +843,127 @@ def test_espcam_power() -> Result:
                    "HIGH na GPIO = MOSFET otwarty = kamera zasilona"])
 
 
-# ── ESP32-CAM: status po UART (pigpio bit-bang) ──────────────────────────────
-def test_espcam_status(seconds: float = 8.0) -> Result:
-    pin = air("ESPCAM_STATUS_PIN", 4)
-    baud = air("ESPCAM_STATUS_BAUD", 115200)
-    if SIMULATE:
-        return Result(OK, "Symulacja — kamera raportuje status", {
-            "Stan": "OK, nagrywa",
-            "Klatki": f"{random.randint(900, 4000)}",
-            "Wolne na karcie": f"{random.randint(3000, 12000)} MB"})
+# ── ESP32-CAM: status po UART ────────────────────────────────────────────────
+# pigpio (bit-bang na GPIO4) nie działa na Raspberry Pi 5, więc na RPi 5 status
+# czytamy sprzętowym UART3: RX = GPIO9 (pin 21), dtoverlay=uart3-pi5 → /dev/ttyAMA3.
+ESPCAM_STATUS_PORT = air("ESPCAM_STATUS_PORT", "/dev/ttyAMA3")
+HINT_ESPCAM_PI5 = [
+    "Na Raspberry Pi 5 pigpio nie działa — status czytamy sprzętowym UART3:",
+    "   1. dopisz do /boot/firmware/config.txt:  dtoverlay=uart3-pi5",
+    "   2. reboot, potem sprawdź: ls /dev/ttyAMA3",
+    "   3. ESP32-CAM GPIO1 (U0TX) → RPi GPIO9 (pin 21), masa wspólna",
+]
+
+
+def _parse_espcam(line: str) -> dict | None:
+    """'$S{"ok":1,...}' → dict; linie bez prefiksu $S (debug, boot) są pomijane."""
+    if not line.startswith("$S"):
+        return None
+    try:
+        data = json.loads(line[2:])
+    except ValueError:
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _espcam_uart(port: str, baud: int, seconds: float) -> tuple[dict | None, int]:
+    """Nasłuch na sprzętowym UART. Zwraca (ostatni status, liczba odebranych linii)."""
+    import serial
+    status, lines = None, 0
+    with serial.Serial(port, baud, timeout=0.5) as ser:
+        ser.reset_input_buffer()
+        deadline = time.time() + seconds
+        while time.time() < deadline:
+            raw = ser.readline().decode("utf-8", errors="replace").strip()
+            if not raw:
+                continue
+            lines += 1
+            status = _parse_espcam(raw) or status
+            if status:
+                break
+    return status, lines
+
+
+def _espcam_pigpio(pin: int, baud: int, seconds: float) -> tuple[dict | None, int] | Result:
+    """Stara ścieżka (RPi 3/4): bit-bang przez pigpio, sterownik z rpi-air."""
     try:
         mod = load_repo_module("air_espcam_monitor", "rpi-air/hardware/espcam_monitor.py")
     except (ImportError, FileNotFoundError) as e:
         return _missing(e, ["sudo apt install pigpio python3-pigpio",
                             "sudo systemctl enable --now pigpiod"])
-    mon = None
+    if not getattr(mod, "_PIGPIO", False):
+        return Result(MISSING, "Brak biblioteki pigpio",
+                      hints=["sudo apt install pigpio python3-pigpio",
+                             "sudo systemctl enable --now pigpiod"])
+    mon = mod.EspCamMonitor(pin, baud)
     try:
-        mon = mod.EspCamMonitor(pin, baud)
         if getattr(mon, "_pi", None) is None:
-            return Result(MISSING, "pigpio niedostępne (demon nie działa lub RPi 5)", hints=[
-                "Uruchom demona: sudo systemctl enable --now pigpiod",
-                "UWAGA: pigpio nie wspiera Raspberry Pi 5 — na RPi 5 ten odczyt",
-                "   trzeba przepisać na lgpio albo sprzętowy UART",
-                f"Pin statusu: GPIO{pin} @ {baud} baud"])
+            return Result(MISSING, "Demon pigpiod nie działa",
+                          hints=["sudo systemctl enable --now pigpiod"])
         time.sleep(seconds)     # kamera raportuje co ~5 s
         ok, rec, frames, free_mb = (list(mon.compact()) + [0, 0, 0, 0])[:4]
-    except Exception as e:
-        return _fail(e, ["sudo systemctl enable --now pigpiod",
-                         "pigpio nie działa na Raspberry Pi 5"])
     finally:
-        if mon is not None:
-            try:
-                mon.stop()
-            except Exception:
-                pass
+        mon.stop()
+    return ({"ok": ok, "rec": rec, "n": frames, "mb": free_mb} if ok else None), int(ok)
 
+
+def test_espcam_status(seconds: float = 8.0) -> Result:
+    pin = air("ESPCAM_STATUS_PIN", 4)
+    baud = air("ESPCAM_STATUS_BAUD", 115200)
+    port = ESPCAM_STATUS_PORT
+    if SIMULATE:
+        return Result(OK, "Symulacja — kamera raportuje status", {
+            "Odczyt": f"{port} @ {baud} baud",
+            "Stan": "OK, nagrywa",
+            "Klatki": f"{random.randint(900, 4000)}",
+            "Wolne na karcie": f"{random.randint(3000, 12000)} MB"})
+
+    try:
+        if _dev_exists(port):
+            source = f"{port} @ {baud} baud"
+            try:
+                got = _espcam_uart(port, baud, seconds)
+            except ImportError as e:
+                return _missing(e, ["pip install pyserial"])
+            wire_hint = "ESP32-CAM GPIO1 (U0TX) → RPi GPIO9 (pin 21)"
+        elif is_pi5():
+            return Result(MISSING, f"Brak portu {port} — sprzętowy UART3 nie jest włączony",
+                          {"Port": port}, HINT_ESPCAM_PI5)
+        else:
+            source = f"GPIO{pin} (pigpio) @ {baud} baud"
+            got = _espcam_pigpio(pin, baud, seconds)
+            if isinstance(got, Result):
+                return got
+            wire_hint = f"ESP32-CAM GPIO1 (U0TX) → RPi GPIO{pin}"
+    except Exception as e:
+        return _fail(e, HINT_ESPCAM_PI5 if is_pi5() else ["sudo systemctl enable --now pigpiod"])
+
+    status, lines = got
+    if not status:
+        return Result(FAIL, "Kamera nie przysłała statusu", {
+            "Odczyt": source, "Odebrane linie": str(lines)},
+            ["Najpierw włącz zasilanie kamery (test zasilania ESP32-CAM)",
+             wire_hint,
+             f"Prędkość musi być {baud} baud (tak nadaje espcam/src/main.cpp)",
+             "Masa ESP32-CAM i RPi musi być wspólna",
+             "Kamera nadaje linie z prefiksem $S co ~5 s — reszta jest ignorowana"]
+            + (["Linie przychodzą, ale bez $S — zła prędkość albo kamera w trybie boot"]
+               if lines else []))
+
+    free_mb = int(status.get("mb", 0))
     values = {
-        "Pin": f"GPIO{pin} @ {baud} baud",
-        "Stan": "OK" if ok else "brak danych",
-        "Nagrywanie": "tak" if rec else "nie",
-        "Klatki": f"{frames}",
+        "Odczyt": source,
+        "Stan": "OK" if status.get("ok") else "kamera zgłasza błąd",
+        "Nagrywanie": "tak" if status.get("rec") else "nie",
+        "Klatki": f"{status.get('n', 0)}",
         "Wolne na karcie": f"{free_mb} MB",
     }
-    if not ok:
-        return Result(FAIL, "Kamera nie przysłała statusu", values,
-                      ["Najpierw włącz zasilanie kamery (test zasilania ESP32-CAM)",
-                       f"ESP32-CAM GPIO1 (U0TX) → RPi GPIO{pin} (pin 7)",
-                       f"Prędkość musi być {baud} baud (tak nadaje espcam/src/main.cpp)",
-                       "Masa ESP32-CAM i RPi musi być wspólna",
-                       "Kamera nadaje linie z prefiksem $S — reszta jest ignorowana"])
+    if not status.get("ok"):
+        return Result(WARN, "Kamera odpowiada, ale zgłasza błąd (karta SD / sensor)", values,
+                      ["Dioda: 2× mignięcie = błąd SD, 3× = błąd kamery"])
+    if not status.get("rec"):
+        return Result(WARN, "Kamera odpowiada, ale nie nagrywa", values,
+                      ["Sprawdź kartę SD w ESP32-CAM"])
     if free_mb < 500:
         return Result(WARN, "Kamera działa, ale na karcie zostało mało miejsca", values,
                       ["Zgraj nagrania i sformatuj kartę przed startem"])
@@ -978,53 +1113,3 @@ def test_relays(index: int = -1) -> Result:
                   ["Cisza = sprawdź tranzystor (2N2222/BC547) i diodę 1N4007 na cewce",
                    "Cewka 3 V / ~70 mA NIE MOŻE być zasilana wprost z GPIO",
                    "Po teście linka musi być z powrotem zapięta w mechanizmie"])
-
-
-# ── Nadajnik HF AD9833 (stacja naziemna, akcja niebezpieczna) ────────────────
-def test_hf_tx() -> Result:
-    """Inicjalizacja AD9833 BEZ kluczowania PTT — brak emisji na antenę."""
-    freq = ground("HF_DEFAULT_FREQ_HZ", 7_100_000)
-    mclk = ground("AD9833_MCLK_HZ", 25_000_000)
-    bus = ground("AD9833_SPI_BUS", 1)
-    cs = ground("AD9833_SPI_CS", 1)
-    ptt = ground("HF_PTT_PIN", 24)
-    if SIMULATE:
-        return Result(INFO, "Symulacja — generator ustawiony (bez emisji)", {
-            "Port SPI": f"/dev/spidev{bus}.{cs}", "Częstotliwość": f"{freq / 1e6:.3f} MHz",
-            "PTT": f"GPIO{ptt}: stan niski (wzmacniacz wyłączony)"})
-    try:
-        import spidev
-    except ImportError as e:
-        return _missing(e, ["pip install spidev"] + HINT_SPI)
-    if not _dev_exists(f"/dev/spidev{bus}.{cs}"):
-        return Result(MISSING, f"Brak /dev/spidev{bus}.{cs} — SPI1 nie jest włączone", hints=[
-            "Dodaj do /boot/firmware/config.txt:  dtoverlay=spi1-3cs",
-            "Potem reboot i sprawdź: ls /dev/spidev*"] + HINT_SPI)
-    spi = None
-    try:
-        spi = spidev.SpiDev()
-        spi.open(bus, cs)
-        spi.max_speed_hz = 1_000_000
-        spi.mode = 0b10
-        word = round(freq * (1 << 28) / mclk) & 0x0FFFFFFF
-        lo, hi = word & 0x3FFF, (word >> 14) & 0x3FFF
-        for w in (0x2100, 0x4000 | lo, 0x4000 | hi, 0xC000, 0x2000):
-            spi.xfer2([(w >> 8) & 0xFF, w & 0xFF])
-    except Exception as e:
-        return _fail(e, ["AD9833: SCLK → SPI1 CLK (pin 40), MOSI → SPI1 MOSI (pin 38)",
-                         "FSYNC/CS → SPI1 CE1 (pin 11), tryb SPI 2 (CPOL=1, CPHA=0)"] + HINT_SPI)
-    finally:
-        if spi is not None:
-            try:
-                spi.close()
-            except Exception:
-                pass
-
-    return Result(INFO, "Generator ustawiony — PTT NIE był kluczowany (brak emisji)", {
-        "Port SPI": f"/dev/spidev{bus}.{cs}",
-        "Częstotliwość": f"{freq / 1e6:.3f} MHz",
-        "Kwarc AD9833": f"{mclk / 1e6:.0f} MHz",
-        "PTT": f"GPIO{ptt} (pin 18) — pozostaje w stanie niskim",
-    }, ["AD9833 nie ma odczytu rejestrów — sygnał sprawdź oscyloskopem na wyjściu OUT",
-        "Nadawanie w paśmie 40 m wymaga uprawnień — kluczuj PTT tylko na sztuczne obciążenie",
-        "Przed kluczowaniem MUSI być podłączona antena albo dummy load"])
