@@ -5,6 +5,9 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// Ścieżka do klucza podpisu (ustawia ją .github/workflows/build-apk.yml)
+val releaseKeystore: String? = System.getenv("STRATO_KEYSTORE")?.takeIf { it.isNotBlank() }
+
 android {
     namespace = "com.example.stratosteam"
     compileSdk = flutter.compileSdkVersion
@@ -29,11 +32,22 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (releaseKeystore != null) {
+            create("stratosteam") {
+                storeFile = file(releaseKeystore)
+                storeType = "PKCS12"
+                storePassword = System.getenv("STRATO_KEYSTORE_PASSWORD")
+                keyAlias = "stratosteam"
+                keyPassword = System.getenv("STRATO_KEYSTORE_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // Stały podpis z GitHub Actions; lokalnie bez klucza — podpis debug.
+            signingConfig = signingConfigs.getByName(if (releaseKeystore != null) "stratosteam" else "debug")
         }
     }
 }
