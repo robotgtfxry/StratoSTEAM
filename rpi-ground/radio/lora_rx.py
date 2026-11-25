@@ -45,12 +45,37 @@ class LoRaRX:
         self._spi.open(LORA_SPI_BUS, LORA_SPI_CS)
         self._spi.max_speed_hz = 5_000_000
         assert self._read_reg(_REG_VERSION) == 0x12, "SX1278 not found"
+        self.resets = 0         # ile razy moduł sam się zresetował
         self._configure()
+        if not self._alive():
+            raise RuntimeError("SX1278 nie przyjął konfiguracji")
         log.info("LoRa RX ready")
 
+    def _frf(self) -> int:
+        return int((LORA_FREQ * 1e6) / 61.03515625)
+
+    def _alive(self) -> bool:
+        """Czy układ nadal jest w nasłuchu LoRa na naszej częstotliwości."""
+        frf = (self._read_reg(_REG_FRF_MSB) << 16) | (self._read_reg(_REG_FRF_MID) << 8)             | self._read_reg(_REG_FRF_LSB)
+        return self._read_reg(_REG_OP_MODE) == (_MODE_LONG_RANGE | _MODE_RX_CONT)             and frf == self._frf()
+
+    def _ensure_alive(self):
+        """Po zaniku zasilania lub zakłóceniu na RST układ wraca do ustawień fabrycznych
+        (FSK, 434 MHz) i milczy — wtedy skonfiguruj go od nowa."""
+        if self._alive():
+            return
+        self.resets += 1
+        self._configure()
+        log.warning("SX1278 zresetował się (%d. raz) — nasłuch %s. Sprawdź zasilanie 3.3 V i pin RST.",
+                    self.resets, "przywrócony" if self._alive() else "NIE wrócił")
+
     def _configure(self):
+        # Bit LoRa wolno zmienić tylko w trybie uśpienia
+        self._write_reg(_REG_OP_MODE, _MODE_SLEEP)
+        time.sleep(0.01)
         self._write_reg(_REG_OP_MODE, _MODE_LONG_RANGE | _MODE_SLEEP)
-        frf = int((LORA_FREQ * 1e6) / 61.03515625)
+        time.sleep(0.01)
+        frf = self._frf()
         self._write_reg(_REG_FRF_MSB, (frf >> 16) & 0xFF)
         self._write_reg(_REG_FRF_MID, (frf >> 8) & 0xFF)
         self._write_reg(_REG_FRF_LSB, frf & 0xFF)
@@ -64,12 +89,17 @@ class LoRaRX:
         self._write_reg(_REG_SYNC_WORD, 0x12)
         self._write_reg(_REG_FIFO_RX_BASE_ADDR, 0x00)
         self._write_reg(_REG_DIO_MAPPING1, 0x00)  # DIO0 = RxDone
+        self._write_reg(_REG_IRQ_FLAGS, 0xFF)
+        self._set_mode(_MODE_STDBY)
+        time.sleep(0.01)
         self._set_mode(_MODE_RX_CONT)
+        time.sleep(0.01)
 
     def receive(self, timeout_s: float = 1.0) -> tuple[bytes | None, int, float]:
         """
         Returns (payload_bytes, rssi_dbm, snr_db) or (None, 0, 0) on timeout.
         """
+        self._ensure_alive()
         deadline = time.time() + timeout_s
         while time.time() < deadline:
             irq = self._read_reg(_REG_IRQ_FLAGS)
@@ -82,7 +112,7 @@ class LoRaRX:
                 self._write_reg(_REG_FIFO_ADDR_PTR, self._read_reg(_REG_FIFO_RX_CURRENT_ADDR))
                 payload = bytes([self._read_reg(_REG_FIFO) for _ in range(length)])
                 snr = (self._read_reg(_REG_PKT_SNR_VALUE) / 4.0)
-                rssi = self._read_reg(_REG_PKT_RSSI_VALUE) - 157
+                rssi = self._read_reg(_REG_PKT_RSSI_VALUE) - 164   # pasmo 433 MHz (LF)
                 self._write_reg(_REG_IRQ_FLAGS, 0xFF)
                 return payload, rssi, snr
             time.sleep(0.005)
@@ -94,6 +124,7 @@ class LoRaRX:
         Called immediately after receiving a telemetry packet — the balloon
         is listening for exactly UPLINK_RX_WINDOW_S seconds.
         """
+        self._ensure_alive()
         self._set_mode(_MODE_STDBY)
         self._write_reg(_REG_FIFO_ADDR_PTR, 0x00)
         self._write_reg(0x0E, 0x00)   # FIFO TX base
