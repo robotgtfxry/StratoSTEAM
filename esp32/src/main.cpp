@@ -336,10 +336,11 @@ void sendBeacon() {
         LoRa.receive();
     }
 
-    Serial.printf("%s seq=%lu len=%u rpi=%s rx=%lu vbe=%.2fV fix=%d lat=%.5f lon=%.5f alt=%ld\n",
+    Serial.printf("%s seq=%lu len=%u rpi=%s rx=%lu rxb=%lu bad=%lu gps=%lu alive=%d vbe=%.2fV fix=%d lat=%.5f lon=%.5f alt=%ld\n",
                   loraOk ? "[LoRa]" : "[NO-LoRa] (nie nadano)",
                   (unsigned long)(beaconSeq - 1), (unsigned)len, rpi.fresh ? "OK" : "—",
-                  (unsigned long)rpiRxLines, vbe, fix,
+                  (unsigned long)rpiRxLines, (unsigned long)rpiRxBytes, (unsigned long)rpiRxBad,
+                  (unsigned long)gps.charsProcessed(), digitalRead(RPI_ALIVE_PIN), vbe, fix,
                   p[0].as<double>(), p[1].as<double>(), p[2].as<long>());
 }
 
@@ -498,7 +499,7 @@ void setup() {
 
     pinMode(RPI_PWR_PIN,   OUTPUT);
     pinMode(RPI_SHTDN_PIN, OUTPUT);
-    pinMode(RPI_ALIVE_PIN, INPUT);
+    pinMode(RPI_ALIVE_PIN, INPUT_PULLDOWN);   // niepodłączona linia nie może udawać ALIVE
     analogReadResolution(12);
     analogSetPinAttenuation(BATT_ADC_PIN, ADC_11db);
     digitalWrite(RPI_PWR_PIN,   LOW);

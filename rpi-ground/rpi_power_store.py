@@ -16,10 +16,14 @@ class RpiPowerStore:
     def __init__(self):
         self._lock = threading.Lock()
         self._pending_on: bool | None = None
+        self._running: bool | None = None      # ostatni stan do wysłania
+        self._changed = threading.Event()
         self._thread = threading.Thread(target=self._poll, daemon=True)
+        self._reporter = threading.Thread(target=self._report_loop, daemon=True)
 
     def start(self):
         self._thread.start()
+        self._reporter.start()
 
     def _poll(self):
         while True:
@@ -46,6 +50,20 @@ class RpiPowerStore:
             return val
 
     def report_status(self, rpi_running: bool):
+        """Nie blokuje — wołane z pętli odbioru radia, a sieć potrafi wisieć kilka sekund."""
+        with self._lock:
+            self._running = rpi_running
+        self._changed.set()
+
+    def _report_loop(self):
+        while True:
+            self._changed.wait()
+            self._changed.clear()
+            with self._lock:
+                running = self._running
+            self._post_status(running)
+
+    def _post_status(self, rpi_running: bool):
         try:
             requests.post(
                 f"{BACKEND_URL}/api/rpi_power/status",
