@@ -1,8 +1,7 @@
 """
 Camera module: continuous H.264 recording to disk + on-demand photo capture.
-Photos are split into base64 chunks for LoRa retransmission via ESP32.
+Photos are compressed to WebP small enough for one LoRa burst (see esp32/src/main.cpp).
 """
-import base64
 import io
 import logging
 import os
@@ -10,8 +9,6 @@ import shutil
 from datetime import datetime
 
 log = logging.getLogger(__name__)
-
-_CHUNK_BYTES = 140   # raw bytes per chunk → 187 base64 chars, LoRa packet ~245 bytes
 
 try:
     from picamera2 import Picamera2
@@ -30,17 +27,12 @@ except ImportError:
 
 
 class CameraModule:
-    def __init__(self, record_dir: str, photo_w: int = 160, photo_h: int = 120,
-                 photo_quality: int = 25, record_w: int = 1920, record_h: int = 1080,
+    def __init__(self, record_dir: str, record_w: int = 1920, record_h: int = 1080,
                  record_fps: int = 25, bitrate: int = 4_000_000):
         self._record_dir = record_dir
-        self._photo_w = photo_w
-        self._photo_h = photo_h
-        self._photo_quality = photo_quality
         self._bitrate = bitrate
         self._recording = False
         self._cam = None
-        self._photo_id = 0
 
         if not _PICAM2:
             return
@@ -61,8 +53,8 @@ class CameraModule:
             log.error("Camera init failed: %s — camera disabled", exc)
             return
         self._cam = cam
-        log.info("Camera ready (record_dir=%s video=%dx%d@%d photo=%dx%d q=%d)",
-                 record_dir, record_w, record_h, record_fps, photo_w, photo_h, photo_quality)
+        log.info("Camera ready (record_dir=%s video=%dx%d@%d)",
+                 record_dir, record_w, record_h, record_fps)
 
     @property
     def available(self) -> bool:
@@ -111,40 +103,45 @@ class CameraModule:
             log.warning("Preview failed: %s", exc)
             return None
 
-    def capture_photo_chunks(self) -> list[tuple[int, int, int, str]]:
-        """
-        Capture one photo, compress it, split into chunks.
-        Returns list of (img_id, seq, total, base64_str).
-        """
-        if not self._cam:
-            return []
-
-        self._photo_id = (self._photo_id % 255) + 1
-        img_id = self._photo_id
-
+    def capture_photo(self, width: int, height: int, max_bytes: int) -> bytes | None:
+        """Zdjęcie WebP w najlepszej jakości, jaka mieści się w max_bytes."""
+        if not self._cam or not _PIL:
+            return None
         try:
-            if _PIL:
-                img = self._grab().resize((self._photo_w, self._photo_h), _PilImage.LANCZOS)
+            img = self._grab()
+            if img.size != (width, height):
+                img = img.resize((width, height), _PilImage.LANCZOS)
+            lo, hi, best = 5, 92, None
+            while lo <= hi:                         # szukanie połówkowe jakości
+                q = (lo + hi) // 2
                 buf = io.BytesIO()
-                img.save(buf, format="JPEG", quality=self._photo_quality, optimize=True)
-                jpeg = buf.getvalue()
-            else:
-                buf = io.BytesIO()
-                self._cam.capture_file(buf, format="jpeg")
-                jpeg = buf.getvalue()
+                img.save(buf, format="WEBP", quality=q, method=4)
+                if buf.tell() <= max_bytes:
+                    best, lo = (q, buf.getvalue()), q + 1
+                else:
+                    hi = q - 1
+            if best is None:
+                log.error("Photo: nie mieści się w %d B", max_bytes)
+                return None
         except Exception as exc:
             log.error("Photo capture failed: %s", exc)
-            return []
+            return None
+        log.info("Photo: %dx%d q=%d %d B", width, height, best[0], len(best[1]))
+        return best[1]
 
-        total = (len(jpeg) + _CHUNK_BYTES - 1) // _CHUNK_BYTES
-        chunks = []
-        for seq in range(total):
-            raw = jpeg[seq * _CHUNK_BYTES:(seq + 1) * _CHUNK_BYTES]
-            b64 = base64.b64encode(raw).decode("ascii")
-            chunks.append((img_id, seq, total, b64))
-
-        log.info("Photo: %d bytes → %d chunks (id=%d)", len(jpeg), total, img_id)
-        return chunks
+    def set_flight(self, on: bool) -> None:
+        """Lot: ostrość na nieskończoność. Na ziemi: autofokus."""
+        if not self._cam:
+            return
+        try:
+            from libcamera import controls
+            if on:
+                self._cam.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": 0.0})
+            else:
+                self._cam.set_controls({"AfMode": controls.AfModeEnum.Continuous})
+            log.info("Ostrość: %s", "nieskończoność" if on else "autofokus")
+        except Exception as exc:        # kamera bez autofokusa
+            log.warning("Ostrości nie da się ustawić: %s", exc)
 
     def disk_usage(self, path: str = "/") -> tuple[float, float]:
         """Returns (used_gb, free_gb) for the filesystem containing `path`."""

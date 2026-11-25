@@ -15,8 +15,7 @@ from config import (
     SENSOR_SET, MPU6050_ADDR, BMP180_ADDR, INA226_ADDR, INA226_SHUNT_OHMS,
     ESPCAM_PWR_PIN, ESPCAM_UART_PORT, ESPCAM_STATUS_BAUD,
     ESP_UART_PORT, ESP_UART_BAUD, ESP_USB_ENABLED, ESP_SEND_INTERVAL_S,
-    CAM_RECORD_DIR, CAM_PHOTO_W, CAM_PHOTO_H, CAM_PHOTO_QUALITY, CAM_CHUNK_INTERVAL_S,
-    CAM_CHUNK_REPEAT, PREVIEW_PORT,
+    CAM_RECORD_DIR, CAM_PHOTO_BY_SF, FLIGHT_FLAG, PREVIEW_PORT,
     CAM_RECORD_W, CAM_RECORD_H, CAM_RECORD_FPS, CAM_RECORD_BITRATE,
     SDR_ENABLED, SDR_TARGET_FREQ, SDR_SAMPLE_RATE, SDR_GAIN,
     SDR_FREQ_CORRECTION, SDR_MEASURE_INTERVAL_S, SDR_NUM_SAMPLES, SDR_BIN_WINDOW,
@@ -66,7 +65,7 @@ class _NullEsp:
     def send(self, *args, **kwargs) -> None:
         pass
 
-    def send_img_chunk(self, *args, **kwargs) -> None:
+    def send_photo(self, *args, **kwargs) -> None:
         pass
 
     def read_cmd(self) -> None:
@@ -106,8 +105,7 @@ def main():
     espcam_mon = EspCamMonitor(ESPCAM_UART_PORT, ESPCAM_STATUS_BAUD)
     esp        = _init("ESP32 UART", lambda: EspUartSender(ESP_UART_PORT, ESP_UART_BAUD, ESP_USB_ENABLED),
                        _NullEsp())
-    cam  = CameraModule(CAM_RECORD_DIR, CAM_PHOTO_W, CAM_PHOTO_H, CAM_PHOTO_QUALITY,
-                        CAM_RECORD_W, CAM_RECORD_H, CAM_RECORD_FPS, CAM_RECORD_BITRATE)
+    cam  = CameraModule(CAM_RECORD_DIR, CAM_RECORD_W, CAM_RECORD_H, CAM_RECORD_FPS, CAM_RECORD_BITRATE)
     sdr  = SdrReceiver(
         target_freq_hz  = SDR_TARGET_FREQ,
         sample_rate     = SDR_SAMPLE_RATE,
@@ -125,8 +123,11 @@ def main():
         cam.start_recording()
 
     last_send       = 0.0
-    pending_chunks: list[tuple[int, int, int, str]] = []
-    last_chunk_sent = 0.0
+    photo_id    = int(time.time()) % 250      # po restarcie inny numer niż poprzednio
+    photo_data: bytes | None = None           # zdjęcie czekające na potwierdzenie S3
+    photo_tries = 0
+    photo_sent  = 0.0
+    cam.set_flight(os.path.exists(FLIGHT_FLAG))
     esp_lora_ok = None          # ostatni stan LoRa zgłoszony przez ESP32
     esp_last_status = time.time()
     esp_link_warned = False
@@ -162,14 +163,30 @@ def main():
                         esp_lora_ok = lora
                     esp_last_status = now
 
+                elif cmd.get("type") == "imgst":
+                    if photo_data is not None and cmd.get("id") == photo_id:
+                        if cmd.get("ok"):
+                            log.info("ESP32: zdjęcie id=%d przyjęte", photo_id)
+                            photo_data = None
+                        else:
+                            photo_sent = 0.0        # ponów od razu
+
                 elif c == "photo" and cam.available:
-                    # nowe zdjęcie zastępuje niewysłaną resztę poprzedniego
-                    chunks = cam.capture_photo_chunks()
-                    if chunks:
-                        pending_chunks = chunks * CAM_CHUNK_REPEAT
-                        log.info("Photo queued: %d chunks pending", len(pending_chunks))
-                    else:
-                        log.warning("Photo capture returned no chunks")
+                    sf = min(max(int(cmd.get("sf", 10)), 7), 10)
+                    photo_data = cam.capture_photo(*CAM_PHOTO_BY_SF[sf])
+                    photo_id = photo_id % 250 + 1
+                    photo_tries, photo_sent = 0, 0.0
+
+                elif c == "flight":
+                    on = bool(cmd.get("on", False))
+                    try:
+                        if on:
+                            open(FLIGHT_FLAG, "w").close()
+                        elif os.path.exists(FLIGHT_FLAG):
+                            os.remove(FLIGHT_FLAG)
+                    except OSError as exc:
+                        log.warning("flaga lotu: %s", exc)
+                    cam.set_flight(on)
 
                 elif c == "cam_rec" and cam.available:
                     if cmd.get("on", False):
@@ -188,12 +205,16 @@ def main():
                 log.info("ESP32: link UART przywrócony")
                 esp_link_warned = False
 
-            # ── Wysyłaj chunki obrazu do ESP32 (po jednym co CAM_CHUNK_INTERVAL_S) ──
-            if pending_chunks and (now - last_chunk_sent >= CAM_CHUNK_INTERVAL_S):
-                img_id, seq, total, b64 = pending_chunks.pop(0)
-                esp.send_img_chunk(img_id, seq, total, b64)
-                last_chunk_sent = now
-                log.info("→ESP32 img chunk %d/%d (id=%d)", seq + 1, total, img_id)
+            # ── Zdjęcie do S3 — ponawiaj, aż potwierdzi (max 3 razy) ──────────
+            if photo_data is not None and now - photo_sent > 8:
+                if photo_tries >= 3:
+                    log.error("ESP32 nie przyjął zdjęcia id=%d", photo_id)
+                    photo_data = None
+                else:
+                    photo_tries += 1
+                    esp.send_photo(photo_id, photo_data)
+                    photo_sent = time.time()
+                    log.info("→ESP32 zdjęcie id=%d %d B (próba %d)", photo_id, len(photo_data), photo_tries)
 
             # ── Pomiar SDR (nie blokuje — sprawdź timer) ─────────────────────
             if sdr and sdr.available and (now - last_sdr >= SDR_MEASURE_INTERVAL_S):

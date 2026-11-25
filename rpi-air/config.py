@@ -68,11 +68,15 @@ CAM_RECORD_W       = 1920
 CAM_RECORD_H       = 1080
 CAM_RECORD_FPS     = 25
 CAM_RECORD_BITRATE = 4_000_000   # bit/s → ~1.8 GB na godzinę
-CAM_PHOTO_W        = 160    # szerokość zdjęcia wysyłanego przez LoRa
-CAM_PHOTO_H        = 90     # wysokość (16:9 jak kamera)
-CAM_PHOTO_QUALITY  = 25     # jakość JPEG (1-95); niższa = mniejszy plik = mniej chunków
-# Fragment i beacon zajmują radio po ~2.1 s, beacon idzie co 5 s — częściej niż co 5 s
-# fragmenty się nie mieszczą i giną.
-CAM_CHUNK_INTERVAL_S = 5.0
-CAM_CHUNK_REPEAT   = 2      # ile razy wysłać komplet fragmentów (drugi raz łata zgubione)
+# Zdjęcie przez LoRa: (szerokość, wysokość, maks. bajtów) zależnie od SF, które wybrała ziemia.
+# Czas serii ok.: SF7 25 s, SF8 25 s, SF9 30 s, SF10 45 s.
+CAM_PHOTO_BY_SF = {
+    7:  (640, 360, 13500),
+    8:  (480, 270, 7200),
+    9:  (400, 225, 4800),
+    10: (320, 180, 3600),
+}
+# Istnieje w trakcie lotu (komenda START ze stacji) → ostrość na stałe na nieskończoność.
+# Bez niego działa autofokus. Plik, żeby restart RPi w locie tego nie zmienił.
+FLIGHT_FLAG        = "/home/admin/.stratosteam-lot"
 PREVIEW_PORT       = 8081   # podgląd na żywo po sieci (tylko Tailscale), None = wyłączony

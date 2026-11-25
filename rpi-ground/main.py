@@ -4,8 +4,10 @@ StratoSTEAM — Ground station
 Receives LoRa telemetry from balloon, forwards to backend.
 Handles uplink: buzzer/LED commands + RPi power control via ESP32.
 """
+import base64
 import json
 import logging
+import os
 import sys
 import time
 
@@ -18,14 +20,17 @@ from beacon import expand_beacon, has_rpi_data, beacon_to_telemetry
 from command_store import CommandStore
 from rpi_power_store import RpiPowerStore
 from exec_store import ExecStore
-from local_feed import LocalFeed
+from local_feed import LOG_DIR, LocalFeed
+from mission import Mission
+from photo_rx import PKT_MAGIC, PhotoRx, airtime, choose_sf
 from camera_store import CameraStore
 from espcam_store import EspCamStore
 from packet import (
     build_command, build_rpi_power_command, build_exec_command,
     build_photo_command, build_cam_rec_command, build_espcam_power_command,
+    build_buzzer_command, build_flight_command, build_raw_command,
 )
-from config import BACKEND_URL, BACKEND_API_KEY, HF_ENABLED
+from config import BACKEND_URL, BACKEND_API_KEY, HF_ENABLED, LORA_SF
 
 _HF_HEADERS = {"X-API-Key": BACKEND_API_KEY}
 
@@ -68,6 +73,25 @@ logging.basicConfig(
 log = logging.getLogger("ground")
 
 
+def receive_burst(lora, photo: PhotoRx, feed: LocalFeed, sf: int, count: int) -> None:
+    """Seria pakietów zdjęcia na innym SF. Zawsze wraca na zwykły SF."""
+    per_pkt = airtime(sf, 244) + 0.08
+    deadline = time.time() + 1.5 + count * per_pkt
+    got = 0
+    lora.set_sf(sf)
+    try:
+        while time.time() < deadline and got < count:
+            raw, _, _ = lora.receive(timeout_s=0.5)
+            if raw and raw[0] == PKT_MAGIC and photo.data(raw) is not None:
+                got += 1
+            feed.photo_progress(photo.state())
+            feed.tick(getattr(lora, "resets", 0))
+    finally:
+        lora.set_sf(LORA_SF)
+    log.info("Zdjęcie id=%s: seria %d/%d na SF%d, razem %d/%d",
+             photo.id, got, count, sf, len(photo.parts), photo.n)
+
+
 def main():
     lora      = LoRaRX()
     uplink    = Uplink()
@@ -77,6 +101,10 @@ def main():
     camera_s  = CameraStore()
     espcam_s  = EspCamStore()
     feed      = LocalFeed()      # okno gui_odbior.py + dziennik na karcie
+    photo     = PhotoRx()
+    mission   = Mission(os.path.join(LOG_DIR, "misja.json"))
+    last_snr: float | None = None
+    buzzer: list[tuple[bool, int]] = []      # komendy buzzera z okna
 
     # TODO(HF): do zrobienia — brak filtra, nadajnik wyłączony (HF_ENABLED w config.py).
     # Import tutaj, bo HfController od razu otwiera SPI1, którego bez nadajnika nie ma.
@@ -97,32 +125,56 @@ def main():
 
     try:
         while True:
+            for c in feed.commands():
+                if c.get("a") == "buzzer":
+                    on = bool(c.get("on"))
+                    ms = min(max(int(c.get("ms") or 0), 0), 60000) if on else 0
+                    # impuls raz; włączenie na stałe i wyłączenie powtórz — łącze bez potwierdzeń
+                    buzzer = [(on, ms)] if ms else [(on, 0)] * 2
+                    feed.buzzer("czeka na pakiet z balonu")
+                else:
+                    mission.command(c, time.time())
+            feed.mission(mission.state())
+            feed.photo_progress(photo.state())
             feed.tick(getattr(lora, "resets", 0))
             raw, rssi, snr = lora.receive(timeout_s=1.0)
             if raw is None:
                 continue
 
+            if raw[0] == PKT_MAGIC:         # spóźniony pakiet serii
+                photo.data(raw)
+                continue
             try:
                 packet = json.loads(raw.decode())
-            except (json.JSONDecodeError, UnicodeDecodeError) as e:
+                if not isinstance(packet, dict):
+                    raise ValueError("nie jest obiektem JSON")
+            except ValueError as e:
                 log.warning("Bad packet: %s", e)
                 feed.bad()
                 continue
 
-            # ── Chunk obrazu z kamery — przekaż do backendu i pomiń resztę ───
-            if packet.get("type") == "img":
-                camera_s.post_chunk(packet)
-                feed.image_chunk(packet)
-                log.info(
-                    "IMG chunk id=%s seq=%s/%s RSSI=%d",
-                    packet.get("id"), packet.get("seq"), packet.get("tot"), rssi,
-                )
+            # ── Zapowiedź serii zdjęcia ─────────────────────────────────────
+            if packet.get("t") == "ph":
+                plan = photo.announce(packet)
+                if plan:
+                    receive_burst(lora, photo, feed, *plan)
+                    blob = photo.complete()
+                    if blob:
+                        log.info("Zdjęcie id=%d komplet: %d B w %.0f s", photo.id, len(blob),
+                                 time.time() - photo.started)
+                        feed.photo_done(blob)
+                        camera_s.post_chunk({"type": "img", "id": photo.id, "seq": 0, "tot": 1,
+                                             "data": base64.b64encode(blob).decode()})
                 continue
 
             # Determine source: ESP32 beacon or full RPi telemetry
             from_esp32 = packet.get("src") == "esp32"
             if from_esp32:
                 packet = expand_beacon(packet)
+                last_snr = snr
+                if "q" in packet:
+                    photo.from_beacon(packet.pop("q"))
+                mission.update(packet, time.time())
                 feed.packet(packet, rssi, snr)
             is_exec_result = packet.get("type") == "exec_result"
 
@@ -248,9 +300,21 @@ def main():
                     ))
                     log.info("CMD → ESP32 ok=%s buzzer=%s led=(%s,%s,%s)", ok,
                              cmd.get("buzzer"), cmd.get("led_r"), cmd.get("led_g"), cmd.get("led_b"))
-                elif feed.pop_photo() or camera_s.pop_photo():
-                    ok = lora.send_command(build_photo_command())
-                    log.info("Camera photo cmd → ESP32 ok=%s", ok)
+                elif buzzer:
+                    on, ms = buzzer.pop(0)
+                    ok = lora.send_command(build_buzzer_command(on, ms))
+                    feed.buzzer(("gra" if on else "wyłączony") + (f" {ms // 1000} s" if ms else ""))
+                    log.info("Buzzer on=%s ms=%d → ESP32 ok=%s", on, ms, ok)
+                elif (flight := mission.pop_flight()) is not None:
+                    ok = lora.send_command(build_flight_command(flight))
+                    log.info("Flight cmd on=%s → ESP32 ok=%s", flight, ok)
+                elif (pc := photo.command(choose_sf(last_snr))) is not None:
+                    ok = lora.send_command(build_raw_command(pc))
+                    log.info("Zdjęcie %s → ESP32 ok=%s", pc, ok)
+                elif not photo.receiving and (feed.pop_photo() or camera_s.pop_photo()):
+                    sf = choose_sf(last_snr)
+                    ok = lora.send_command(build_photo_command(sf))
+                    log.info("Camera photo cmd sf=%d → ESP32 ok=%s", sf, ok)
                 elif (rec := camera_s.pop_rec()) is not None:
                     ok = lora.send_command(build_cam_rec_command(rec))
                     log.info("Camera rec cmd on=%s → ESP32 ok=%s", rec, ok)

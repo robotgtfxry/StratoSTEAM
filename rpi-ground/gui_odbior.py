@@ -16,14 +16,15 @@ import sys
 import threading
 import time
 import tkinter as tk
+from tkinter import messagebox
 import urllib.request
 
-from PIL import Image, ImageFile
+from PIL import Image
 
 from config import PREVIEW_URL
-from local_feed import AUTO_PATH, AUTO_S, MAX_TRIES, PHOTO_PATH, REQUEST_PATH, STATE_PATH
+from local_feed import AUTO_PATH, AUTO_S, CMD_DIR, MAX_TRIES, PHOTO_PATH, REQUEST_PATH, STATE_PATH
+from mission import ASCENT, DESCENT, LANDED, MANUAL, PREP, START, preflight
 
-ImageFile.LOAD_TRUNCATED_IMAGES = True      # zdjęcie w trakcie odbioru też pokaż
 
 REFRESH_MS = 500
 SERVICE_TIMEOUT_S = 10      # brak znaku życia usługi
@@ -65,7 +66,10 @@ def demo_state(t0: float = time.time()) -> dict:
     hist = [[now - 5 * (180 - i), 120 + 5 * (age - 5 * (180 - i)) + 8 * math.sin(i / 3),
              -88 - i / 9 + 3 * math.sin(i / 2)] for i in range(180)]
     return {
-        "started": now - 4000, "alive": now, "packets": 212, "bad": 1, "lost": 6, "img_chunks": 8,
+        "started": now - 4000, "alive": now, "packets": 212, "bad": 1, "lost": 6,
+        "mission": {"phase": ASCENT, "t0": now - 1234, "alt0": 120, "max_alt": hist[-1][1],
+                    "alt": hist[-1][1], "vs": 5.1, "src": "GPS", "manual": {},
+                    "events": [[now - 1234, "START wciśnięty"], [now - 1190, "Balon się wznosi"]]},
         "lora_resets": 0, "last_rx": now - (now % 5), "rssi": -104, "snr": 5.8, "history": hist,
         "last": {"seq": 219, "lat": 52.297312, "lon": 21.113644, "alt": hist[-1][1], "sat": 11, "gview": 17, "gsnr": 43,
                  "fix": 1, "vbe": 7.41, "vbat": 7.38, "imA": 812, "temp": -38.2, "hum": 14.1,
@@ -86,7 +90,7 @@ class Card(tk.Frame):
         self._val: dict[str, tk.Label] = {}
         for i, (key, name) in enumerate(rows, start=1):
             tk.Label(self, text=name, bg=CARD, fg=DIM, font=(FONT, 10), anchor="w").grid(
-                row=i, column=0, sticky="w", padx=(12, 6), pady=1)
+                row=i, column=0, sticky="w", padx=(12, 4), pady=1)
             v = tk.Label(self, text="—", bg=CARD, fg=FG, font=(FONT, 12, "bold"), anchor="e")
             v.grid(row=i, column=1, sticky="e", padx=(0, 12), pady=1)
             self._val[key] = v
@@ -148,6 +152,165 @@ class LiveFeed(threading.Thread):
             time.sleep(delay)
 
 
+def send_cmd(c: dict) -> None:
+    """Polecenie dla usługi rpi-ground."""
+    os.makedirs(CMD_DIR, exist_ok=True)
+    path = os.path.join(CMD_DIR, f"{time.time():.6f}.json")
+    with open(path + ".tmp", "w", encoding="utf-8") as f:
+        json.dump(c, f)
+    os.replace(path + ".tmp", path)
+
+
+def clock(seconds: float) -> str:
+    s = int(abs(seconds))
+    return f"T{'-' if seconds < 0 else '+'}{s // 3600:02d}:{s % 3600 // 60:02d}:{s % 60:02d}"
+
+
+PHASE_LOOK = {PREP: ("PRZYGOTOWANIE", DIM), START: ("START — czekam na wznoszenie", WARN),
+              ASCENT: ("▲ LOT: WZNOSZENIE", OK), DESCENT: ("▼ LOT: OPADANIE", BLUE),
+              LANDED: ("■ WYLĄDOWAŁ", WARN)}
+
+
+class MissionBar(tk.Frame):
+    """Pasek fazy misji nad danymi."""
+
+    def __init__(self, parent, on_open):
+        super().__init__(parent, bg=CARD, highlightbackground=LINE, highlightthickness=1)
+        self._phase = tk.Label(self, text="", bg=CARD, fg=DIM, font=(FONT, 15, "bold"))
+        self._phase.pack(side="left", padx=12, pady=5)
+        self._clock = tk.Label(self, text="", bg=CARD, fg=FG, font=(FONT, 15, "bold"))
+        self._clock.pack(side="left", padx=8)
+        tk.Button(self, text="Procedura startu", command=on_open, bg="#238636", fg="white",
+                  activebackground=OK, activeforeground="white", relief="flat",
+                  font=(FONT, 10, "bold"), padx=10).pack(side="right", padx=10, pady=4)
+        self._buz_on = False
+        self._buz = tk.Button(self, text="Buzzer: włącz", command=self._toggle_buz, **self._BTN)
+        self._buz.pack(side="right", padx=(0, 4), pady=4)
+        tk.Button(self, text="Buzzer 5 s", command=lambda: send_cmd(
+            {"a": "buzzer", "on": True, "ms": 5000}), **self._BTN).pack(side="right", padx=4, pady=4)
+        self._buz_info = tk.Label(self, text="", bg=CARD, fg=WARN, font=(FONT, 9))
+        self._buz_info.pack(side="right", padx=4)
+        self._info = tk.Label(self, text="", bg=CARD, fg=DIM, font=(FONT, 10))
+        self._info.pack(side="left", padx=8)
+
+    _BTN = dict(bg="#21262d", fg=FG, activebackground=LINE, activeforeground=FG, relief="flat",
+                font=(FONT, 10), padx=8)
+
+    def _toggle_buz(self) -> None:
+        self._buz_on = not self._buz_on
+        send_cmd({"a": "buzzer", "on": self._buz_on})
+        self._buz.config(text="Buzzer: WYŁĄCZ" if self._buz_on else "Buzzer: włącz",
+                         fg=WARN if self._buz_on else FG)
+
+    def refresh(self, st: dict, now: float) -> None:
+        b = st.get("buzzer")
+        self._buz_info.config(text=f"buzzer {b['text']}" if b and now - b["ts"] < 20 else "")
+        m = st.get("mission") or {}
+        text, color = PHASE_LOOK.get(m.get("phase"), ("—", DIM))
+        self._phase.config(text=text, fg=color)
+        self._clock.config(text=clock(now - m["t0"]) if m.get("t0") else "T−")
+        bits = []
+        if m.get("alt") is not None:
+            bits.append(f"{m['alt']:.0f} m ({m.get('src')})")
+        if m.get("vs") is not None:
+            bits.append(f"{m['vs']:+.1f} m/s")
+        if m.get("max_alt") is not None and m.get("phase") != PREP:
+            bits.append(f"szczyt {m['max_alt']:.0f} m")
+        self._info.config(text="   ".join(bits))
+
+
+class Procedure(tk.Toplevel):
+    """Lista kontrolna i przycisk START."""
+
+    def __init__(self, parent):
+        super().__init__(parent, bg=BG)
+        self.title("StratoSTEAM — procedura startu")
+        self.geometry("620x800")
+        self._st: dict = {}
+        self._auto_rows: list[tuple[tk.Label, tk.Label, tk.Label]] = []
+        self._manual: dict[str, tk.BooleanVar] = {}
+        self._synced = False
+        box = self._box("Sprawdzenia automatyczne")
+        for _ in preflight({}, 0):
+            row = tk.Frame(box, bg=CARD)
+            row.pack(fill="x", padx=10, pady=1)
+            mark = tk.Label(row, text="?", bg=CARD, fg=DIM, width=2, font=(FONT, 11, "bold"))
+            name = tk.Label(row, text="", bg=CARD, fg=FG, font=(FONT, 10), anchor="w")
+            val = tk.Label(row, text="", bg=CARD, fg=DIM, font=(FONT, 10), anchor="e")
+            mark.pack(side="left")
+            name.pack(side="left", fill="x", expand=True)
+            val.pack(side="right")
+            self._auto_rows.append((mark, name, val))
+        box = self._box("Sprawdzenia ręczne")
+        for key, text in MANUAL:
+            v = self._manual[key] = tk.BooleanVar()
+            tk.Checkbutton(box, text=text, variable=v, bg=CARD, fg=FG, selectcolor=BG, anchor="w",
+                           activebackground=CARD, activeforeground=FG, highlightthickness=0, bd=0,
+                           font=(FONT, 10), command=lambda k=key, v=v: send_cmd(
+                               {"a": "manual", "k": k, "v": v.get()})).pack(fill="x", padx=10, pady=1)
+        self._sum = tk.Label(self, text="", bg=BG, fg=DIM, font=(FONT, 12, "bold"))
+        self._sum.pack(pady=(8, 4))
+        btns = tk.Frame(self, bg=BG)
+        btns.pack(pady=4)
+        self._start = tk.Button(btns, text="START", command=self._go, font=(FONT, 18, "bold"),
+                                relief="flat", padx=40, pady=6, fg="white", bg="#238636",
+                                activebackground=OK, activeforeground="white")
+        self._start.pack(side="left", padx=6)
+        tk.Button(btns, text="Nowa procedura", command=self._reset, font=(FONT, 10), relief="flat",
+                  bg="#21262d", fg=FG, activebackground=LINE, activeforeground=FG,
+                  padx=10, pady=6).pack(side="left", padx=6)
+        self._log = tk.Label(self, text="", bg=BG, fg=DIM, font=(FONT, 9), justify="left", anchor="w")
+        self._log.pack(fill="x", padx=14, pady=6)
+
+    def _box(self, title: str) -> tk.Frame:
+        f = tk.Frame(self, bg=CARD, highlightbackground=LINE, highlightthickness=1)
+        f.pack(fill="x", padx=12, pady=(10, 0))
+        tk.Label(f, text=title, bg=CARD, fg=BLUE, font=(FONT, 11, "bold"), anchor="w").pack(
+            fill="x", padx=10, pady=(6, 2))
+        return f
+
+    def _missing(self) -> list[str]:
+        out = [name for name, ok, _ in preflight(self._st, time.time()) if not ok]
+        return out + [text for k, text in MANUAL if not self._manual[k].get()]
+
+    def _go(self) -> None:
+        missing = self._missing()
+        msg = "Wszystkie sprawdzenia OK. Rozpocząć misję?" if not missing else \
+            "NIE SPEŁNIONE:\n\n• " + "\n• ".join(missing) + "\n\nRozpocząć mimo to?"
+        ask = messagebox.askyesno if not missing else \
+            (lambda t, m, parent: messagebox.askyesno(t, m, parent=parent, icon="warning", default="no"))
+        if ask("START misji", msg, parent=self):
+            send_cmd({"a": "start", "skipped": missing})
+
+    def _reset(self) -> None:
+        if messagebox.askyesno("Nowa procedura", "Wyzerować fazę misji, zegar i listę kontrolną?",
+                               parent=self, icon="warning", default="no"):
+            send_cmd({"a": "reset"})
+            self._synced = False
+
+    def refresh(self, st: dict, now: float) -> None:
+        self._st = st
+        m = st.get("mission") or {}
+        if not self._synced and m:
+            for k, v in self._manual.items():
+                v.set(bool(m.get("manual", {}).get(k)))
+            self._synced = True
+        for (mark, name, val), (text, ok, value) in zip(self._auto_rows, preflight(st, now)):
+            mark.config(text="✔" if ok else "✘" if ok is False else "?",
+                        fg=OK if ok else BAD if ok is False else DIM)
+            name.config(text=text)
+            val.config(text=value)
+        missing = len(self._missing())
+        prep = m.get("phase") == PREP
+        self._sum.config(text=("GOTOWY DO STARTU" if not missing else f"Brakuje: {missing}") if prep
+                         else PHASE_LOOK.get(m.get("phase"), ("", DIM))[0],
+                         fg=(OK if not missing else WARN) if prep else OK)
+        self._start.config(state="normal" if prep else "disabled",
+                           bg="#238636" if prep and not missing else "#9e6a03" if prep else "#21262d")
+        ev = (m.get("events") or [])[-5:]
+        self._log.config(text="\n".join(time.strftime("%H:%M:%S", time.localtime(t)) + "  " + x for t, x in ev))
+
+
 class Photo(tk.Frame):
     """Obraz z kamery: na żywo po sieci, a gdy jej nie ma — ostatnie zdjęcie z LoRa."""
 
@@ -170,7 +333,13 @@ class Photo(tk.Frame):
         tk.Checkbutton(head, text=f"auto co {AUTO_S // 60} min", variable=self._auto,
                        command=self._set_auto, bg=CARD, fg=DIM, selectcolor=BG, font=(FONT, 9),
                        activebackground=CARD, activeforeground=FG, highlightthickness=0,
-                       bd=0).pack(side="right", padx=6)
+                       bd=0).pack(side="right", padx=8)
+        self._live_on = tk.BooleanVar(value=not os.path.exists(PHOTO_PATH))
+        tk.Checkbutton(head, text="na żywo", variable=self._live_on, bg=CARD, fg=DIM, selectcolor=BG,
+                       font=(FONT, 9), activebackground=CARD, activeforeground=FG,
+                       highlightthickness=0, bd=0).pack(side="right")
+        self._bar = tk.Canvas(self, bg=LINE, height=5, highlightthickness=0)
+        self._bar.pack(side="bottom", fill="x", padx=12, pady=(0, 4))
         self._info = tk.Label(self, text="", bg=CARD, fg=DIM, font=(FONT, 9), anchor="w")
         self._info.pack(side="bottom", fill="x", padx=12, pady=(0, 4))
         self._view = tk.Canvas(self, bg=BG, highlightthickness=0, width=200, height=100, cursor="hand2")
@@ -178,6 +347,7 @@ class Photo(tk.Frame):
         self._view.bind("<Button-1>", lambda _e: self._toggle_big())
 
     def _request(self) -> None:
+        self._live_on.set(False)
         try:
             with open(REQUEST_PATH, "w", encoding="utf-8") as f:
                 f.write(str(time.time()))
@@ -211,7 +381,7 @@ class Photo(tk.Frame):
         now = time.time()
         ph = st.get("photo")
         frame = self._live.frame
-        if frame and now - frame[0] < self.LIVE_S:
+        if self._live_on.get() and frame and now - frame[0] < self.LIVE_S:
             jpeg, key = frame[1], ("live", frame[0])
             text, color = f"● NA ŻYWO przez sieć ({ago(now - frame[0])} temu)", OK
         else:
@@ -223,9 +393,13 @@ class Photo(tk.Frame):
             except OSError:
                 pass
             if ph:
-                state = "komplet" if ph["done"] else f"odbieram {ph['got']}/{ph['total']}"
-                text, color = f"zdjęcie LoRa: {state}, {ago(now - ph['ts'])} temu", \
-                    OK if ph["done"] else WARN
+                kb = f"{ph['bytes'] / 1024:.1f} kB"
+                if ph["done"]:
+                    text, color = f"zdjęcie LoRa: całe, {kb}, {ago(now - ph['ts'])} temu", OK
+                elif ph["failed"]:
+                    text, color = f"nie udało się: {ph['got']}/{ph['total']} pakietów", BAD
+                else:
+                    text, color = f"odbieram {ph['got']}/{ph['total']} pakietów ({kb})…", WARN
             else:
                 text, color = "brak sieci i zdjęć z LoRa", DIM
         if os.path.exists(REQUEST_PATH):
@@ -234,8 +408,13 @@ class Photo(tk.Frame):
             text, color = (f"prośba {st.get('photo_try', 1)}/{MAX_TRIES} wysłana "
                            f"{ago(now - st['photo_req'])} temu"), WARN
         elif st.get("photo_fail"):
-            text, color = "RPi balonu nie odsyła zdjęcia (przewód GPIO14→S3?)", BAD
+            text, color = "RPi balonu nie odsyła zdjęcia (kabel USB do S3?)", BAD
         self._info.config(text=text, fg=color)
+        self._live.enabled = self._live_on.get()
+        self._bar.delete("all")
+        if ph and not ph["done"] and not ph["failed"] and ph["total"]:
+            self._bar.create_rectangle(0, 0, self._bar.winfo_width() * ph["got"] / ph["total"], 6,
+                                       fill=WARN, width=0)
 
         big = self._big if self._big is not None and self._big.winfo_exists() else None
         size = (self._view.winfo_width(), self._view.winfo_height(),
@@ -271,7 +450,7 @@ class App(tk.Tk):
         self.title("StratoSTEAM — odbiór danych")
         self.configure(bg=BG)
         sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
-        self.geometry(f"{min(1080, sw - 20)}x{min(720, sh - 80)}")
+        self.geometry(f"{min(1280, sw - 20)}x{min(920, sh - 70)}")
         self.minsize(760, 520)
         self.bind("<F11>", lambda _e: self.attributes("-fullscreen",
                                                       not self.attributes("-fullscreen")))
@@ -287,12 +466,16 @@ class App(tk.Tk):
         self._age = tk.Label(top, text="", bg=BG, fg=DIM, font=(FONT, 12), anchor="e")
         self._age.pack(side="right")
 
+        self._proc: Procedure | None = None
+        self._mission = MissionBar(self, self._open_proc)
+        self._mission.pack(fill="x", padx=12, pady=(0, 4))
+
         grid = tk.Frame(self, bg=BG)
         grid.pack(fill="x", padx=8)
         specs = [
             ("gps", "Pozycja (GPS)", [("lat", "Szerokość"), ("lon", "Długość"), ("alt", "Wysokość"),
-                                      ("sat", "Satelity / widoczne"), ("snr", "Sygnał GPS"), ("fix", "Fix")]),
-            ("radio", "Radio LoRa", [("rssi", "RSSI"), ("snr", "SNR"), ("pk", "Pakiety / straty"),
+                                      ("sat", "Satelity"), ("snr", "Sygnał GPS"), ("fix", "Fix")]),
+            ("radio", "Radio LoRa", [("rssi", "RSSI"), ("snr", "SNR"), ("pk", "Pakiety/straty"),
                                      ("bad", "Uszkodzone"), ("rst", "Resety modułu")]),
             ("pwr", "Zasilanie", [("vbat", "Bateria (INA)"), ("vbe", "Bateria (ESP32)"),
                                   ("imA", "Prąd"), ("w", "Moc"), ("rpi", "RPi na balonie")]),
@@ -302,8 +485,7 @@ class App(tk.Tk):
                                    ("g", "Przeciążenie"), ("seq", "Nr pakietu")]),
             ("cam", "Kamery i dysk", [("ok", "ESP32-CAM"), ("rec", "Nagrywanie"), ("fr", "Klatki"),
                                       ("sd", "Karta SD wolne"), ("dsk", "Dysk RPi wolne")]),
-            ("stn", "Stacja", [("svc", "Usługa"), ("up", "Działa od"), ("img", "Fragmenty zdjęć"),
-                               ("clk", "Zegar"), ("cut", "Pakiet skrócony")]),
+            ("stn", "Stacja", [("svc", "Usługa"), ("up", "Działa od"), ("clk", "Zegar"), ("cut", "Pakiet skrócony")]),
         ]
         self._c: dict[str, Card] = {}
         for i, (key, title, rows) in enumerate(specs):
@@ -322,8 +504,14 @@ class App(tk.Tk):
         self._photo = Photo(charts, self._live)
         for col, w in enumerate((self._alt, self._rssi, self._photo)):
             w.grid(row=0, column=col, sticky="nsew", padx=(0 if col == 0 else 4, 0 if col == 2 else 4))
-            charts.columnconfigure(col, weight=1, uniform="c")
+            charts.columnconfigure(col, weight=2 if col == 2 else 1, uniform="c")
         charts.rowconfigure(0, weight=1)
+
+    def _open_proc(self) -> None:
+        if self._proc is not None and self._proc.winfo_exists():
+            self._proc.lift()
+            return
+        self._proc = Procedure(self)
 
     def _refresh(self) -> None:
         try:
@@ -356,7 +544,7 @@ class App(tk.Tk):
         g.set("lat", f"{p['lat']:.6f}" if fix else "—")
         g.set("lon", f"{p['lon']:.6f}" if fix else "—")
         g.set("alt", fmt(p.get("alt") if fix else None, "m", 0))
-        g.set("sat", f"{p['sat']} / {p['gview']}" if "gview" in p else fmt(p.get("sat"), "", 0))
+        g.set("sat", f"{p['sat']} z {p['gview']}" if "gview" in p else fmt(p.get("sat"), "", 0))
         snr = p.get("gsnr")
         g.set("snr", fmt(snr, "dBHz", 0), OK if (snr or 0) >= 30 else WARN if snr else BAD)
         g.set("fix", ("TAK" if fix else "NIE") if p else "—", OK if fix else BAD)
@@ -409,7 +597,6 @@ class App(tk.Tk):
         n = self._c["stn"]
         n.set("svc", "działa" if alive else "STOP", OK if alive else BAD)
         n.set("up", ago(now - st["started"]) if alive and st.get("started") else "—")
-        n.set("img", str(st.get("img_chunks", 0)) if st else "—")
         n.set("clk", time.strftime("%H:%M:%S"))
         n.set("cut", ("TAK" if p.get("x") else "nie") if p else "—", WARN if p.get("x") else FG)
 
@@ -417,6 +604,9 @@ class App(tk.Tk):
         self._alt.draw([(h[0], h[1]) for h in hist if h[1] is not None])
         self._rssi.draw([(h[0], h[2]) for h in hist if h[2] is not None])
         self._photo.refresh(st)
+        self._mission.refresh(st, now)
+        if self._proc is not None and self._proc.winfo_exists():
+            self._proc.refresh(st, now)
 
 
 if __name__ == "__main__":

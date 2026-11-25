@@ -22,6 +22,7 @@
 #include <LoRa.h>
 #include <ArduinoJson.h>
 #include <esp_task_wdt.h>
+#include <mbedtls/base64.h>
 
 // ── Piny ──────────────────────────────────────────────────────────────────────
 #define GPS_RX_PIN     4
@@ -51,7 +52,10 @@
 #define LORA_BW                125E3
 #define LORA_TX_POWER          17
 #define BEACON_INTERVAL_MS     5000     // interwał beacona (=ESP_SEND_INTERVAL_S RPi5)
-#define IMG_CHUNK_DELAY_MS     2200     // min. odstęp między nadaniem kolejnych chunków obrazu
+#define IMG_MAX_BYTES          16384
+#define IMG_DATA               240      // bajtów obrazu w pakiecie (+4 nagłówka)
+#define IMG_ROUND_MS           14000    // najdłuższa seria bez beacona
+#define IMG_GAP_MS             4500     // okno na komendy z ziemi między seriami
 #define SHUTDOWN_WAIT_MS       20000
 #define RPI_AUTO_RESTART_MS    1800000UL
 #define RPI_ALIVE_LOST_MS      60000UL  // ALIVE musi zniknąć na tyle, zanim odetniemy zasilanie
@@ -61,7 +65,7 @@
 #define RPI_DATA_TIMEOUT_MS    15000    // dane starsze niż 15s = RPi5 nieosiągalna
 #define GPS_FIX_MAX_AGE_MS     10000    // starsza pozycja = brak fixa
 #define LORA_TX_TIMEOUT_MS     4000     // 255 B przy SF10 nadaje się ~2.3 s
-#define WDT_TIMEOUT_MS         20000    // zawieszona pętla → restart S3
+#define WDT_TIMEOUT_MS         40000    // zawieszona pętla → restart S3
 #define LORA_RETRY_MS          30000    // co ile ponawiać init LoRa, gdy modułu brak
 #define STATUS_INTERVAL_MS     5000     // status ESP → RPi przez UART
 #define NOLORA_BLINK_MS        2000     // okres mrugania LED gdy brak LoRa
@@ -72,6 +76,7 @@
 void rpiPowerOn();
 void rpiRequestShutdown();
 void rpiCutPower();
+void sendToRpi(const String& line);
 
 // ── Globals ───────────────────────────────────────────────────────────────────
 HardwareSerial gpsSerial(1);
@@ -109,10 +114,15 @@ bool     ledOverride   = false; // LED ustawiony komendą z ziemi
 String   rpiLineBuf  = "";   // UART2
 String   usbLineBuf  = "";   // USB (Serial)
 
-// Kolejka chunków obrazu — max 1 oczekujący (RPi wysyła co 3s, więc 1 wystarczy)
-String   pendingImgLine  = "";
-bool     imgChunkReady   = false;
-uint32_t lastImgChunk    = 0;
+// Zdjęcie: całe w pamięci S3, nadawane seriami pakietów; braki dosyłane na prośbę ziemi
+uint8_t* imgBuf      = nullptr;
+uint16_t imgLen      = 0, imgGot = 0;
+uint32_t imgCrc      = 0;
+uint8_t  imgId       = 0, imgN = 0;
+uint8_t  imgSf       = 10;             // SF serii — wybiera ziemia według jakości łącza
+bool     imgReady    = false;
+uint8_t  imgTodo[16] = {0};            // mapa bitowa pakietów do nadania
+uint32_t imgNextRound = 0;
 
 bool     rpiPowered      = false;
 bool     shutdownReq     = false;
@@ -176,6 +186,46 @@ void sendToRpi(const String& line) {
     Serial.println(line);
 }
 
+// ── Zdjęcie: odbiór z RPi ─────────────────────────────────────────────────────
+uint32_t crc32(const uint8_t* d, size_t n) {      // zgodne z zlib.crc32
+    uint32_t v = 0xFFFFFFFF;
+    while (n--) {
+        v ^= *d++;
+        for (int k = 0; k < 8; k++) v = (v >> 1) ^ (0xEDB88320 & -(v & 1));
+    }
+    return ~v;
+}
+
+void imgFromRpi(const char* type, JsonDocument& doc) {
+    if (!imgBuf) return;
+    if (strcmp(type, "imgb") == 0) {
+        imgReady = false;
+        memset(imgTodo, 0, sizeof(imgTodo));
+        imgId  = doc["id"]  | 0;
+        imgLen = doc["len"] | 0;
+        imgCrc = doc["crc"] | 0UL;
+        imgGot = 0;
+        if (imgLen > IMG_MAX_BYTES) imgLen = 0;
+    } else if (strcmp(type, "imgd") == 0) {
+        const uint32_t off = doc["o"] | 0UL;
+        const char* b64 = doc["d"] | "";
+        size_t out = 0;
+        if ((doc["id"] | -1) != imgId || off >= imgLen) return;
+        if (mbedtls_base64_decode(imgBuf + off, imgLen - off, &out,
+                                  (const uint8_t*)b64, strlen(b64)) == 0) imgGot += out;
+    } else if (strcmp(type, "imge") == 0) {
+        const bool ok = imgLen && imgGot == imgLen && crc32(imgBuf, imgLen) == imgCrc;
+        if (ok) {
+            imgN = (imgLen + IMG_DATA - 1) / IMG_DATA;
+            for (int i = 0; i < imgN; i++) imgTodo[i / 8] |= 1 << (i % 8);
+            imgReady     = true;
+            imgNextRound = 0;
+        }
+        Serial.printf("[ESP32] zdjęcie id=%d %u/%u B %s\n", imgId, imgGot, imgLen, ok ? "OK" : "BŁĄD");
+        sendToRpi(String("{\"type\":\"imgst\",\"id\":") + imgId + ",\"ok\":" + (ok ? "true" : "false") + "}");
+    }
+}
+
 // ── Parser danych z RPi5 (line-delimited JSON) ────────────────────────────────
 void parseRpiLine(const String& line) {
     if (line.length() < 5) return;
@@ -195,12 +245,13 @@ void parseRpiLine(const String& line) {
     // inna komenda (np. ping z testera) — to nie są dane czujników
     if (!doc["cmd"].isNull()) return;
 
-    // chunk obrazu — odłóż do głównej pętli, nie blokuj tutaj
-    if (strcmp(doc["type"] | "", "img") == 0) {
-        pendingImgLine  = line;
-        imgChunkReady   = true;
+    // zdjęcie z RPi: imgb (początek) → imgd (dane) → imge (koniec, kontrola CRC)
+    const char* type = doc["type"] | "";
+    if (strncmp(type, "img", 3) == 0) {
+        imgFromRpi(type, doc);
         return;
     }
+    if (type[0]) return;
 
     rpi.temp = doc["temp"] | 0.0f;
     rpi.hum  = doc["hum"]  | 0.0f;
@@ -374,6 +425,7 @@ bool gpsFix() {
 // Format kompaktowy — dekoduje go rpi-ground/beacon.py (zmieniaj oba razem!):
 //   p [lat,lon,alt,sat,fix]  e [temp,hum,pres,p2,alt2]  i [roll,pit,yaw,ax,ay,az]
 //   b [vbat,imA]  d [dsku,dskf]  h hfdb  c [ok,rec,klatki,MB]
+//   q [id, pakiety, bajty, crc] zdjęcie gotowe do odbioru
 //   g [widoczne, maxSNR, zdania ok, zdania złe]
 //   x 1 = część pól pominięta, żeby zmieścić się w LORA_MAX_PAYLOAD
 static double rnd(double v, double scale) { return round(v * scale) / scale; }
@@ -392,6 +444,10 @@ void sendBeacon() {
     p.add(gps.satellites.isValid() ? (int)gps.satellites.value()         : 0);
     p.add(fix ? 1 : 0);
     doc["vbe"] = rnd(vbe, 100);
+    if (imgReady) {                           // zdjęcie czeka na potwierdzenie z ziemi
+        JsonArray q = doc["q"].to<JsonArray>();
+        q.add(imgId);  q.add(imgN);  q.add(imgLen);  q.add(imgCrc);
+    }
     JsonArray g = doc["g"].to<JsonArray>();   // diagnostyka GPS
     g.add(gpsView);  g.add(gpsSnrMax);
     g.add(gps.passedChecksum() % 10000);  g.add(gps.failedChecksum() % 10000);
@@ -470,8 +526,36 @@ void handleIncoming() {
 
     // ── Komendy kamery — forward do RPi przez UART2 TX ────────────────────────
     if (strcmp(cmd, "photo") == 0) {
-        Serial.println("[ESP32] photo cmd → RPi");
-        sendToRpi("{\"cmd\":\"photo\"}");
+        imgSf = constrain((int)(doc["sf"] | LORA_SF), 7, 12);
+        Serial.printf("[ESP32] photo cmd sf=%d → RPi\n", imgSf);
+        sendToRpi(String("{\"cmd\":\"photo\",\"sf\":") + imgSf + "}");
+        return;
+    }
+
+    // ziemia prosi o brakujące pakiety: "m" = mapa bitowa szesnastkowo
+    if (strcmp(cmd, "img_req") == 0) {
+        if (!imgReady || (doc["id"] | -1) != imgId) return;
+        imgSf = constrain((int)(doc["sf"] | (int)imgSf), 7, 12);
+        const String m = doc["m"] | "";
+        memset(imgTodo, 0, sizeof(imgTodo));
+        for (int i = 0; i + 1 < (int)m.length() && i / 2 < 16; i += 2)
+            imgTodo[i / 2] = (uint8_t)strtol(m.substring(i, i + 2).c_str(), nullptr, 16);
+        imgNextRound = 0;
+        Serial.printf("[ESP32] dosyłam zdjęcie id=%d mapa=%s\n", imgId, m.c_str());
+        return;
+    }
+
+    if (strcmp(cmd, "img_ok") == 0) {
+        if ((doc["id"] | -1) == imgId) { imgReady = false; memset(imgTodo, 0, sizeof(imgTodo)); }
+        Serial.printf("[ESP32] zdjęcie id=%d odebrane na ziemi\n", imgId);
+        return;
+    }
+
+    // start / koniec lotu (RPi blokuje ostrość kamery na nieskończoność)
+    if (strcmp(cmd, "flight") == 0) {
+        bool on = doc["on"] | false;
+        Serial.printf("[ESP32] flight on=%d → RPi\n", on);
+        sendToRpi(String("{\"cmd\":\"flight\",\"on\":") + (on ? "true" : "false") + "}");
         return;
     }
 
@@ -493,20 +577,58 @@ void handleIncoming() {
     }
 }
 
-// ── Chunk obrazu → LoRa (lub odrzucenie gdy brak LoRa) ────────────────────────
-void sendImgChunk() {
-    const String chunk = pendingImgLine;   // w trakcie nadawania UART może podstawić następny
-    imgChunkReady = false;
-    JsonDocument dbg;
-    deserializeJson(dbg, chunk);
-    int id = dbg["id"] | 0, seq = dbg["seq"] | 0, tot = dbg["tot"] | 0;
-    if (loraOk) {
-        Serial.printf("[LoRa] img id=%d seq=%d/%d\n", id, seq, tot);
-        loraSend((const uint8_t*)chunk.c_str(), chunk.length());
-    } else {
-        Serial.printf("[NO-LoRa] img id=%d seq=%d/%d odrzucony\n", id, seq, tot);
+// ── Zdjęcie → LoRa, jedna seria ───────────────────────────────────────────────
+void serviceDelay(uint32_t ms) {
+    const uint32_t t0 = millis();
+    while (millis() - t0 < ms) { readGps(); readRpiSerial(); delay(2); }
+}
+
+bool imgPending() {
+    for (uint8_t b : imgTodo) if (b) return true;
+    return false;
+}
+
+// Zapowiedź na zwykłym SF, potem pakiety na imgSf, potem powrót na zwykły SF.
+// Pakiet: 0xA5, id, numer, liczba pakietów, dane
+void sendImgRound() {
+    const uint8_t  id = imgId;
+    const uint32_t restarts = loraRestarts;
+    // przybliżony czas pakietu 244 B: SF7 0.38 s, każdy SF wyżej ~1.8× dłużej
+    uint32_t pktMs = 420;
+    for (int f = 7; f < imgSf; f++) pktMs = pktMs * 18 / 10;
+    int todo = 0;
+    for (int i = 0; i < imgN; i++) if (imgTodo[i / 8] >> (i % 8) & 1) todo++;
+    const int count = min(todo, max(1, (int)(IMG_ROUND_MS / pktMs)));
+
+    char ann[128];
+    const int annLen = snprintf(ann, sizeof(ann),
+        "{\"t\":\"ph\",\"id\":%u,\"len\":%u,\"n\":%u,\"crc\":%lu,\"sf\":%u,\"m\":%d}",
+        id, imgLen, imgN, (unsigned long)imgCrc, imgSf, count);
+    if (!loraSend((const uint8_t*)ann, annLen)) return;
+    Serial.printf("[LoRa] zdjęcie id=%u: seria %d z %d pakietów, SF%u\n", id, count, todo, imgSf);
+    serviceDelay(400);                          // ziemia przełącza odbiornik
+    LoRa.idle();
+    LoRa.setSpreadingFactor(imgSf);
+
+    uint8_t pkt[4 + IMG_DATA];
+    int sent = 0;
+    for (int i = 0; i < imgN && sent < count; i++) {
+        if (!(imgTodo[i / 8] >> (i % 8) & 1)) continue;
+        if (!imgReady || imgId != id) break;    // RPi właśnie podmienia zdjęcie
+        const size_t off = (size_t)i * IMG_DATA;
+        const size_t len = min((size_t)IMG_DATA, (size_t)imgLen - off);
+        pkt[0] = 0xA5;  pkt[1] = id;  pkt[2] = i;  pkt[3] = imgN;
+        memcpy(pkt + 4, imgBuf + off, len);
+        const bool ok = loraSend(pkt, len + 4);
+        if (loraRestarts != restarts) return;   // moduł podniesiony od nowa — już na zwykłym SF
+        if (!ok) break;
+        imgTodo[i / 8] &= ~(1 << (i % 8));
+        sent++;
     }
-    lastImgChunk  = millis();
+    LoRa.idle();
+    LoRa.setSpreadingFactor(LORA_SF);
+    LoRa.receive();
+    serviceDelay(300);
 }
 
 // ── Status ESP → RPi (UART) ───────────────────────────────────────────────────
@@ -582,13 +704,14 @@ void setup() {
     pinMode(RPI_PWR_PIN, OUTPUT);
     digitalWrite(RPI_PWR_PIN, HIGH);
 
-    Serial.setRxBufferSize(2048);
+    Serial.setRxBufferSize(8192);
+    imgBuf = (uint8_t*)malloc(IMG_MAX_BYTES);
     Serial.begin(115200);
     delay(500);
 
     // Nadawanie LoRa blokuje pętlę na ~2 s — domyślne 256 B by się przepełniło
     gpsSerial.setRxBufferSize(4096);
-    rpiSerial.setRxBufferSize(2048);
+    rpiSerial.setRxBufferSize(8192);
     gpsSerial.begin(9600,    SERIAL_8N1, GPS_RX_PIN, -1);
     rpiSerial.begin(115200,  SERIAL_8N1, RPI_RX_PIN, RPI_TX_PIN);
 
@@ -681,17 +804,12 @@ void loop() {
     handleIncoming();
     // Beacon idzie zawsze — także gdy RPi nigdy nie wstała (GPS musi działać)
     if (now - lastBeacon >= BEACON_INTERVAL_MS) {
-        // chunk obrazu ma pierwszeństwo jeśli jest gotowy i minął min. odstęp
-        if (imgChunkReady && (now - lastImgChunk >= IMG_CHUNK_DELAY_MS)) {
-            sendImgChunk();
-            // nie aktualizuj lastBeacon — beacon wyśle się przy następnej iteracji
-        } else {
-            delay(random(0, 100));
-            sendBeacon();
-            lastBeacon = now;
-        }
-    } else if (imgChunkReady && (now - lastImgChunk >= IMG_CHUNK_DELAY_MS)) {
-        // Chunk gotowy, a beacon jeszcze nie — wyślij chunk między beaconami
-        sendImgChunk();
+        delay(random(0, 100));
+        sendBeacon();
+        lastBeacon = now;
+    } else if (imgReady && imgPending() && loraOk && now >= imgNextRound) {
+        sendImgRound();
+        lastBeacon   = millis() - BEACON_INTERVAL_MS;   // po serii od razu beacon i okno na komendy
+        imgNextRound = millis() + IMG_GAP_MS;
     }
 }

@@ -3,10 +3,12 @@ Link to ESP32-S3 (bidirectional): USB cable if plugged in, otherwise UART wires.
 TX: sensor telemetry + image chunks.
 RX: commands from ESP32 (photo request, cam_rec toggle).
 """
+import base64
 import json
 import logging
 import termios
 import time
+import zlib
 
 import serial
 from serial.tools import list_ports
@@ -107,9 +109,14 @@ class EspUartSender:
             payload["ec"] = espcam_status
         self._write(payload)
 
-    def send_img_chunk(self, img_id: int, seq: int, total: int, b64: str) -> None:
-        """Send one image chunk to ESP32 for LoRa retransmission."""
-        self._write({"type": "img", "id": img_id, "seq": seq, "tot": total, "data": b64})
+    def send_photo(self, img_id: int, data: bytes) -> None:
+        """Całe zdjęcie do pamięci S3; S3 odpowiada {"type":"imgst","id":…,"ok":…}."""
+        self._write({"type": "imgb", "id": img_id, "len": len(data), "crc": zlib.crc32(data)})
+        for off in range(0, len(data), 240):
+            self._write({"type": "imgd", "id": img_id, "o": off,
+                         "d": base64.b64encode(data[off:off + 240]).decode("ascii")})
+            time.sleep(0.04)        # ~370 B na linię; 115200 bodów = ~32 ms, nie zapychaj S3
+        self._write({"type": "imge", "id": img_id})
 
     # ── RX ────────────────────────────────────────────────────────────────────
 

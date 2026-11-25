@@ -45,6 +45,7 @@ class LoRaRX:
         self._spi.open(LORA_SPI_BUS, LORA_SPI_CS)
         self._spi.max_speed_hz = 5_000_000
         assert self._read_reg(_REG_VERSION) == 0x12, "SX1278 not found"
+        self._sf = LORA_SF
         self.resets = 0         # ile razy moduł sam się zresetował
         self._configure()
         if not self._alive():
@@ -83,8 +84,7 @@ class LoRaRX:
         bw_bits = bw_map.get(LORA_BW, 7) << 4
         cr_bits = (LORA_CR - 4) << 1
         self._write_reg(_REG_MODEM_CONFIG1, bw_bits | cr_bits)  # explicit header (musi zgadzać się z rpi-air)
-        self._write_reg(_REG_MODEM_CONFIG2, (LORA_SF << 4) | 0x04)
-        self._write_reg(_REG_MODEM_CONFIG3, 0x04)
+        self._write_sf()
         self._write_reg(0x09, 0x80 | (LORA_TX_POWER - 2))  # PA_BOOST, moc TX uplink
         self._write_reg(_REG_SYNC_WORD, 0x12)
         self._write_reg(_REG_FIFO_RX_BASE_ADDR, 0x00)
@@ -94,6 +94,19 @@ class LoRaRX:
         time.sleep(0.01)
         self._set_mode(_MODE_RX_CONT)
         time.sleep(0.01)
+
+    def _write_sf(self):
+        ldro = 0x08 if self._sf >= 11 else 0x00
+        self._write_reg(_REG_MODEM_CONFIG2, (self._sf << 4) | 0x04)
+        self._write_reg(_REG_MODEM_CONFIG3, 0x04 | ldro)
+
+    def set_sf(self, sf: int):
+        """Zmiana SF na czas serii zdjęcia (i z powrotem na LORA_SF)."""
+        self._sf = sf
+        self._set_mode(_MODE_STDBY)
+        self._write_sf()
+        self._write_reg(_REG_IRQ_FLAGS, 0xFF)
+        self._set_mode(_MODE_RX_CONT)
 
     def receive(self, timeout_s: float = 1.0) -> tuple[bytes | None, int, float]:
         """
