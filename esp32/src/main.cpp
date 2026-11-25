@@ -108,7 +108,8 @@ uint32_t loraRestarts  = 0;     // ile razy moduł trzeba było podnieść
 uint32_t lastLoraRetry = 0;
 uint32_t lastStatus    = 0;
 bool     ledOverride   = false; // LED ustawiony komendą z ziemi
-String   rpiLineBuf  = "";
+String   rpiLineBuf  = "";   // UART2
+String   usbLineBuf  = "";   // USB (Serial)
 
 // Kolejka chunków obrazu — max 1 oczekujący (RPi wysyła co 3s, więc 1 wystarczy)
 String   pendingImgLine  = "";
@@ -169,6 +170,12 @@ void applyBuzzerLed(JsonDocument& doc, const char* src) {
     ledOverride = (r || g || b || buz);
     Serial.printf("[ESP32] %s: buzzer=%d ms=%lu led=(%d,%d,%d)\n",
                   src, buz, (unsigned long)ms, r, g, b);
+}
+
+// ── Linia do RPi — na oba łącza; RPi czyta tylko jedno ───────────────────────
+void sendToRpi(const String& line) {
+    rpiSerial.println(line);
+    Serial.println(line);
 }
 
 // ── Parser danych z RPi5 (line-delimited JSON) ────────────────────────────────
@@ -239,17 +246,24 @@ void parseRpiLine(const String& line) {
 }
 
 // ── Odczyt UART z RPi5 ────────────────────────────────────────────────────────
-void readRpiSerial() {
-    while (rpiSerial.available()) {
-        char c = (char)rpiSerial.read();
+void readRpiPort(Stream& port, String& buf) {
+    while (port.available()) {
+        char c = (char)port.read();
         rpiRxBytes++;
         if (c == '\n') {
-            parseRpiLine(rpiLineBuf);
-            rpiLineBuf = "";
-        } else if (rpiLineBuf.length() < 512) {
-            rpiLineBuf += c;
+            const String line = buf;   // parser może trwać — bufor od razu wolny
+            buf = "";
+            parseRpiLine(line);
+        } else if (buf.length() < 512) {
+            buf += c;
         }
     }
+}
+
+// RPi może być podłączone przewodami (UART2) albo kablem USB (Serial) — słuchaj obu
+void readRpiSerial() {
+    readRpiPort(rpiSerial, rpiLineBuf);
+    readRpiPort(Serial, usbLineBuf);
     // oznacz dane jako nieświeże po przekroczeniu timeoutu
     if (rpi.fresh && (millis() - rpiLastRx > RPI_DATA_TIMEOUT_MS)) {
         rpi.fresh = false;
@@ -424,7 +438,7 @@ void handleIncoming() {
     // ── Komendy kamery — forward do RPi przez UART2 TX ────────────────────────
     if (strcmp(cmd, "photo") == 0) {
         Serial.println("[ESP32] photo cmd → RPi");
-        rpiSerial.println("{\"cmd\":\"photo\"}");
+        sendToRpi("{\"cmd\":\"photo\"}");
         return;
     }
 
@@ -432,7 +446,7 @@ void handleIncoming() {
         bool on = doc["on"] | false;
         Serial.printf("[ESP32] cam_rec on=%d → RPi\n", on);
         String fwd = String("{\"cmd\":\"cam_rec\",\"on\":") + (on ? "true" : "false") + "}";
-        rpiSerial.println(fwd);
+        sendToRpi(fwd);
         return;
     }
 
@@ -441,7 +455,7 @@ void handleIncoming() {
         bool on = doc["on"] | false;
         Serial.printf("[ESP32] espcam_pwr on=%d → RPi\n", on);
         String fwd = String("{\"cmd\":\"espcam_pwr\",\"on\":") + (on ? "true" : "false") + "}";
-        rpiSerial.println(fwd);
+        sendToRpi(fwd);
         return;
     }
 }
@@ -476,7 +490,7 @@ void sendStatusToRpi() {
     st["vbe"]  = readBattAdc();
     char buf[160];
     serializeJson(st, buf);
-    rpiSerial.println(buf);
+    sendToRpi(buf);
 }
 
 // ── Sygnalizacja braku LoRa: krótkie czerwone mignięcie co 2 s ────────────────
@@ -535,6 +549,7 @@ void setup() {
     pinMode(RPI_PWR_PIN, OUTPUT);
     digitalWrite(RPI_PWR_PIN, HIGH);
 
+    Serial.setRxBufferSize(2048);
     Serial.begin(115200);
     delay(500);
 

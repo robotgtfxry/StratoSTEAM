@@ -4,6 +4,8 @@
 # UART do ESP32 (RPi5 GPIO14 TX → ESP32 GPIO3 RX)
 ESP_UART_PORT = "/dev/ttyAMA0"
 ESP_UART_BAUD = 115200
+# Kabel USB do ESP32-S3 (układ CH343) ma pierwszeństwo; gdy go nie ma — przewody UART powyżej.
+ESP_USB_ENABLED = True
 ESP_SEND_INTERVAL_S = 5     # jak często wysyłamy dane czujników do ESP32
 
 # BME280 (I2C)
