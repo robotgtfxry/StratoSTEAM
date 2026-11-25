@@ -21,7 +21,7 @@ import urllib.request
 from PIL import Image, ImageFile
 
 from config import PREVIEW_URL
-from local_feed import PHOTO_PATH, REQUEST_PATH, STATE_PATH
+from local_feed import AUTO_PATH, AUTO_S, MAX_TRIES, PHOTO_PATH, REQUEST_PATH, STATE_PATH
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True      # zdjęcie w trakcie odbioru też pokaż
 
@@ -162,10 +162,15 @@ class Photo(tk.Frame):
         head = tk.Frame(self, bg=CARD)
         head.pack(fill="x", padx=12, pady=(6, 2))
         tk.Label(head, text="Kamera", bg=CARD, fg=BLUE, font=(FONT, 11, "bold")).pack(side="left")
-        self._btn = tk.Button(head, text="Zrób zdjęcie (LoRa)", command=self._request, bg="#21262d",
+        self._btn = tk.Button(head, text="Zrób zdjęcie", command=self._request, bg="#21262d",
                               fg=FG, activebackground=LINE, activeforeground=FG, relief="flat",
                               font=(FONT, 9), padx=8, pady=1)
         self._btn.pack(side="right")
+        self._auto = tk.BooleanVar(value=os.path.exists(AUTO_PATH))
+        tk.Checkbutton(head, text=f"auto co {AUTO_S // 60} min", variable=self._auto,
+                       command=self._set_auto, bg=CARD, fg=DIM, selectcolor=BG, font=(FONT, 9),
+                       activebackground=CARD, activeforeground=FG, highlightthickness=0,
+                       bd=0).pack(side="right", padx=6)
         self._info = tk.Label(self, text="", bg=CARD, fg=DIM, font=(FONT, 9), anchor="w")
         self._info.pack(side="bottom", fill="x", padx=12, pady=(0, 4))
         self._view = tk.Canvas(self, bg=BG, highlightthickness=0, width=200, height=100, cursor="hand2")
@@ -178,6 +183,15 @@ class Photo(tk.Frame):
                 f.write(str(time.time()))
         except OSError as e:
             self._info.config(text=f"nie mogę wysłać prośby: {e}", fg=BAD)
+
+    def _set_auto(self) -> None:
+        try:
+            if self._auto.get():
+                open(AUTO_PATH, "w").close()
+            else:
+                os.remove(AUTO_PATH)
+        except OSError:
+            pass
 
     def _toggle_big(self) -> None:
         if self._big is not None and self._big.winfo_exists():
@@ -217,7 +231,10 @@ class Photo(tk.Frame):
         if os.path.exists(REQUEST_PATH):
             text, color = "prośba czeka na pakiet z balonu…", WARN
         elif st.get("photo_req"):
-            text, color = f"prośba wysłana {ago(now - st['photo_req'])} temu, czekam na zdjęcie", WARN
+            text, color = (f"prośba {st.get('photo_try', 1)}/{MAX_TRIES} wysłana "
+                           f"{ago(now - st['photo_req'])} temu"), WARN
+        elif st.get("photo_fail"):
+            text, color = "RPi balonu nie odsyła zdjęcia (przewód GPIO14→S3?)", BAD
         self._info.config(text=text, fg=color)
 
         big = self._big if self._big is not None and self._big.winfo_exists() else None

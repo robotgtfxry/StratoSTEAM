@@ -77,6 +77,10 @@ class CameraModule:
             return None
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         path = os.path.join(self._record_dir, f"rec_{ts}.h264")
+        n = 1
+        while os.path.exists(path):     # bez internetu zegar po restarcie może się cofnąć
+            path = os.path.join(self._record_dir, f"rec_{ts}_{n}.h264")
+            n += 1
         self._cam.start_recording(H264Encoder(self._bitrate), FileOutput(path))
         self._recording = True
         log.info("Recording → %s  bitrate=%.1f Mbps", path, self._bitrate / 1e6)

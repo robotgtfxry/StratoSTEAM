@@ -19,6 +19,10 @@ STATE_PATH = os.environ.get("STRATO_STATE_PATH", "/dev/shm/stratosteam-ground.js
 LOG_DIR = os.path.expanduser(os.environ.get("STRATO_LOG_DIR", "~/stratosteam-odbior"))
 PHOTO_PATH = os.environ.get("STRATO_PHOTO_PATH", "/dev/shm/stratosteam-photo.jpg")
 REQUEST_PATH = os.environ.get("STRATO_REQUEST_PATH", "/dev/shm/stratosteam-photo.req")
+AUTO_PATH = os.environ.get("STRATO_AUTO_PATH", "/dev/shm/stratosteam-photo.auto")
+AUTO_S = 180            # automatyczne zdjęcie co tyle sekund (gdy plik AUTO_PATH istnieje)
+RETRY_S = 40            # brak fragmentów po prośbie → ponów
+MAX_TRIES = 3
 PHOTO_MAX_CHUNKS = 200
 PHOTO_GAP_S = 60        # ta sama nr zdjęcia po takiej przerwie = nowe zdjęcie (restart balonu)
 HISTORY = 240           # punktów na wykresach
@@ -29,11 +33,13 @@ class LocalFeed:
         self._path = state_path
         self._log_dir = log_dir
         self._chunks: dict[int, bytes] = {}
+        self._last_req = 0.0
         self._history: deque = deque(maxlen=HISTORY)
         self._warned = False
         self._state = {
             "started": time.time(), "packets": 0, "bad": 0, "img_chunks": 0, "lost": 0,
-            "lora_resets": 0, "photo": None, "photo_req": None, "last": None, "last_rx": None, "rssi": None, "snr": None,
+            "lora_resets": 0, "photo": None, "photo_req": None, "photo_try": 0,
+            "photo_fail": None, "last": None, "last_rx": None, "rssi": None, "snr": None,
         }
 
     def packet(self, flat: dict, rssi: int, snr: float) -> None:
@@ -63,7 +69,7 @@ class LocalFeed:
             ph = self._state["photo"] = {"id": img_id, "total": total, "got": 0,
                                          "done": False, "ts": now}
             self._chunks = {}
-            self._state["photo_req"] = None
+            self._state.update(photo_req=None, photo_fail=None)
         ph["ts"] = now
         if ph["done"] or seq in self._chunks:
             return
@@ -81,12 +87,31 @@ class LocalFeed:
             self._write(os.path.join(self._log_dir, time.strftime("foto-%Y%m%d-%H%M%S.jpg")), prefix)
 
     def pop_photo(self) -> bool:
-        """Czy w oknie kliknięto „Zrób zdjęcie”. Zużywa prośbę."""
+        """Czy wysłać teraz prośbę o zdjęcie: kliknięcie, ponowienie albo tryb automatyczny."""
+        st, now = self._state, time.time()
         try:
             os.remove(REQUEST_PATH)
+            clicked = True
         except OSError:
-            return False
-        self._state["photo_req"] = time.time()
+            clicked = False
+
+        if clicked:
+            st["photo_try"] = 0
+        elif st["photo_req"]:
+            if now - self._last_req < RETRY_S:
+                return False
+            if st["photo_try"] >= MAX_TRIES:        # RPi balonu nie odpowiada
+                st.update(photo_req=None, photo_fail=now)
+                return False
+        else:
+            receiving = st["photo"] and now - st["photo"]["ts"] < RETRY_S
+            if receiving or not os.path.exists(AUTO_PATH) or now - self._last_req < AUTO_S:
+                return False
+            st["photo_try"] = 0
+        st["photo_try"] += 1
+        st["photo_req"] = st["photo_req"] if st["photo_try"] > 1 else now
+        st["photo_fail"] = None
+        self._last_req = now
         return True
 
     def _write(self, path: str, data: bytes) -> None:
