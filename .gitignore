@@ -32,3 +32,6 @@ Thumbs.db
 
 # Zdjęcia zapisane przez backend
 backend/photos/
+
+# Klucze prywatne (lokalna kopia, NIGDY do repo)
+klucze/
