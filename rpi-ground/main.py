@@ -4,7 +4,6 @@ StratoSTEAM — Ground station
 Receives LoRa telemetry from balloon, forwards to backend.
 Handles uplink: buzzer/LED commands + RPi power control via ESP32.
 """
-import base64
 import json
 import logging
 import os
@@ -22,6 +21,8 @@ from rpi_power_store import RpiPowerStore
 from exec_store import ExecStore
 from local_feed import LOG_DIR, LocalFeed
 from mission import Mission
+from mission_uplink import MissionUplink
+from photo_outbox import PhotoOutbox
 from photo_rx import PKT_MAGIC, PhotoRx, airtime, choose_sf
 from camera_store import CameraStore
 from espcam_store import EspCamStore
@@ -103,6 +104,8 @@ def main():
     feed      = LocalFeed()      # okno gui_odbior.py + dziennik na karcie
     photo     = PhotoRx()
     mission   = Mission(os.path.join(LOG_DIR, "misja.json"))
+    mission_up = MissionUplink()
+    outbox    = PhotoOutbox(os.path.join(LOG_DIR, "do-wyslania"))   # zdjęcia czekające na internet
     last_snr: float | None = None
     buzzer: list[tuple[bool, int]] = []      # komendy buzzera z okna
 
@@ -121,6 +124,8 @@ def main():
     exec_s.start()
     camera_s.start()
     espcam_s.start()
+    mission_up.start()
+    outbox.start()
     log.info("Ground station listening…")
 
     try:
@@ -134,7 +139,10 @@ def main():
                     feed.buzzer("czeka na pakiet z balonu")
                 else:
                     mission.command(c, time.time())
+            if (auto := mission.pop_auto()) is not None:
+                feed.set_auto(auto)
             feed.mission(mission.state())
+            mission_up.update(mission.state(), feed.auto_on(), feed.last_rx)
             feed.photo_progress(photo.state())
             feed.tick(getattr(lora, "resets", 0))
             raw, rssi, snr = lora.receive(timeout_s=1.0)
@@ -162,9 +170,7 @@ def main():
                     if blob:
                         log.info("Zdjęcie id=%d komplet: %d B w %.0f s", photo.id, len(blob),
                                  time.time() - photo.started)
-                        feed.photo_done(blob)
-                        camera_s.post_chunk({"type": "img", "id": photo.id, "seq": 0, "tot": 1,
-                                             "data": base64.b64encode(blob).decode()})
+                        outbox.add(feed.photo_done(blob))
                 continue
 
             # Determine source: ESP32 beacon or full RPi telemetry

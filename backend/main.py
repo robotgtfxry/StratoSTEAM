@@ -8,7 +8,7 @@ from database import init_db, SessionLocal
 from models import TelemetryRecord, WaypointRecord
 from routers import telemetry, ws, hf, commands, rpi_power, exec_cmd, camera, espcam
 from routers import waypoints as waypoints_router
-from routers import espcam_status
+from routers import espcam_status, mission
 
 log = logging.getLogger("waypoint_task")
 
@@ -77,3 +77,4 @@ app.include_router(camera.router)
 app.include_router(espcam.router)
 app.include_router(waypoints_router.router, prefix="/api")
 app.include_router(espcam_status.router)
+app.include_router(mission.router)

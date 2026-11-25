@@ -29,3 +29,6 @@ Thumbs.db
 *.p12.base64
 *.jks
 *.keystore
+
+# Zdjęcia zapisane przez backend
+backend/photos/

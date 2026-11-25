@@ -4,6 +4,7 @@ import '../services/telemetry_service.dart';
 import '../models/telemetry.dart';
 import '../services/rpi_power_service.dart';
 import '../widgets/info_card.dart';
+import '../widgets/mission_card.dart';
 import '../widgets/altitude_chart.dart';
 import '../widgets/map_view.dart';
 import '../widgets/attitude_indicator.dart';
@@ -47,6 +48,10 @@ class DashboardScreen extends StatelessWidget {
               padding: const EdgeInsets.all(12),
               child: Column(
                 children: [
+                  // faza misji ze stacji (START, T+, wysokość)
+                  const MissionCard(),
+                  const SizedBox(height: 12),
+
                   // GPS status bar (-- gdy brak danych)
                   _StatusBar(t: t),
                   const SizedBox(height: 12),

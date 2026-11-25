@@ -30,7 +30,8 @@ class Uplink:
         packet["snr"] = round(snr, 1)
         self._q.put(packet)
 
-    def _post(self, packet: dict) -> bool:
+    def _post(self, packet: dict) -> bool | None:
+        """True = przyjęty, False = serwer odmówił, None = brak połączenia."""
         try:
             r = requests.post(
                 f"{BACKEND_URL}/api/telemetry",
@@ -46,6 +47,7 @@ class Uplink:
                 return True
         except requests.RequestException as e:
             log.warning("Uplink error: %s", e)
+            return None
         return False
 
     def _worker(self):
@@ -64,8 +66,12 @@ class Uplink:
 
             # try to flush
             still_pending = []
-            for pkt in pending:
-                if not self._post(pkt):
+            for i, pkt in enumerate(pending):
+                ok = self._post(pkt)
+                if ok is None:              # brak sieci: reszta też nie przejdzie
+                    still_pending += pending[i:]
+                    break
+                if not ok:
                     still_pending.append(pkt)
             pending = still_pending
 

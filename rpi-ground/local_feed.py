@@ -19,7 +19,8 @@ LOG_DIR = os.path.expanduser(os.environ.get("STRATO_LOG_DIR", "~/stratosteam-odb
 PHOTO_PATH = os.environ.get("STRATO_PHOTO_PATH", "/dev/shm/stratosteam-photo.webp")
 CMD_DIR = os.environ.get("STRATO_CMD_DIR", "/dev/shm/stratosteam-cmd")
 REQUEST_PATH = os.environ.get("STRATO_REQUEST_PATH", "/dev/shm/stratosteam-photo.req")
-AUTO_PATH = os.environ.get("STRATO_AUTO_PATH", "/dev/shm/stratosteam-photo.auto")
+# na karcie, nie w RAM — automatyczne zdjęcia mają przetrwać restart stacji w locie
+AUTO_PATH = os.environ.get("STRATO_AUTO_PATH", os.path.join(LOG_DIR, "auto-zdjecia"))
 AUTO_S = 180            # automatyczne zdjęcie co tyle sekund (gdy plik AUTO_PATH istnieje)
 RETRY_S = 40            # brak fragmentów po prośbie → ponów
 MAX_TRIES = 3
@@ -57,10 +58,32 @@ class LocalFeed:
             st.update(photo_req=None, photo_fail=None)      # balon odpowiedział
         st["photo"] = state
 
-    def photo_done(self, blob: bytes) -> None:
-        """Całe, sprawdzone zdjęcie."""
+    def photo_done(self, blob: bytes) -> str:
+        """Całe, sprawdzone zdjęcie. Zwraca ścieżkę pliku na karcie."""
         self._write(PHOTO_PATH, blob)
-        self._write(os.path.join(self._log_dir, time.strftime("foto-%Y%m%d-%H%M%S.webp")), blob)
+        path = os.path.join(self._log_dir, time.strftime("foto-%Y%m%d-%H%M%S.webp"))
+        self._write(path, blob)
+        return path
+
+    @property
+    def last_rx(self) -> float | None:
+        return self._state["last_rx"]
+
+    @staticmethod
+    def auto_on() -> bool:
+        return os.path.exists(AUTO_PATH)
+
+    @staticmethod
+    def set_auto(on: bool) -> None:
+        try:
+            if on:
+                os.makedirs(os.path.dirname(AUTO_PATH), exist_ok=True)
+                open(AUTO_PATH, "w").close()
+            elif os.path.exists(AUTO_PATH):
+                os.remove(AUTO_PATH)
+            log.info("Automatyczne zdjęcia: %s", "włączone" if on else "wyłączone")
+        except OSError as e:
+            log.warning("Automatyczne zdjęcia: %s", e)
 
     def buzzer(self, text: str) -> None:
         self._state["buzzer"] = {"text": text, "ts": time.time()}

@@ -93,7 +93,7 @@ class CameraCard extends StatelessWidget {
               Flexible(
                 child: Text(
                   cam.lastPhotoOk!
-                      ? 'Żądanie wysłane â€” zdjęcie dotrze za ok. 1 min'
+                      ? 'Żądanie wysłane — zdjęcie dotrze za ok. 1 min'
                       : 'Błąd wysyłania żądania',
                   style: TextStyle(
                     color: cam.lastPhotoOk!
@@ -113,7 +113,7 @@ class CameraCard extends StatelessWidget {
               const Icon(Icons.image_outlined, color: Colors.white24, size: 13),
               const SizedBox(width: 5),
               Text(
-                'Ostatnie zdjęcie â€˘ ${_fmtTs(cam.latestPhotoTs)}',
+                'Ostatnie zdjęcie • ${_fmtTs(cam.latestPhotoTs)}',
                 style: const TextStyle(color: Colors.white38, fontSize: 11),
               ),
             ]),
@@ -128,13 +128,17 @@ class CameraCard extends StatelessWidget {
               ),
             ),
           ],
+          if (cam.photos.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _Gallery(cam: cam),
+          ],
         ],
       ),
     );
   }
 
   String _fmtTs(DateTime? ts) {
-    if (ts == null) return 'â€”';
+    if (ts == null) return '—';
     return '${ts.hour.toString().padLeft(2, '0')}:'
         '${ts.minute.toString().padLeft(2, '0')}:'
         '${ts.second.toString().padLeft(2, '0')}';
@@ -265,7 +269,7 @@ class _DiskBar extends StatelessWidget {
                 ? '${cam.diskUsedGb!.toStringAsFixed(1)} / '
                   '${cam.diskTotalGb!.toStringAsFixed(1)} GB  '
                   '(${cam.diskUsedPct!.toStringAsFixed(0)}%)'
-                : 'â€” / â€” GB',
+                : '— / — GB',
             style: TextStyle(
               color: hasData ? barColor : Colors.white24,
               fontSize: 12,
@@ -294,4 +298,80 @@ class _DiskBar extends StatelessWidget {
       ],
     );
   }
+}
+
+// Wszystkie zdjęcia z serwera (także dosłane po powrocie internetu)
+
+class _Gallery extends StatelessWidget {
+  final CameraService cam;
+  const _Gallery({required this.cam});
+
+  static String _time(int key) {
+    final t = DateTime.fromMillisecondsSinceEpoch(key * 1000);
+    String two(int v) => v.toString().padLeft(2, '0');
+    return '${two(t.day)}.${two(t.month)} ${two(t.hour)}:${two(t.minute)}:${two(t.second)}';
+  }
+
+  Widget _image(int key, BoxFit fit) => Image.network(
+        cam.photoUrl(key),
+        headers: cam.photoHeaders,
+        fit: fit,
+        gaplessPlayback: true,
+        errorBuilder: (_, __, ___) =>
+            const Center(child: Icon(Icons.broken_image, color: Colors.white24)),
+      );
+
+  void _open(BuildContext context, int key) => showDialog<void>(
+        context: context,
+        builder: (ctx) => Dialog(
+          backgroundColor: const Color(0xFF0D1117),
+          insetPadding: const EdgeInsets.all(8),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Flexible(
+              child: InteractiveViewer(
+                  maxScale: 6, child: _image(key, BoxFit.contain)),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Text(_time(key),
+                  style: const TextStyle(color: Colors.white54, fontSize: 12)),
+            ),
+          ]),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Wszystkie zdjęcia (${cam.photos.length})',
+              style: const TextStyle(color: Colors.white38, fontSize: 11)),
+          const SizedBox(height: 6),
+          SizedBox(
+            height: 96,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: cam.photos.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (ctx, i) {
+                final key = cam.photos[i];
+                return GestureDetector(
+                  onTap: () => _open(ctx, key),
+                  child: Column(children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: SizedBox(
+                          width: 128, height: 72, child: _image(key, BoxFit.cover)),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(_time(key),
+                        style: const TextStyle(
+                            color: Colors.white38, fontSize: 10)),
+                  ]),
+                );
+              },
+            ),
+          ),
+        ],
+      );
 }

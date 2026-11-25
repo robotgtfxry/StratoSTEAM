@@ -17,6 +17,12 @@ class CameraService extends ChangeNotifier {
   DateTime? latestPhotoTs;
   int _latestId = -1;
 
+  /// Zapisane zdjęcia, od najnowszego (klucz = czas zdjęcia w sekundach).
+  List<int> photos = [];
+
+  String photoUrl(int key) => '${_settings.serverUrl}/api/camera/photos/$key';
+  Map<String, String> get photoHeaders => {'X-API-Key': _settings.apiKey};
+
   // Disk usage
   double? diskUsedGb;
   double? diskFreeGb;
@@ -28,7 +34,11 @@ class CameraService extends ChangeNotifier {
 
   CameraService(this._settings) {
     _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) => _fetchLatest());
-    _storagePollTimer = Timer.periodic(const Duration(seconds: 10), (_) => _fetchStorage());
+    _storagePollTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      _fetchStorage();
+      _fetchPhotos();
+    });
+    _fetchPhotos();
   }
 
   Map<String, String> get _headers => {
@@ -94,6 +104,27 @@ class CameraService extends ChangeNotifier {
     } catch (_) {}
   }
 
+  Future<void> _fetchPhotos() async {
+    try {
+      final r = await http
+          .get(
+            Uri.parse('${_settings.serverUrl}/api/camera/photos?limit=60'),
+            headers: photoHeaders,
+          )
+          .timeout(const Duration(seconds: 5));
+      if (r.statusCode == 200) {
+        final list = [
+          for (final p in (jsonDecode(r.body)['photos'] as List))
+            p['key'] as int
+        ];
+        if (!listEquals(list, photos)) {
+          photos = list;
+          notifyListeners();
+        }
+      }
+    } catch (_) {}
+  }
+
   Future<void> _fetchLatest() async {
     try {
       final r = await http
@@ -108,7 +139,8 @@ class CameraService extends ChangeNotifier {
         if (newId != _latestId) {
           _latestId = newId;
           latestPhoto = base64Decode(data['b64'] as String);
-          latestPhotoTs = DateTime.now();
+          latestPhotoTs = DateTime.fromMillisecondsSinceEpoch(
+              ((data['ts'] as num) * 1000).toInt());
           notifyListeners();
         }
       }

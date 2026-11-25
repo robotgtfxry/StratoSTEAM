@@ -6,14 +6,22 @@ Camera routes:
   GET  /api/camera/record/pending — ground polls
   POST /api/camera/chunk          — ground uploads received LoRa chunk
   GET  /api/camera/latest         — Flutter fetches latest assembled photo
+  GET  /api/camera/photos         — lista zapisanych zdjęć (od najnowszego)
+  GET  /api/camera/photos/{key}   — jedno zdjęcie
 """
 import base64
+import logging
+import os
 import time
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Response, status
 from pydantic import BaseModel
 from config import settings
 
 router = APIRouter(prefix="/api/camera", tags=["camera"])
+log = logging.getLogger("camera")
+
+PHOTO_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "photos")
+PHOTO_KEEP = 500        # tyle ostatnich zdjęć zostaje na dysku
 
 
 def _verify_key(x_api_key: str = Header(...)):
@@ -77,6 +85,29 @@ class ChunkIn(BaseModel):
     seq: int
     tot: int
     data: str   # base64
+    ts: float | None = None   # kiedy stacja odebrała zdjęcie (dosyłane później)
+
+
+def _keys() -> list[int]:
+    try:
+        return sorted(int(n[:-4]) for n in os.listdir(PHOTO_DIR)
+                      if n.endswith(".img") and n[:-4].isdigit())
+    except OSError:
+        return []
+
+
+def _store(blob: bytes, ts: float) -> None:
+    """Zapis na dysk; klucz z czasu zdjęcia, więc ponowione wysłanie nie robi kopii."""
+    try:
+        os.makedirs(PHOTO_DIR, exist_ok=True)
+        path = os.path.join(PHOTO_DIR, f"{int(ts)}.img")
+        with open(path + ".tmp", "wb") as f:
+            f.write(blob)
+        os.replace(path + ".tmp", path)
+        for k in _keys()[:-PHOTO_KEEP]:
+            os.remove(os.path.join(PHOTO_DIR, f"{k}.img"))
+    except OSError as e:
+        log.warning("zdjęcie nie zapisane: %s", e)
 
 
 @router.post("/chunk", status_code=status.HTTP_200_OK)
@@ -97,10 +128,12 @@ async def receive_chunk(body: ChunkIn, _: None = Depends(_verify_key)):
         # All chunks present — assemble full JPEG
         ordered = [_assemblies[img_id]["chunks"][i] for i in range(total)]
         full_bytes = b"".join(base64.b64decode(c) for c in ordered)
+        ts = body.ts if body.ts and 1.6e9 < body.ts < 4e9 else time.time()
+        _store(full_bytes, ts)
         _latest = {
             "id":     img_id,
             "b64":    base64.b64encode(full_bytes).decode("ascii"),
-            "ts":     time.time(),
+            "ts":     ts,
             "chunks": total,
             "size":   len(full_bytes),
         }
@@ -119,6 +152,24 @@ async def latest_image():
     if _latest is None:
         raise HTTPException(status_code=404, detail="No image available yet")
     return _latest
+
+
+# ── Galeria ───────────────────────────────────────────────────────────────────
+
+@router.get("/photos")
+async def list_photos(limit: int = 60, _: None = Depends(_verify_key)):
+    keys = _keys()[::-1][:min(max(limit, 1), PHOTO_KEEP)]
+    return {"photos": [{"key": k, "ts": k} for k in keys]}
+
+
+@router.get("/photos/{key}")
+async def get_photo(key: int, _: None = Depends(_verify_key)):
+    try:
+        with open(os.path.join(PHOTO_DIR, f"{key}.img"), "rb") as f:
+            blob = f.read()
+    except OSError:
+        raise HTTPException(status_code=404, detail="No such photo")
+    return Response(blob, media_type="image/webp" if blob[:4] == b"RIFF" else "image/jpeg")
 
 
 # ── Disk storage ──────────────────────────────────────────────────────────────

@@ -52,6 +52,7 @@ class Mission:
         self._ground: deque = deque(maxlen=60)
         self._still_since: float | None = None
         self._flight_cmds: list[bool] = []
+        self._auto: bool | None = None      # zmiana automatycznych zdjęć do wykonania
         self.vs: float | None = None
         self.alt: float | None = None
         try:
@@ -74,16 +75,23 @@ class Mission:
             skipped = [str(x)[:60] for x in c.get("skipped", [])][:20]
             self._phase(START, now, "START wciśnięty" + (f" mimo: {', '.join(skipped)}" if skipped else ""))
             self._flight_cmds = [True] * FLIGHT_REPEAT
+            self._auto = True
         elif a == "reset":
             self.d.update(phase=PREP, t0=None, alt0=None, max_alt=None, manual={})
             self._ground.clear()
             self._still_since = None
             self._event(now, "Nowa procedura startu")
             self._flight_cmds = [False] * FLIGHT_REPEAT
+            self._auto = False
 
     def pop_flight(self) -> bool | None:
         """Czy wysłać teraz balonowi komendę „lot” (True/False)."""
         return self._flight_cmds.pop(0) if self._flight_cmds else None
+
+    def pop_auto(self) -> bool | None:
+        """Czy włączyć/wyłączyć automatyczne zdjęcia (start → tak, lądowanie → nie)."""
+        val, self._auto = self._auto, None
+        return val
 
     # ── telemetria ────────────────────────────────────────────────────────────
 
@@ -111,6 +119,7 @@ class Mission:
                 self.d.update(t0=now, alt0=base, max_alt=alt)
                 self._phase(ASCENT, now, "Start wykryty automatycznie")
                 self._flight_cmds = [True] * FLIGHT_REPEAT
+                self._auto = True
             elif base is None or abs(alt - base) < LAUNCH_CLIMB_M / 2:
                 self._ground.append(alt)
             return
@@ -131,6 +140,7 @@ class Mission:
             self._still_since = (self._still_since or now) if still else None
             if self._still_since and now - self._still_since >= LAND_STILL_S:
                 self._phase(LANDED, now, "Lądowanie")
+                self._auto = False
 
     def _phase(self, phase: str, now: float, text: str) -> None:
         self.d["phase"] = phase

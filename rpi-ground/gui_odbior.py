@@ -275,8 +275,9 @@ class Procedure(tk.Toplevel):
 
     def _go(self) -> None:
         missing = self._missing()
-        msg = "Wszystkie sprawdzenia OK. Rozpocząć misję?" if not missing else \
-            "NIE SPEŁNIONE:\n\n• " + "\n• ".join(missing) + "\n\nRozpocząć mimo to?"
+        note = f"\n\nWłączy też automatyczne zdjęcia co {AUTO_S // 60} min."
+        msg = f"Wszystkie sprawdzenia OK. Rozpocząć misję?{note}" if not missing else \
+            "NIE SPEŁNIONE:\n\n• " + "\n• ".join(missing) + f"\n\nRozpocząć mimo to?{note}"
         ask = messagebox.askyesno if not missing else \
             (lambda t, m, parent: messagebox.askyesno(t, m, parent=parent, icon="warning", default="no"))
         if ask("START misji", msg, parent=self):
@@ -379,6 +380,7 @@ class Photo(tk.Frame):
 
     def refresh(self, st: dict) -> None:
         now = time.time()
+        self._auto.set(os.path.exists(AUTO_PATH))       # START i lądowanie też to przełączają
         ph = st.get("photo")
         frame = self._live.frame
         if self._live_on.get() and frame and now - frame[0] < self.LIVE_S:

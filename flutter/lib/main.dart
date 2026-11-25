@@ -9,6 +9,7 @@ import 'services/terminal_service.dart';
 import 'services/camera_service.dart';
 import 'services/espcam_service.dart';
 import 'services/espcam_status_service.dart';
+import 'services/mission_service.dart';
 import 'services/pin_service.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/map_screen.dart';
@@ -68,6 +69,10 @@ void main() async {
         ChangeNotifierProxyProvider<SettingsService, EspCamStatusService>(
           create: (ctx) => EspCamStatusService(ctx.read<SettingsService>()),
           update: (_, s, prev) => prev ?? EspCamStatusService(s),
+        ),
+        ChangeNotifierProxyProvider<SettingsService, MissionService>(
+          create: (ctx) => MissionService(ctx.read<SettingsService>()),
+          update: (_, s, prev) => prev ?? MissionService(s),
         ),
         ChangeNotifierProxyProvider<SettingsService, PinService>(
           create: (ctx) => PinService(ctx.read<SettingsService>()),
