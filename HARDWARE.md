@@ -85,7 +85,9 @@
 | VCC      | 3.3V       |
 | GND      | GND        |
 
-> Tylko ESP32. DIO0 i RST w pełni używane przez bibliotekę Arduino-LoRa.
+> Tylko ESP32. RST używa biblioteka Arduino-LoRa. **DIO0 jest nieużywane**: firmware czyta stan z rejestru IRQ i przestawia DIO0 na CadDone,
+> bo podniesienie DIO0 przy odebraniu pakietu wyłączało moduł (SPI zwracało same zera, ginęły wszystkie komendy z ziemi).
+> Przy okazji sprawdź przewód DIO0 (GPIO9) — prawdopodobnie zwiera do GND lub ma zimny lut.
 
 ---
 

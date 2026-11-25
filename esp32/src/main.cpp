@@ -316,6 +316,8 @@ void readRpiSerial() {
 }
 
 // ── LoRa init ─────────────────────────────────────────────────────────────────
+void loraListen();
+
 bool initLoRa() {
     SPI.begin(LORA_SCK_PIN, LORA_MISO_PIN, LORA_MOSI_PIN, LORA_CS_PIN);
     LoRa.setPins(LORA_CS_PIN, LORA_RST_PIN, LORA_DIO0_PIN);
@@ -324,7 +326,7 @@ bool initLoRa() {
     LoRa.setSignalBandwidth(LORA_BW);
     LoRa.setTxPower(LORA_TX_POWER);
     LoRa.enableCrc();     // bez CRC przekłamany pakiet przechodzi jako poprawny
-    LoRa.receive();
+    loraListen();
     return true;
 }
 
@@ -383,6 +385,22 @@ uint8_t loraReg(uint8_t addr) {
     return v;
 }
 
+void loraWriteReg(uint8_t addr, uint8_t val) {
+    SPI.beginTransaction(SPISettings(8000000, MSBFIRST, SPI_MODE0));
+    digitalWrite(LORA_CS_PIN, LOW);
+    SPI.transfer(addr | 0x80);
+    SPI.transfer(val);
+    digitalWrite(LORA_CS_PIN, HIGH);
+    SPI.endTransaction();
+}
+
+// Nasłuch. Stan odbioru i nadawania czytamy z rejestru IRQ, więc linia DIO0 jest zbędna:
+// DIO0 na CadDone (nie występuje), bo podniesienie DIO0 przy odebraniu pakietu wyłączało moduł.
+void loraListen() {
+    LoRa.receive();
+    loraWriteReg(0x40, 0x80);
+}
+
 // Po zaniku zasilania układ wraca do ustawień fabrycznych: FSK, 434 MHz
 bool loraAlive() {
     const uint32_t frf  = ((uint32_t)loraReg(0x06) << 16) | ((uint32_t)loraReg(0x07) << 8) | loraReg(0x08);
@@ -391,7 +409,8 @@ bool loraAlive() {
 }
 
 void loraLost(const char* why) {
-    Serial.printf("[ESP32] LoRa: %s — inicjalizuję od nowa\n", why);
+    Serial.printf("[ESP32] LoRa: %s (ver=%02X op=%02X frf=%02X%02X%02X) — inicjalizuję od nowa\n", why,
+                  loraReg(0x42), loraReg(0x01), loraReg(0x06), loraReg(0x07), loraReg(0x08));
     loraOk = initLoRa();
     loraRestarts++;
     lastLoraRetry = millis();
@@ -413,7 +432,7 @@ bool loraSend(const uint8_t* data, size_t len) {
         delay(2);
     }
     LoRa.beginPacket();                               // biblioteka kasuje flagę TxDone
-    LoRa.receive();
+    loraListen();
     return true;
 }
 
@@ -508,6 +527,8 @@ void handleIncoming() {
 
     String raw = "";
     while (LoRa.available()) raw += (char)LoRa.read();
+    Serial.printf("[ESP32] LoRa RX %d B rssi=%d snr=%.1f: %.60s\n", pktSize, LoRa.packetRssi(),
+                  LoRa.packetSnr(), raw.c_str());
 
     JsonDocument doc;
     if (deserializeJson(doc, raw) != DeserializationError::Ok) return;
@@ -630,7 +651,7 @@ void sendImgRound() {
     }
     LoRa.idle();
     LoRa.setSpreadingFactor(LORA_SF);
-    LoRa.receive();
+    loraListen();
     serviceDelay(300);
 }
 
