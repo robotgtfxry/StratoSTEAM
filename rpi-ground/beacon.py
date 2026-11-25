@@ -6,6 +6,7 @@ i tablice (esp32/src/main.cpp, sendBeacon):
   p  [lat, lon, alt, sat, fix]        e  [temp, hum, pres, p2, alt2]
   i  [roll, pit, yaw, ax, ay, az]     b  [vbat, imA]
   d  [dsku, dskf]   h  hfdb   c  [ok, rec, klatki, wolne_MB]
+  g  [widoczne satelity, max SNR, zdania ok, zdania złe]
   x  1 = część pól pominięta, bo pakiet byłby za długi
 
 Stary, płaski format (lat, temp, vbat, …) jest nadal rozumiany.
@@ -18,6 +19,7 @@ _GROUPS = {
     "i": ("roll", "pit", "yaw", "ax", "ay", "az"),
     "b": ("vbat", "imA"),
     "d": ("dsku", "dskf"),
+    "g": ("gview", "gsnr", "gok", "gbad"),
 }
 
 

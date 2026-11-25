@@ -67,7 +67,7 @@ def demo_state(t0: float = time.time()) -> dict:
     return {
         "started": now - 4000, "alive": now, "packets": 212, "bad": 1, "lost": 6, "img_chunks": 8,
         "lora_resets": 0, "last_rx": now - (now % 5), "rssi": -104, "snr": 5.8, "history": hist,
-        "last": {"seq": 219, "lat": 52.297312, "lon": 21.113644, "alt": hist[-1][1], "sat": 11,
+        "last": {"seq": 219, "lat": 52.297312, "lon": 21.113644, "alt": hist[-1][1], "sat": 11, "gview": 17, "gsnr": 43,
                  "fix": 1, "vbe": 7.41, "vbat": 7.38, "imA": 812, "temp": -38.2, "hum": 14.1,
                  "pres": 421.7, "p2": 421.2, "alt2": 6712, "roll": 4.2, "pit": -2.8, "yaw": 0,
                  "ax": 0.1, "ay": 0.7, "az": 9.8, "dsku": 17.2, "dskf": 11.4,
@@ -291,7 +291,7 @@ class App(tk.Tk):
         grid.pack(fill="x", padx=8)
         specs = [
             ("gps", "Pozycja (GPS)", [("lat", "Szerokość"), ("lon", "Długość"), ("alt", "Wysokość"),
-                                      ("sat", "Satelity"), ("fix", "Fix")]),
+                                      ("sat", "Satelity / widoczne"), ("snr", "Sygnał GPS"), ("fix", "Fix")]),
             ("radio", "Radio LoRa", [("rssi", "RSSI"), ("snr", "SNR"), ("pk", "Pakiety / straty"),
                                      ("bad", "Uszkodzone"), ("rst", "Resety modułu")]),
             ("pwr", "Zasilanie", [("vbat", "Bateria (INA)"), ("vbe", "Bateria (ESP32)"),
@@ -356,7 +356,9 @@ class App(tk.Tk):
         g.set("lat", f"{p['lat']:.6f}" if fix else "—")
         g.set("lon", f"{p['lon']:.6f}" if fix else "—")
         g.set("alt", fmt(p.get("alt") if fix else None, "m", 0))
-        g.set("sat", fmt(p.get("sat"), "", 0))
+        g.set("sat", f"{p['sat']} / {p['gview']}" if "gview" in p else fmt(p.get("sat"), "", 0))
+        snr = p.get("gsnr")
+        g.set("snr", fmt(snr, "dBHz", 0), OK if (snr or 0) >= 30 else WARN if snr else BAD)
         g.set("fix", ("TAK" if fix else "NIE") if p else "—", OK if fix else BAD)
 
         r = self._c["radio"]

@@ -286,8 +286,9 @@ Pakiet ma limit **255 B**, więc ESP32 nadaje krótkie klucze. Dekoduje je `rpi-
 | `i`   | [roll, pit, yaw, ax, ay, az] |
 | `d`   | [dsku, dskf] |
 | `h`   | hfdb |
+| `g`   | diagnostyka GPS [widoczne satelity, max SNR, zdania ok, zdania złe] |
 | `c`   | status ESP32-CAM [ok, rec, klatki, wolne_MB] |
-| `x`   | 1 = część pól pominięta (kolejno d, i, c, h), bo pakiet był za długi |
+| `x`   | 1 = część pól pominięta (kolejno g, d, i, c, h), bo pakiet był za długi |
 
 ---
 

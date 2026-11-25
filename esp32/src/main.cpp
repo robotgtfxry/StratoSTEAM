@@ -275,6 +275,47 @@ bool initLoRa() {
     return true;
 }
 
+// ── Odbiór GPS + diagnostyka ──────────────────────────────────────────────────
+// TinyGPS++ nie podaje siły sygnału ani liczby widocznych satelitów — wyciągamy je z GSV.
+#define GPS_RAW_MS 90000UL       // tyle po starcie surowe NMEA idą na USB (linie "$...")
+String   gpsLine     = "";
+uint8_t  gpsView     = 0;        // satelity widoczne (suma systemów) w ostatniej sekundzie
+uint8_t  gpsSnrMax   = 0;        // najsilniejszy sygnał [dBHz]
+uint8_t  gpsViewAcc  = 0, gpsSnrAcc = 0;
+
+static String nmeaField(const String& s, int n) {
+    int from = 0;
+    while (n-- > 0) { from = s.indexOf(',', from); if (from < 0) return ""; from++; }
+    int to = from;
+    while (to < (int)s.length() && s[to] != ',' && s[to] != '*') to++;
+    return s.substring(from, to);
+}
+
+void gpsParseLine(const String& s) {
+    if (millis() < GPS_RAW_MS) Serial.println(s);
+    if (s.length() < 8 || s[0] != '$') return;
+    const String type = s.substring(3, 6);
+    if (type == "RMC") {                       // początek nowego cyklu
+        gpsView = gpsViewAcc;  gpsSnrMax = gpsSnrAcc;
+        gpsViewAcc = gpsSnrAcc = 0;
+    } else if (type == "GSV") {
+        if (nmeaField(s, 2) == "1") gpsViewAcc += nmeaField(s, 3).toInt();
+        for (int f = 7; f <= 19; f += 4) {
+            const int snr = nmeaField(s, f).toInt();
+            if (snr > gpsSnrAcc && snr < 100) gpsSnrAcc = snr;
+        }
+    }
+}
+
+void readGps() {
+    while (gpsSerial.available()) {
+        const char c = (char)gpsSerial.read();
+        gps.encode(c);
+        if (c == '\n') { gpsParseLine(gpsLine); gpsLine = ""; }
+        else if (c != '\r' && gpsLine.length() < 100) gpsLine += c;
+    }
+}
+
 // ── Nadawanie LoRa z limitem czasu ────────────────────────────────────────────
 // LoRa.endPacket() bez "async" czeka na TxDone w nieskończoność — gdy moduł zgubi zasilanie
 // w trakcie nadawania, cały S3 by się zawiesił. Tu czekamy najwyżej LORA_TX_TIMEOUT_MS
@@ -314,7 +355,7 @@ bool loraSend(const uint8_t* data, size_t len) {
             loraLost("brak potwierdzenia nadania");
             return false;
         }
-        while (gpsSerial.available()) gps.encode(gpsSerial.read());
+        readGps();
         readRpiSerial();
         delay(2);
     }
@@ -333,6 +374,7 @@ bool gpsFix() {
 // Format kompaktowy — dekoduje go rpi-ground/beacon.py (zmieniaj oba razem!):
 //   p [lat,lon,alt,sat,fix]  e [temp,hum,pres,p2,alt2]  i [roll,pit,yaw,ax,ay,az]
 //   b [vbat,imA]  d [dsku,dskf]  h hfdb  c [ok,rec,klatki,MB]
+//   g [widoczne, maxSNR, zdania ok, zdania złe]
 //   x 1 = część pól pominięta, żeby zmieścić się w LORA_MAX_PAYLOAD
 static double rnd(double v, double scale) { return round(v * scale) / scale; }
 
@@ -350,6 +392,9 @@ void sendBeacon() {
     p.add(gps.satellites.isValid() ? (int)gps.satellites.value()         : 0);
     p.add(fix ? 1 : 0);
     doc["vbe"] = rnd(vbe, 100);
+    JsonArray g = doc["g"].to<JsonArray>();   // diagnostyka GPS
+    g.add(gpsView);  g.add(gpsSnrMax);
+    g.add(gps.passedChecksum() % 10000);  g.add(gps.failedChecksum() % 10000);
 
     if (rpi.fresh) {
         // pełna telemetria z RPi5
@@ -373,7 +418,7 @@ void sendBeacon() {
 
     // Pakiet nie może przekroczyć 255 B — ucięty JSON jest bezużyteczny.
     // Odrzucaj najmniej ważne grupy; pozycja i zasilanie zostają zawsze.
-    for (const char* key : {"d", "i", "c", "h"}) {
+    for (const char* key : {"g", "d", "i", "c", "h"}) {
         if (measureJson(doc) <= LORA_MAX_PAYLOAD) break;
         if (doc[key].isNull()) continue;
         doc.remove(key);
@@ -577,7 +622,7 @@ void setup() {
 
 // ── Loop ──────────────────────────────────────────────────────────────────────
 void loop() {
-    while (gpsSerial.available()) gps.encode(gpsSerial.read());
+    readGps();
     readRpiSerial();
 
     bool     rpiAlive = (digitalRead(RPI_ALIVE_PIN) == HIGH);
