@@ -66,8 +66,8 @@ wygodne przed startem misji.
 | INA226 | napięcie, prąd, moc na baterii (ID producenta 0x5449) |
 | Kamera CSI | zdjęcie próbne 640×480 + kontrola czy nie jest czarne |
 | RTL-SDR | otwarcie dongla i pomiar mocy nośnej w dBFS |
-| ESP32-CAM (zasilanie) | przełączanie MOSFET-a na GPIO17 |
-| ESP32-CAM (status) | odbiór linii JSON `$S` po sprzętowym UART3 (`/dev/ttyAMA3`, RX = GPIO9) |
+| ESP32-CAM (zasilanie) | stałe z USB — test tylko informuje |
+| ESP32-CAM (status) | odbiór linii JSON `$S` po USB (CH340, port wyszukiwany automatycznie) |
 | UART ↔ ESP32-S3 | nasłuch łącza + ping |
 | Sygnały GPIO ↔ ESP32-S3 | RPI_ALIVE i linia shutdown |
 | Przekaźniki ×2 | impuls zwalniający linki — **z potwierdzeniem** |
@@ -101,10 +101,10 @@ Tam, gdzie lotny kod ma sterownik, tester wczytuje **te same pliki, które lecą
 * sterowniki: `rpi-air/sensors/bme280.py`, `rpi-air/hardware/*.py` (kamera, RTL-SDR),
 * konfiguracja: `rpi-air/config.py` (adresy I2C, piny, prędkości).
 
-GY-87 (MPU-6050, QMC5883L/HMC5883L, BMP180) i INA226 nie mają jeszcze sterowników
-w `rpi-air/` — tester czyta je bezpośrednio przez `smbus2` (`hw_tests.py`).
+GY-87 i INA226 tester czyta bezpośrednio przez `smbus2` (`hw_tests.py`); kod lotny ma własne
+sterowniki w `rpi-air/sensors/` (magnetometr QMC5883L/HMC5883L tylko w testerze).
 Adresy i bocznik można nadpisać w `rpi-air/config.py`: `MPU6050_ADDR`, `BMP180_ADDR`,
-`INA226_ADDR`, `INA226_SHUNT_OHMS`, a port statusu kamery: `ESPCAM_STATUS_PORT`.
+`INA226_ADDR`, `INA226_SHUNT_OHMS`, a port statusu kamery: `ESPCAM_UART_PORT`.
 
 Zmiana pinu w `config.py` od razu zmienia instrukcję podłączenia w okienku.
 Opisy podłączeń są zebrane w jednym miejscu — `testy/catalog.py`.
@@ -129,7 +129,7 @@ Opisy podłączeń są zebrane w jednym miejscu — `testy/catalog.py`.
 * **RPi.GPIO** nie działa na RPi 5 — potrzebna podmianka:
   `sudo apt remove python3-rpi.gpio && sudo apt install python3-rpi-lgpio`.
   Dotyczy przekaźników, zasilania ESP32-CAM i sygnałów do ESP32-S3.
-* **pigpio** nie wspiera RPi 5 — dlatego tester czyta status ESP32-CAM sprzętowym UART3:
-  `dtoverlay=uart3-pi5` w `/boot/firmware/config.txt`, reboot, TX kamery → GPIO9 (pin 21).
+* **ESP32-CAM po USB**: kabel musi mieć linie danych, a pakiet `brltty` potrafi przejąć CH340
+  (`setup.sh` w `rpi-air` go wyłącza).
 * Usługa `rpi-air` zajmuje UART i kamerę. Przed testami:
   `sudo systemctl stop rpi-air`.

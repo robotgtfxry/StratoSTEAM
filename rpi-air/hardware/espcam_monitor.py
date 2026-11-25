@@ -1,5 +1,5 @@
 """
-ESP32-CAM status monitor — odczyt przez sprzętowy UART RPi 5.
+ESP32-CAM status monitor — odczyt przez USB.
 
 Kamera wysyła co ~5 s przez UART TX (GPIO1, 115200 baud) linię JSON
 poprzedzoną prefiksem "$S":
@@ -7,8 +7,8 @@ poprzedzoną prefiksem "$S":
 
 Linie bez prefiksu (debug, komunikaty bootu) są ignorowane.
 
-Połączenie: ESP32-CAM U0T (GPIO1) → RPi5 GPIO9 (pin 21) = UART3 RX.
-Wymaga w /boot/firmware/config.txt:  dtoverlay=uart3-pi5   →  /dev/ttyAMA3
+Połączenie: nakładka ESP32-CAM-MB (CH340) → kabel USB → RPi. Port "auto" wyszukuje
+CH340, więc numer ttyUSB może się zmieniać, a kabel można wypiąć i wpiąć w trakcie pracy.
 """
 import json
 import logging
@@ -19,6 +19,7 @@ log = logging.getLogger(__name__)
 
 try:
     import serial
+    from serial.tools import list_ports
     _SERIAL = True
 except ImportError:
     _SERIAL = False
@@ -26,6 +27,38 @@ except ImportError:
 
 STATUS_TIMEOUT_S = 30   # po tym czasie bez statusu → kamera nieosiągalna
 REOPEN_DELAY_S = 5      # ponowna próba otwarcia portu po błędzie
+
+# Układy CH340/CH341 z nakładek ESP32-CAM-MB (VID, PID).
+# Innych portów nie otwieramy na próbę: otwarcie portu może zresetować płytkę po drugiej
+# stronie, a reset ESP32-S3 odcina zasilanie RPi.
+CH340_IDS = {(0x1A86, 0x7523), (0x1A86, 0x7522), (0x1A86, 0x5523)}
+
+
+def find_port(port: str) -> str:
+    """Zwraca ścieżkę portu kamery. Dla "auto" szuka dokładnie jednego CH340."""
+    if port != "auto":
+        return port
+    found = sorted(p.device for p in list_ports.comports() if (p.vid, p.pid) in CH340_IDS)
+    if not found:
+        raise OSError("nie widać kamery na USB (brak CH340) — sprawdź kabel: musi mieć linie danych")
+    if len(found) > 1:
+        raise OSError(f"kilka układów CH340 ({', '.join(found)}) — "
+                      "wpisz ESPCAM_UART_PORT w rpi-air/config.py")
+    return found[0]
+
+
+def open_port(port: str, baud: int, timeout: float = 1.0):
+    """
+    Otwiera port kamery z DTR i RTS wyłączonymi. Na nakładce MB te linie idą do IO0 i EN —
+    włączone trzymałyby kamerę w resecie albo w trybie wgrywania.
+    """
+    ser = serial.Serial(baudrate=baud, timeout=timeout)
+    ser.port = find_port(port)
+    ser.dtr = False
+    ser.rts = False
+    ser.open()
+    return ser
+
 
 
 class EspCamMonitor:
@@ -57,15 +90,15 @@ class EspCamMonitor:
 
     def _open(self) -> bool:
         try:
-            self._ser = serial.Serial(self._port, self._baud, timeout=1.0)
-            log.info("EspCamMonitor: listening on %s @ %d baud", self._port, self._baud)
+            self._ser = open_port(self._port, self._baud)
+            log.info("EspCamMonitor: listening on %s @ %d baud", self._ser.port, self._baud)
             self._open_failed = False
             return True
         except Exception as e:
             # tylko raz na awarię — próby są co REOPEN_DELAY_S, nie zaśmiecaj logu przez cały lot
             if not self._open_failed:
-                log.error("EspCamMonitor: nie mogę otworzyć %s (%s) — "
-                          "czy jest dtoverlay=uart3-pi5 w /boot/firmware/config.txt?", self._port, e)
+                log.error("EspCamMonitor: kamera niedostępna (%s) — ponawiam co %d s",
+                          e, REOPEN_DELAY_S)
             self._open_failed = True
             self._ser = None
             return False

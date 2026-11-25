@@ -1,4 +1,5 @@
 # StratoSTEAM — Ground station configuration
+import os
 
 # LoRa RX (must match air config exactly)
 LORA_FREQ = 433.0
@@ -11,14 +12,18 @@ LORA_SPI_CS = 0
 LORA_DIO0_PIN = 25
 
 # Backend server
-BACKEND_URL = "http://localhost:8000"          # local dev
-# BACKEND_URL = "https://your-server.example.com"  # production
-BACKEND_API_KEY = "change-me-in-production"
+# Klucz API nie może być w repo: na stacji jest w /etc/stratosteam.env (czyta go usługa).
+BACKEND_URL = os.environ.get("STRATO_BACKEND_URL", "http://localhost:8000")
+BACKEND_API_KEY = os.environ.get("STRATO_API_KEY", "change-me-in-production")
 
 # How often to flush buffered packets when offline (seconds)
 OFFLINE_FLUSH_INTERVAL_S = 10
 
 # AD9833 + LPF-B0R35+ + RD06HHF1 — HF ionospheric test transmitter
+# TODO(HF): DO ZROBIENIA — wyłączone, brakuje jednego filtra w torze HF.
+#           Lista rzeczy do zrobienia przed włączeniem: HARDWARE.md → „Tor HF”.
+#           Włączać razem z SDR_ENABLED w rpi-air/config.py i w Flutterze (hf_service.dart).
+HF_ENABLED     = False
 AD9833_SPI_BUS = 1
 AD9833_SPI_CS  = 1
 AD9833_MCLK_HZ = 25_000_000     # 25 MHz crystal on AD9833 module

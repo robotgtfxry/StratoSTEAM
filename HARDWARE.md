@@ -2,7 +2,7 @@
 
 > **Architektura systemu:**
 > - **ESP32-S3 (balon)** — węzeł radiowy: GPS (NEO-M8N) + LoRa (SX1278), retransmisja danych z RPi5
-> - **Raspberry Pi 5 (balon)** — węzeł pomiarowy: czujniki atmosferyczne, IMU, kamera CSI, 1× ESP32-CAM (zasilanie 5V + status UART3), RTL-SDR (odbiór sygnału HF z ziemi), 2× przekaźnik HJR1-2C L-3VDC (system zwalniania linek)
+> - **Raspberry Pi 5 (balon)** — węzeł pomiarowy: czujniki atmosferyczne, IMU, kamera CSI, 1× ESP32-CAM (zasilanie + status po USB), RTL-SDR (odbiór sygnału HF z ziemi), 2× przekaźnik HJR1-2C L-3VDC (system zwalniania linek)
 > - **Raspberry Pi 5 (ziemia)** — stacja naziemna: LoRa RX/TX, nadajnik HF (AD9833 + RD06HHF1)
 > - Limit wagowy ładunku: **1 kg** (większa pojemność baterii)
 
@@ -89,6 +89,45 @@
 
 ---
 
+## LoRa SX1278 — stacja naziemna 433 MHz (SPI0, RPi5 ziemia)
+
+| Pin LoRa | RPi5 BCM            | Pin fizyczny    |
+|----------|---------------------|-----------------|
+| VCC      | 3.3V                | pin 17 (lub 1)  |
+| GND      | GND                 | pin 20 (lub 25) |
+| SCK      | GPIO11 (SPI0 SCLK)  | pin 23          |
+| MOSI     | GPIO10 (SPI0 MOSI)  | pin 19          |
+| MISO     | GPIO9 (SPI0 MISO)   | pin 21          |
+| NSS/CS   | GPIO8 (SPI0 CE0)    | pin 24          |
+| DIO0     | GPIO25              | pin 22          |
+| RST      | niepodłączony / 3.3V | —              |
+
+> RPi5 (ziemia). Piny w `rpi-ground/config.py`: `LORA_SPI_BUS = 0`, `LORA_SPI_CS = 0`, `LORA_DIO0_PIN = 25`.  
+> **Tylko 3.3V** — 5V uszkodzi moduł.  
+> **Antena 433 MHz musi być podłączona przed startem** — stacja nadaje uplink 17 dBm (PA_BOOST), TX bez anteny może uszkodzić tor PA.  
+> RST nie jest sterowany przez `rpi-ground/radio/lora_rx.py` (wewnętrzny pull-up) — można zostawić wolny.  
+> Brak konfliktu z AD9833 (SPI1, GPIO18–21) ani PTT (GPIO24).
+
+**Włączenie SPI:**
+```bash
+sudo raspi-config nonint do_spi 0
+echo "dtoverlay=spi1-2cs" | sudo tee -a /boot/firmware/config.txt   # SPI1 dla AD9833
+sudo reboot
+```
+Po restarcie: `/dev/spidev0.0` (LoRa) i `/dev/spidev1.1` (AD9833).
+
+**Test połączenia** (rejestr `RegVersion` 0x42):
+```bash
+python3 -c "
+import spidev; s=spidev.SpiDev(); s.open(0,0); s.max_speed_hz=1000000
+print(hex(s.xfer2([0x42,0])[1]))"
+```
+`0x12` = SX1278 OK. `0x0` / `0xff` = błąd okablowania (zamienione MISO/MOSI, zły CS, brak zasilania).
+
+> Na RPi 5 `RPi.GPIO` nie działa — wymagany zamiennik `rpi-lgpio` (`pip install rpi-lgpio`).
+
+---
+
 ## Kamera — RPi Camera Module (CSI cam0, RPi5 balon)
 
 | Złącze | RPi5               |
@@ -102,30 +141,24 @@
 
 ---
 
-## ESP32-CAM — podłączenie bezpośrednie do RPi5 (balon)
+## ESP32-CAM — podłączenie po USB do RPi5 (balon)
 
-Na balonie leci **jedna** kamera ESP32-CAM (AI-Thinker, czujnik **OV3660**). Zasilana **bezpośrednio** z szyny 5 V RPi — działa zawsze, gdy RPi ma prąd. Status idzie przez **sprzętowy UART3** RPi 5.
-
-| Sygnał       | RPi5                    | ESP32-CAM       | Uwagi                                  |
-|--------------|-------------------------|-----------------|----------------------------------------|
-| Zasilanie    | 5V (pin 2 lub 4)        | 5V              | szczyty ~300 mA, krótki gruby przewód  |
-| Masa         | GND (pin 6, 9 lub 14)   | GND             | masa wspólna                           |
-| Status (RX)  | GPIO9 (pin 21) = UART3 RX | U0T (GPIO1, TX) | 115200 baud, 3.3V ↔ 3.3V, bez level-shiftera |
+Na balonie leci **jedna** kamera ESP32-CAM (AI-Thinker, czujnik **OV3660**) w nakładce **ESP32-CAM-MB** (CH340).
+Jeden kabel USB daje **zasilanie i status** — żadnych połączeń z GPIO.
 
 ```
- RPi5 pin 2  (5V)   ──────────────── 5V    ESP32-CAM
- RPi5 pin 6  (GND)  ──────────────── GND
- RPi5 pin 21 (GPIO9)◄──────────────── U0T (GPIO1)
+ RPi5 USB ═══ kabel USB (z liniami danych) ═══ ESP32-CAM-MB + ESP32-CAM
 ```
 
-Wymagane w `/boot/firmware/config.txt` (sekcja `[all]`):
-```
-dtoverlay=uart3-pi5
-```
-→ port `/dev/ttyAMA3`. W `rpi-air/config.py`: `ESPCAM_UART_PORT = "/dev/ttyAMA3"`, `ESPCAM_PWR_PIN = None`.
+W `rpi-air/config.py`: `ESPCAM_UART_PORT = "auto"`, `ESPCAM_PWR_PIN = None`.
 
-> Nie podłączaj U0R (GPIO3) ani GPIO0 — tylko do programowania. GPIO8 (pin 24) = UART3 TX — zarezerwowany przez overlay, nic do niego nie podłączaj.
-> Komenda LoRa `espcam_pwr` jest przy tym podłączeniu ignorowana (tylko log). Żeby wrócić do przełączania MOSFET-em: ustaw `ESPCAM_PWR_PIN` na numer GPIO (np. 17) i użyj tranzystora logic-level ≥1 A (AO3400 / IRLZ44N — nie BSS138, za słaby).
+- Port jest wyszukiwany po układzie CH340, więc numer `ttyUSB` nie ma znaczenia. Kabel można wypiąć i wpiąć — odczyt wraca sam.
+- Przy **dwóch** CH340 na USB wpisz stałą ścieżkę z `ls -l /dev/serial/by-path/`. Program celowo nie zgaduje: otwarcie portu ESP32-S3 mogłoby go zresetować i odciąć zasilanie RPi.
+- Start usługi `rpi-air` może raz zrestartować kamerę — zaczyna wtedy nową sesję nagrań.
+- Sprawdzenie: `lsusb | grep 1a86`, potem `python3 testy/main.py --test espcam_status`.
+- Po zmianie z UART3 uruchom raz `sudo bash rpi-air/setup.sh` i zrób reboot.
+
+> Komenda LoRa `espcam_pwr` jest ignorowana (tylko log). Żeby wrócić do przełączania MOSFET-em: ustaw `ESPCAM_PWR_PIN` na numer GPIO (np. 17) i użyj tranzystora logic-level ≥1 A (AO3400 / IRLZ44N — nie BSS138, za słaby).
 
 ### Oprogramowanie ESP32-CAM (`espcam/src/main.cpp`)
 
@@ -139,12 +172,12 @@ dtoverlay=uart3-pi5
 
 **Wgrywanie:** `cd espcam && pio run -t upload` (przez nakładkę ESP32-CAM-MB / USB)
 
-**Status przez UART** — co 5 s linia z prefiksem `$S`:
+**Status przez USB** — co 5 s linia z prefiksem `$S`:
 ```
 $S{"ok":1,"rec":1,"sd":1,"n":1234,"mb":7800,"fps":9.5}
 ```
 `ok` = kamera działa, `rec` = trwa zapis, `sd` = karta zamontowana, `n` = klatki, `mb` = wolne MB, `fps` = klatki/s.
-Linie bez `$S` (boot, debug) są ignorowane. `EspCamMonitor` (pyserial, `/dev/ttyAMA3`) dokłada `"ec": [ok, rec, klatki, wolne_MB]` do pakietu UART → ESP32-S3 → LoRa (pole `c`) → backend → Flutter. Gdy kamera milczy > 30 s, `ok` i `rec` = 0.
+Linie bez `$S` (boot, debug) są ignorowane. `EspCamMonitor` (pyserial, USB) dokłada `"ec": [ok, rec, klatki, wolne_MB]` do pakietu UART → ESP32-S3 → LoRa (pole `c`) → backend → Flutter. Gdy kamera milczy > 30 s, `ok` i `rec` = 0.
 
 ---
 
@@ -164,6 +197,34 @@ w narożnikach ramy zawieszenia ładunku (przód-lewy, przód-prawy, tył-lewy, 
 > `reference_unit` (ADC units/g) wymaga kalibracji z odważnikiem wzorcowym dla każdego kanału.  
 > Klucze w JSON UART → ESP32: `"sg0"`, `"sg1"`, `"sg2"`, `"sg3"` [g].  
 > Pola w telemetrii: `strain_g0` … `strain_g3`.
+
+---
+
+## Czujniki: GY-87 + INA226 (zamontowane) zamiast wersji z PCB
+
+Na balonie są fizycznie: BME280 (0x76), MPU-6050 (0x68), BMP180 (0x77), INA226 (0x44).
+Wybiera je `SENSOR_SET = "gy87"` w `rpi-air/config.py`; `"pcb"` = BNO085 + MS5611 + INA219.
+
+> BMP180 i BME280 mierzą tylko do 300 hPa (~9 km) — wyżej wysokość bierz z GPS.
+> Yaw = 0: kompas z GY-87 nie jest jeszcze obsługiwany.
+
+---
+
+## Tor HF — DO ZROBIENIA (wyłączony)
+
+> **Nie leci w tej wersji:** brakuje jednego filtra. Kod zostaje, ale jest wyłączony:
+> `HF_ENABLED = False` (`rpi-ground/config.py`), `SDR_ENABLED = False` (`rpi-air/config.py`),
+> `HfService.enabled` (Flutter — domyślnie `false`, włączenie: `flutter build apk --dart-define=HF_ENABLED=true`).
+> Miejsca w kodzie: `grep -rn "TODO(HF)"`.
+
+Do zrobienia przed włączeniem:
+
+- [ ] dokupić i wlutować brakujący filtr
+- [ ] direct sampling w `sdr_receiver.py` (zwykły RTL-SDR nie stroi się na 7.1 MHz) albo RTL-SDR V4 ze sterownikiem RTL-SDR Blog
+- [ ] `SDR_GAIN` na stałą wartość — przy `auto` pomiarów z różnych wysokości nie da się porównać
+- [ ] szersze okno FFT — ±15 binów to ok. ±15 Hz, błąd kwarcu bywa większy
+- [ ] automatyczne wyłączenie nadajnika po utracie łączności z backendem (`hf_controller.py`)
+- [ ] licencja / pozwolenie na nadawanie w paśmie 40 m
 
 ---
 
@@ -292,8 +353,6 @@ Relay NO ───────────────────────�
 | Pin | BCM | Funkcja |
 |-----|-----|---------|
 | 3 / 5 | GPIO2 / GPIO3 | I2C: BME280, MS5611, BNO085, INA219 |
-| 21 | GPIO9 | status ESP32-CAM (UART3 RX, 115200) |
-| 24 | GPIO8 | UART3 TX (zarezerwowany, niepodłączony) |
 | 8 / 10 | GPIO14 / GPIO15 | UART do ESP32-S3 |
 | 13 | GPIO27 | przekaźnik #0 (zwolnienie linki) |
 | 29 | GPIO5 | przekaźnik #1 (zwolnienie linki) |
@@ -304,7 +363,7 @@ Relay NO ───────────────────────�
 | 32 / 33 | GPIO12 / GPIO13 | HX711 #2 (DT / SCK) |
 | 18 / 22 | GPIO24 / GPIO25 | HX711 #3 (DT / SCK) |
 
-Wolne po stronie balonu: GPIO4, GPIO7, GPIO10, GPIO11, GPIO17, GPIO18, GPIO22, GPIO23 (dawniej kanały kamer 1-3 — zwolnione po przejściu na jedną ESP32-CAM).
+Wolne po stronie balonu: GPIO4, GPIO7, GPIO8, GPIO9, GPIO10, GPIO11, GPIO17, GPIO18, GPIO22, GPIO23 (dawniej kanały kamer 1-3 — zwolnione po przejściu na jedną ESP32-CAM).
 
 ---
 
@@ -315,8 +374,7 @@ Wolne po stronie balonu: GPIO4, GPIO7, GPIO10, GPIO11, GPIO17, GPIO18, GPIO22, G
   Dotyczy HX711, przekaźników i sygnałów do ESP32-S3.
   W `rpi-air/.venv` po `pip install -r requirements.txt` zrób też `pip uninstall -y RPi.GPIO`
   (dociąga je adafruit-blinka i przesłania rpi-lgpio).
-- Status ESP32-CAM idzie przez sprzętowy UART3 (`dtoverlay=uart3-pi5` → `/dev/ttyAMA3`),
-  bez pigpio (pigpio nie wspiera RPi 5).
+- Status ESP32-CAM idzie kablem USB (CH340) — port wyszukiwany automatycznie.
 - UART na RPi 5 to `/dev/ttyAMA0` (GPIO14/15) — w `raspi-config` wyłącz konsolę
   szeregową, a sam port zostaw włączony.
 - SPI1 (nadajnik HF na stacji naziemnej) wymaga `dtoverlay=spi1-3cs`

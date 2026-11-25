@@ -1,7 +1,7 @@
 """
 ESP32-CAM power control.
 
-Domyślnie kamera jest podłączona BEZPOŚREDNIO do 5V RPi (zawsze zasilona)
+Domyślnie kamera jest podłączona kablem USB do RPi (zawsze zasilona)
 — wtedy pin = None i komenda "espcam_pwr" jest tylko logowana.
 
 Opcjonalnie: N-MOSFET low-side switch (GPIO HIGH → MOSFET otwarty → kamera zasilona).
@@ -15,7 +15,7 @@ class EspCamPower:
     def __init__(self, pin: int | None):
         self._pin = pin
         if pin is None:
-            log.info("EspCamPower: kamera zasilana bezpośrednio z 5V (bez przełączania)")
+            log.info("EspCamPower: kamera zasilana z USB (bez przełączania)")
             return
         import RPi.GPIO as GPIO
         self._gpio = GPIO
@@ -25,7 +25,7 @@ class EspCamPower:
 
     def set(self, on: bool) -> None:
         if self._pin is None:
-            log.warning("espcam_pwr on=%s zignorowane — kamera podłączona na stałe do 5V", on)
+            log.warning("espcam_pwr on=%s zignorowane — kamera zasilana na stałe z USB", on)
             return
         self._gpio.output(self._pin, self._gpio.HIGH if on else self._gpio.LOW)
         log.info("EspCam %s", "ON" if on else "OFF")

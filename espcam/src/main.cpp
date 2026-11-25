@@ -11,7 +11,7 @@
  * Bez karty SD kamera działa dalej (klatki są zliczane, nie zapisywane),
  * a karta jest wykrywana ponownie co SD_RETRY_MS — po włożeniu nagrywanie rusza samo.
  *
- * Status wysyłany przez GPIO1 (U0TX) co 5s → RPi5 GPIO9 (UART3), format:
+ * Status wysyłany przez U0TX (USB nakładki ESP32-CAM-MB → RPi5) co 5s, format:
  *   $S{"ok":1,"rec":1,"sd":1,"n":1234,"mb":7800,"fps":9.8}
  *   ok = kamera działa, sd = karta SD zamontowana, rec = trwa zapis,
  *   fps = średnia liczba klatek/s od poprzedniego statusu
@@ -58,6 +58,9 @@ private:
   File     _f;
   uint32_t _frames    = 0;
   uint32_t _moviStart = 0;   // offset początku bloku movi
+  // Offsety pól uzupełnianych przy close() — zapamiętane podczas pisania nagłówka
+  uint32_t _hdrlSizePos = 0, _strlSizePos = 0, _framesPos = 0, _lengthPos = 0;
+  uint32_t _hdrlEnd = 0;
   uint16_t _w = 0, _h = 0;
   uint8_t  _fps = 0;
 
@@ -98,7 +101,8 @@ bool AviWriter::open(const char *path, uint16_t w, uint16_t h, uint8_t fps) {
 
   // LIST hdrl
   _write4cc("LIST");
-  _writeU32LE(0);           // [16] rozmiar LIST hdrl — patch przy close
+  _hdrlSizePos = _f.position();
+  _writeU32LE(0);           // rozmiar LIST hdrl — patch przy close
   _write4cc("hdrl");
 
   // avih (MainAVIHeader, 56 bajtów)
@@ -107,8 +111,9 @@ bool AviWriter::open(const char *path, uint16_t w, uint16_t h, uint8_t fps) {
   _writeU32LE(1000000 / fps);  // dwMicroSecPerFrame
   _writeU32LE(0);              // dwMaxBytesPerSec
   _writeU32LE(0);              // dwPaddingGranularity
-  _writeU32LE(0x10);           // dwFlags (AVIF_HASINDEX)
-  _writeU32LE(0);              // [64] dwTotalFrames — patch przy close
+  _writeU32LE(0);              // dwFlags (bez indeksu idx1)
+  _framesPos = _f.position();
+  _writeU32LE(0);              // dwTotalFrames — patch przy close
   _writeU32LE(0);              // dwInitialFrames
   _writeU32LE(1);              // dwStreams
   _writeU32LE(w * h * 3);      // dwSuggestedBufferSize
@@ -118,7 +123,8 @@ bool AviWriter::open(const char *path, uint16_t w, uint16_t h, uint8_t fps) {
 
   // LIST strl
   _write4cc("LIST");
-  _writeU32LE(0);           // [116] rozmiar LIST strl — patch przy close
+  _strlSizePos = _f.position();
+  _writeU32LE(0);           // rozmiar LIST strl — patch przy close
   _write4cc("strl");
 
   // strh (AVIStreamHeader, 56 bajtów)
@@ -133,7 +139,8 @@ bool AviWriter::open(const char *path, uint16_t w, uint16_t h, uint8_t fps) {
   _writeU32LE(1);           // dwScale
   _writeU32LE(fps);         // dwRate
   _writeU32LE(0);           // dwStart
-  _writeU32LE(0);           // [192] dwLength — patch przy close
+  _lengthPos = _f.position();
+  _writeU32LE(0);           // dwLength — patch przy close
   _writeU32LE(w * h * 3);   // dwSuggestedBufferSize
   _writeU32LE(0);           // dwQuality
   _writeU32LE(0);           // dwSampleSize
@@ -150,6 +157,8 @@ bool AviWriter::open(const char *path, uint16_t w, uint16_t h, uint8_t fps) {
   _write4cc("MJPG");        // biCompression
   _writeU32LE(w * h * 3);   // biSizeImage
   _writeU32LE(0); _writeU32LE(0); _writeU32LE(0); _writeU32LE(0);
+
+  _hdrlEnd = _f.position();
 
   // JUNK chunk — wyrównanie do 2048 bajtów (standard AVI)
   uint32_t pos = _f.position();
@@ -188,10 +197,10 @@ void AviWriter::close() {
 
   // Patch rozmiarów w headerze
   _patchU32(4,   fileSize - 8);     // RIFF size
-  _patchU32(16,  116 + 4);          // LIST hdrl size (strl + hdrl data)
-  _patchU32(64,  _frames);          // avih dwTotalFrames
-  _patchU32(116, 56 + 8 + 56 + 8 + 40 + 8); // LIST strl size
-  _patchU32(192, _frames);          // strh dwLength
+  _patchU32(_hdrlSizePos, _hdrlEnd - _hdrlSizePos - 4);  // LIST hdrl size
+  _patchU32(_strlSizePos, _hdrlEnd - _strlSizePos - 4);  // LIST strl size
+  _patchU32(_framesPos, _frames);   // avih dwTotalFrames
+  _patchU32(_lengthPos, _frames);   // strh dwLength
   // Znajdź offset LIST movi: moviStart - 4 (przed "movi" tagiem)
   _patchU32(_moviStart - 4, moviSize);
 

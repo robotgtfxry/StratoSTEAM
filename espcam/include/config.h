@@ -22,7 +22,7 @@
 #define FILE_SPLIT_S         300             // 5 minut na plik
 
 // ─── Status UART → RPi ───────────────────────────────────────────────────────
-// ESP32-CAM GPIO1 (U0TX) → RPi5 GPIO9 (pin 21) = sprzętowy UART3 (/dev/ttyAMA3)
+// Idzie kablem USB: U0TX → CH340 (nakładka ESP32-CAM-MB) → USB RPi5
 // Linie statusu zaczynają się od "$S" — RPi ignoruje pozostałe (debug, boot)
 #define SERIAL_BAUD          115200
 #define STATUS_INTERVAL_MS   5000

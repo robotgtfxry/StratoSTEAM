@@ -58,6 +58,7 @@
 #define RPI_HALT_DELAY_MS      10000UL  // czas na domknięcie systemu po opadnięciu ALIVE
 #define LORA_MAX_PAYLOAD       255      // limit SX1278
 #define RPI_DATA_TIMEOUT_MS    15000    // dane starsze niż 15s = RPi5 nieosiągalna
+#define GPS_FIX_MAX_AGE_MS     10000    // starsza pozycja = brak fixa
 #define LORA_RETRY_MS          30000    // co ile ponawiać init LoRa, gdy modułu brak
 #define STATUS_INTERVAL_MS     5000     // status ESP → RPi przez UART
 #define NOLORA_BLINK_MS        2000     // okres mrugania LED gdy brak LoRa
@@ -259,8 +260,15 @@ bool initLoRa() {
     LoRa.setSpreadingFactor(LORA_SF);
     LoRa.setSignalBandwidth(LORA_BW);
     LoRa.setTxPower(LORA_TX_POWER);
+    LoRa.enableCrc();     // bez CRC przekłamany pakiet przechodzi jako poprawny
     LoRa.receive();
     return true;
+}
+
+// ── GPS fix ───────────────────────────────────────────────────────────────────
+// Samo isValid() po pierwszym fixie już nigdy nie wraca do false.
+bool gpsFix() {
+    return gps.location.isValid() && gps.location.age() < GPS_FIX_MAX_AGE_MS;
 }
 
 // ── Beacon TX ─────────────────────────────────────────────────────────────────
@@ -273,7 +281,7 @@ static double rnd(double v, double scale) { return round(v * scale) / scale; }
 void sendBeacon() {
     JsonDocument doc;
     const float vbe = readBattAdc();   // napięcie baterii mierzone przez ESP32 (zawsze)
-    const bool  fix = gps.location.isValid();
+    const bool  fix = gpsFix();
 
     doc["src"] = "esp32";
     doc["seq"] = beaconSeq++;
@@ -414,7 +422,7 @@ void sendStatusToRpi() {
     st["rx"]   = rpiRxLines;
     st["rxb"]  = rpiRxBytes;
     st["bad"]  = rpiRxBad;
-    st["fix"]  = gps.location.isValid();
+    st["fix"]  = gpsFix();
     st["sat"]  = gps.satellites.isValid() ? (int)gps.satellites.value() : 0;
     st["vbe"]  = readBattAdc();
     char buf[160];
@@ -477,6 +485,9 @@ void setup() {
     Serial.begin(115200);
     delay(500);
 
+    // Nadawanie LoRa blokuje pętlę na ~2 s — domyślne 256 B by się przepełniło
+    gpsSerial.setRxBufferSize(4096);
+    rpiSerial.setRxBufferSize(2048);
     gpsSerial.begin(9600,    SERIAL_8N1, GPS_RX_PIN, -1);
     rpiSerial.begin(115200,  SERIAL_8N1, RPI_RX_PIN, RPI_TX_PIN);
 

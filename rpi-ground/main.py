@@ -15,7 +15,6 @@ import requests
 from radio import LoRaRX
 from uplink import Uplink
 from beacon import expand_beacon, has_rpi_data, beacon_to_telemetry
-from hf_controller import HfController
 from command_store import CommandStore
 from rpi_power_store import RpiPowerStore
 from exec_store import ExecStore
@@ -25,7 +24,7 @@ from packet import (
     build_command, build_rpi_power_command, build_exec_command,
     build_photo_command, build_cam_rec_command, build_espcam_power_command,
 )
-from config import BACKEND_URL, BACKEND_API_KEY
+from config import BACKEND_URL, BACKEND_API_KEY, HF_ENABLED
 
 _HF_HEADERS = {"X-API-Key": BACKEND_API_KEY}
 
@@ -71,14 +70,22 @@ log = logging.getLogger("ground")
 def main():
     lora      = LoRaRX()
     uplink    = Uplink()
-    hf        = HfController()
     commands  = CommandStore()
     rpi_power = RpiPowerStore()
     exec_s    = ExecStore()
     camera_s  = CameraStore()
     espcam_s  = EspCamStore()
 
-    hf.start()
+    # TODO(HF): do zrobienia — brak filtra, nadajnik wyłączony (HF_ENABLED w config.py).
+    # Import tutaj, bo HfController od razu otwiera SPI1, którego bez nadajnika nie ma.
+    hf = None
+    if HF_ENABLED:
+        from hf_controller import HfController
+        hf = HfController()
+        hf.start()
+    else:
+        log.info("HF: wyłączone (do zrobienia)")
+
     commands.start()
     rpi_power.start()
     exec_s.start()
@@ -151,7 +158,7 @@ def main():
 
                 # HF SDR measurement z beacona → backend
                 hfdb = packet.get("hfdb")
-                if hfdb is not None and hfdb > -999.0:
+                if HF_ENABLED and hfdb is not None and hfdb > -999.0:
                     alt = float(packet.get("alt2") or packet.get("alt") or 0.0)
                     _post_hf_measurement(alt=alt, dbfs=float(hfdb))
                     log.info("HF measurement: %.1f dBFS @ %.0f m", hfdb, alt)
@@ -248,7 +255,8 @@ def main():
     except KeyboardInterrupt:
         log.info("Shutdown")
     finally:
-        hf.stop()
+        if hf:
+            hf.stop()
         lora.close()
 
 

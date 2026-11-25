@@ -305,6 +305,8 @@ def build_devices() -> list[Device]:
                 "Uruchom test — zmierzy moc w okolicy nośnej.",
             ],
             notes=[
+                "DO ZROBIENIA: tor HF nie leci w tej wersji (brak filtra) — "
+                "ten test można pominąć.",
                 "Strojenie jest 100 kHz poniżej celu — to omija szpilkę DC przetwornika.",
                 "Poziom ok. −80 dBFS to szum własny: nadajnik naziemny jest wyłączony "
                 "albo nie ma anteny.",
@@ -317,61 +319,52 @@ def build_devices() -> list[Device]:
         ),
         Device(
             id="espcam_pwr",
-            name="ESP32-CAM — zasilanie przez MOSFET",
+            name="ESP32-CAM — zasilanie",
             group=GRUPA_BALON,
-            bus="stałe 5 V" if espcam_pwr is None else f"GPIO{espcam_pwr}",
-            summary="Kamera wisi na tranzystorze po stronie masy. Stan wysoki na GPIO = "
-                    "MOSFET otwarty = kamera zasilona. Dzięki temu można ją wyłączyć "
-                    "w locie i oszczędzić prąd.",
-            wiring=[*([] if espcam_pwr is None else
-                      [w_gpio("Bramka MOSFET", espcam_pwr, "przez rezystor 100 Ω")]),
-                    w_5v("VCC kamery"), w_gnd("Masa systemowa (source)")],
+            bus="USB (stałe)" if espcam_pwr is None else f"GPIO{espcam_pwr}",
+            summary="Kamera jest zasilana na stałe kablem USB — nie ma czego przełączać. "
+                    "Test ma sens tylko po powrocie do MOSFET-a (ESPCAM_PWR_PIN).",
+            wiring=([Wire("Nakładka ESP32-CAM-MB", "dowolny port USB", (), K_OTHER)]
+                    if espcam_pwr is None else
+                    [w_gpio("Bramka MOSFET", espcam_pwr, "przez rezystor 100 Ω"),
+                     w_5v("VCC kamery"), w_gnd("Masa systemowa (source)")]),
             steps=[
-                "Bramka BSS138 przez 100 Ω do GPIO, plus 10 kΩ z bramki do masy.",
-                "Source tranzystora → masa systemu, Drain → GND kamery.",
-                "VCC kamery → 5 V (pin 2 lub 4).",
-                "Uruchom test — włączy kanał na ~0.8 s i wyłączy.",
-                "Patrz na diodę kamery: powinna mrugnąć.",
+                "Podłącz kamerę kablem USB — czerwona dioda zacznie mrugać co 2 s.",
+                "Czy kamera faktycznie działa, mówi test statusu ESP32-CAM.",
             ],
-            notes=[
-                "Podciągnięcie 10 kΩ do masy trzyma kamerę wyłączoną w czasie startu RPi.",
-                "Test sprawdza tylko stan pinu — czy kamera faktycznie wstała, "
-                "mówi test statusu ESP32-CAM.",
-                "Komenda w locie: {\"cmd\":\"espcam_pwr\",\"on\":true}",
-            ],
+            notes=["Komenda espcam_pwr jest przy zasilaniu z USB ignorowana (tylko log)."],
             libs=["RPi.GPIO — na RPi 5: python3-rpi-lgpio"],
             test=T.test_espcam_power,
             duration="ok. 2 s",
         ),
         Device(
             id="espcam_status",
-            name="ESP32-CAM — status po UART",
+            name="ESP32-CAM — status po USB",
             group=GRUPA_BALON,
-            bus=f"UART3 {T.ESPCAM_STATUS_PORT} @ {espcam_baud} baud",
+            bus=f"USB (CH340) @ {espcam_baud} baud",
             summary="Kamera co 5 s wypluwa linię JSON ze swoim stanem: czy nagrywa, "
-                    "ile klatek, ile wolnego miejsca na karcie.",
-            wiring=[w_gpio("TX kamery (GPIO1 / U0TX)", 9, "UART3 RX, poziom 3.3 V"),
-                    w_gnd("Masa wspólna z kamerą")],
+                    "ile klatek, ile wolnego miejsca na karcie. Jeden kabel USB daje "
+                    "zasilanie i status.",
+            wiring=[Wire("Nakładka ESP32-CAM-MB", "dowolny port USB", (), K_OTHER,
+                         "kabel z liniami danych")],
             steps=[
-                "Włącz UART3: dopisz dtoverlay=uart3-pi5 w /boot/firmware/config.txt i zrestartuj.",
-                "Najpierw włącz zasilanie kamery (poprzedni test).",
-                f"GPIO1 (U0TX) kamery → {gpio_label(9)}.",
-                "Masa kamery musi być wspólna z masą Raspberry Pi.",
-                "Uruchom test — nasłuchuje do 8 s, kamera raportuje co ~5 s.",
+                "Włóż kartę SD (FAT32, do 32 GB) i wepnij kamerę w nakładkę ESP32-CAM-MB.",
+                "Połącz nakładkę kablem USB z Raspberry Pi.",
+                "Sprawdź, czy system ją widzi: lsusb | grep -i 1a86",
+                "Uruchom test — nasłuchuje do 15 s, kamera raportuje co ~5 s.",
             ],
             notes=[
+                "Port jest wyszukiwany automatycznie (CH340). Przy dwóch CH340 wpisz ścieżkę "
+                "w rpi-air/config.py: ESPCAM_UART_PORT.",
+                "Otwarcie portu może raz zrestartować kamerę — zacznie wtedy nową sesję nagrań.",
                 f"Prędkość {espcam_baud} baud — tyle ustawia espcam/include/config.h "
                 "(SERIAL_BAUD).",
                 "Format linii: $S{\"ok\":1,\"rec\":1,\"n\":1234,\"mb\":7800} — linie bez "
                 "prefiksu $S (debug, boot) są ignorowane.",
-                "pigpio (bit-bang na GPIO4) nie wspiera Raspberry Pi 5 — dlatego tester czyta "
-                "status sprzętowym UART3 (/dev/ttyAMA3, RX = GPIO9). Port zmienisz w "
-                "rpi-air/config.py: ESPCAM_STATUS_PORT.",
-                "Poziomy napięć są zgodne (3.3 V ↔ 3.3 V), konwerter nie jest potrzebny.",
             ],
             libs=["pyserial"],
             test=T.test_espcam_status,
-            duration="ok. 8 s",
+            duration="ok. 15 s",
             live=False,
         ),
         Device(

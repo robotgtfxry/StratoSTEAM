@@ -12,6 +12,10 @@ class HfMeasurement {
 }
 
 class HfService extends ChangeNotifier {
+  // TODO(HF): do zrobienia - brak filtra w torze HF, funkcja wylaczona.
+  // Wlaczac razem z HF_ENABLED (rpi-ground/config.py) i SDR_ENABLED (rpi-air/config.py).
+  static const bool enabled = bool.fromEnvironment('HF_ENABLED');
+
   final SettingsService _settings;
 
   bool hwActive = false;
@@ -32,6 +36,7 @@ class HfService extends ChangeNotifier {
   ];
 
   HfService(this._settings) {
+    if (!enabled) return;
     _pollState();
     _pollMeasurements();
     Timer.periodic(const Duration(seconds: 2), (_) => _pollState());
@@ -72,6 +77,7 @@ class HfService extends ChangeNotifier {
   }
 
   Future<void> sendCommand(String action, int freqHz) async {
+    if (!enabled) return;
     _loading = true;
     notifyListeners();
     try {

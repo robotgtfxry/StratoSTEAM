@@ -9,6 +9,17 @@ ESP_SEND_INTERVAL_S = 5     # jak często wysyłamy dane czujników do ESP32
 # BME280 (I2C)
 BME280_ADDR = 0x76
 
+# Zestaw czujników zamontowany na balonie:
+#   "gy87" = GY-87 (MPU-6050 + BMP180) i INA226 — to, co jest fizycznie podłączone
+#   "pcb"  = BNO085 + MS5611 + INA219 — wersja z płytki PCB
+SENSOR_SET = "gy87"
+
+# GY-87 + INA226 (I2C)
+MPU6050_ADDR = 0x68
+BMP180_ADDR = 0x77
+INA226_ADDR = 0x44
+INA226_SHUNT_OHMS = 0.1     # wartość bocznika na module — sprawdź nadruk (R100 = 0.1)
+
 # MS5611 (I2C)
 MS5611_ADDR = 0x77
 
@@ -19,15 +30,14 @@ BNO085_ADDR = 0x4A
 INA219_ADDR = 0x40
 INA219_SHUNT_OHMS = 0.1
 
-# ESP32-CAM — 1 kamera, zasilana BEZPOŚREDNIO z 5V RPi (pin 2/4), zawsze włączona.
-# None = brak przełączania. Jeśli kiedyś wróci MOSFET: numer GPIO BCM (np. 17).
+# ESP32-CAM — 1 kamera, podłączona kablem USB do RPi (nakładka ESP32-CAM-MB).
+# USB daje zasilanie i status, kamera jest zawsze włączona — nic więcej nie trzeba.
+# None = brak przełączania zasilania. Jeśli kiedyś wróci MOSFET: numer GPIO BCM (np. 17).
 ESPCAM_PWR_PIN = None
 
-# ESP32-CAM — status przez sprzętowy UART3 RPi 5
-# ESP32-CAM U0T (GPIO1) → RPi5 GPIO9 (pin 21) = UART3 RX
-# Wymaga w /boot/firmware/config.txt:  dtoverlay=uart3-pi5
-# Poziomy napięć zgodne: ESP32-CAM 3.3V = RPi 3.3V (bez level-shiftera)
-ESPCAM_UART_PORT = "/dev/ttyAMA3"
+# "auto" = znajdź kamerę po układzie CH340 (niezależnie od numeru ttyUSB).
+# Gdy podłączone są dwa CH340 — wpisz stałą ścieżkę z: ls -l /dev/serial/by-path/
+ESPCAM_UART_PORT = "auto"
 ESPCAM_STATUS_BAUD = 115200  # musi zgadzać się z SERIAL_BAUD w espcam/include/config.h
 
 # HX711 — 4× czujnik siły (tensometry, zawieszenie ładunku)
@@ -47,7 +57,10 @@ RPI_ALIVE_PIN    = 26   # OUTPUT — RPi trzyma HIGH póki działa (pin 37 → E
 ESP32_SHTDN_PIN  = 6    # INPUT  — ESP32 podnosi gdy chce shutdown (pin 31 ← ESP32 GPIO7)
 
 # RTL-SDR odbiornik HF (eksperyment jonosferyczny)
-SDR_ENABLED          = True
+# TODO(HF): DO ZROBIENIA — wyłączone, brakuje jednego filtra w torze HF.
+#           Lista rzeczy do zrobienia przed włączeniem: HARDWARE.md → „Tor HF”.
+#           Włączać razem z HF_ENABLED w rpi-ground/config.py i w Flutterze (hf_service.dart).
+SDR_ENABLED          = False
 SDR_TARGET_FREQ      = 7_100_000   # Hz — musi zgadzać się z nadajnikiem naziemnym
 SDR_SAMPLE_RATE      = 250_000     # Hz
 SDR_GAIN             = "auto"      # lub np. 40 (dB)

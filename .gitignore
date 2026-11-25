@@ -20,3 +20,8 @@ node_modules/
 # Pliki systemowe
 .DS_Store
 Thumbs.db
+
+# Sekrety
+.env
+*.env
+!.env.example

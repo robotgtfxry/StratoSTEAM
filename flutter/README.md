@@ -35,8 +35,8 @@ flutter build apk --release
 | Kamera RPi | ostatnie zdjęcie 160×120 przesłane przez LoRa, żądanie nowego, start/stop nagrywania 4K |
 | ESP32-CAM | włącznik zasilania jedynej kamery + status: nagrywa / klatki / wolne MB na karcie |
 | Zasilanie RPi | włączenie i bezpieczne wyłączenie RPi na balonie (przez ESP32-S3) |
-| Nadajnik HF | start/stop i częstotliwość generatora AD9833 na stacji naziemnej |
-| Wykres HF | siła sygnału (dBFS) zmierzona przez RTL-SDR w funkcji wysokości |
+| Nadajnik HF *(do zrobienia — wyłączone)* | start/stop i częstotliwość generatora AD9833 na stacji naziemnej |
+| Wykres HF *(do zrobienia — wyłączone)* | siła sygnału (dBFS) zmierzona przez RTL-SDR w funkcji wysokości |
 | Zwalnianie linek | komenda odczepienia ładunku od balonu |
 
 Komendy zmieniające stan sprzętu wymagają PIN-u (`pin_dialog.dart`) — chroni to

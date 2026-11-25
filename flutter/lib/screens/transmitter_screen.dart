@@ -53,6 +53,34 @@ class _TransmitterScreenState extends State<TransmitterScreen> {
         padding: const EdgeInsets.all(16),
         children: [
 
+          // TODO(HF): do zrobienia - zniknie po ustawieniu HfService.enabled
+          if (!HfService.enabled) ...[
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.orangeAccent.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                    color: Colors.orangeAccent.withValues(alpha: 0.4)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.construction,
+                      color: Colors.orangeAccent, size: 20),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'DO ZROBIENIA: nadajnik HF jest wyłączony (brak filtra).',
+                      style:
+                          TextStyle(color: Colors.orangeAccent, fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+
           // â”€â”€ Status sprzętu â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
           _StatusCard(hf: hf),
           const SizedBox(height: 16),
@@ -542,7 +570,9 @@ class _TxToggle extends StatelessWidget {
           active ? 'WYŁÄ„CZ NADAJNIK' : 'WŁÄ„CZ NADAJNIK',
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
         ),
-        onPressed: loading ? null : (active ? onStop : onStart),
+        onPressed: loading || !HfService.enabled
+            ? null
+            : (active ? onStop : onStart),
       ),
     );
   }

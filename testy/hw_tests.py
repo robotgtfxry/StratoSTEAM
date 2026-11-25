@@ -808,12 +808,12 @@ def test_camera() -> Result:
 # ── ESP32-CAM: zasilanie przez MOSFET ────────────────────────────────────────
 def test_espcam_power() -> Result:
     pin = air("ESPCAM_PWR_PIN", 17)
+    if pin is None:
+        return Result(INFO, "Kamera zasilana na stałe z USB — nie ma czego przełączać", {},
+                      ["ESPCAM_PWR_PIN = None w rpi-air/config.py"])
     if SIMULATE:
         return Result(OK, "Symulacja — kanał zasilania przełączony", {
             "Kamera": f"GPIO{pin}: włączona → wyłączona OK"})
-    if pin is None:
-        return Result(INFO, "Kamera zasilana na stałe z 5 V — nie ma czego przełączać", {},
-                      ["ESPCAM_PWR_PIN = None w rpi-air/config.py"])
     try:
         import RPi.GPIO as GPIO
     except Exception as e:
@@ -846,127 +846,77 @@ def test_espcam_power() -> Result:
                    "HIGH na GPIO = MOSFET otwarty = kamera zasilona"])
 
 
-# ── ESP32-CAM: status po UART ────────────────────────────────────────────────
-# pigpio (bit-bang na GPIO4) nie działa na Raspberry Pi 5, więc na RPi 5 status
-# czytamy sprzętowym UART3: RX = GPIO9 (pin 21), dtoverlay=uart3-pi5 → /dev/ttyAMA3.
-ESPCAM_STATUS_PORT = air("ESPCAM_STATUS_PORT", "/dev/ttyAMA3")
-HINT_ESPCAM_PI5 = [
-    "Na Raspberry Pi 5 pigpio nie działa — status czytamy sprzętowym UART3:",
-    "   1. dopisz do /boot/firmware/config.txt:  dtoverlay=uart3-pi5",
-    "   2. reboot, potem sprawdź: ls /dev/ttyAMA3",
-    "   3. ESP32-CAM GPIO1 (U0TX) → RPi GPIO9 (pin 21), masa wspólna",
+# ── ESP32-CAM: status po USB ─────────────────────────────────────────────────
+# Ten sam sterownik, który leci na balonie: wyszukuje CH340 i otwiera port bez resetu kamery.
+HINT_ESPCAM_USB = [
+    "Kabel USB musi mieć linie danych (nie tylko ładowanie)",
+    "Sprawdź, czy system widzi nakładkę: lsusb | grep -i 1a86   oraz: ls /dev/ttyUSB*",
+    "Brak uprawnień? sudo usermod -aG dialout $USER i wyloguj się",
+    "Port zajęty przez usługę? sudo systemctl stop rpi-air",
 ]
 
 
-def _parse_espcam(line: str) -> dict | None:
-    """'$S{"ok":1,...}' → dict; linie bez prefiksu $S (debug, boot) są pomijane."""
-    if not line.startswith("$S"):
-        return None
-    try:
-        data = json.loads(line[2:])
-    except ValueError:
-        return None
-    return data if isinstance(data, dict) else None
-
-
-def _espcam_uart(port: str, baud: int, seconds: float) -> tuple[dict | None, int]:
-    """Nasłuch na sprzętowym UART. Zwraca (ostatni status, liczba odebranych linii)."""
-    import serial
+def _espcam_usb(mod, port: str, baud: int, seconds: float) -> tuple[dict | None, int, str]:
+    """Nasłuch po USB. Zwraca (status, liczba odebranych linii, użyty port)."""
     status, lines = None, 0
-    with serial.Serial(port, baud, timeout=0.5) as ser:
-        ser.reset_input_buffer()
+    ser = mod.open_port(port, baud, timeout=0.5)
+    try:
         deadline = time.time() + seconds
-        while time.time() < deadline:
-            raw = ser.readline().decode("utf-8", errors="replace").strip()
-            if not raw:
-                continue
-            lines += 1
-            status = _parse_espcam(raw) or status
-            if status:
-                break
-    return status, lines
-
-
-def _espcam_pigpio(pin: int, baud: int, seconds: float) -> tuple[dict | None, int] | Result:
-    """Stara ścieżka (RPi 3/4): bit-bang przez pigpio, sterownik z rpi-air."""
-    try:
-        mod = load_repo_module("air_espcam_monitor", "rpi-air/hardware/espcam_monitor.py")
-    except (ImportError, FileNotFoundError) as e:
-        return _missing(e, ["sudo apt install pigpio python3-pigpio",
-                            "sudo systemctl enable --now pigpiod"])
-    if not getattr(mod, "_PIGPIO", False):
-        return Result(MISSING, "Brak biblioteki pigpio",
-                      hints=["sudo apt install pigpio python3-pigpio",
-                             "sudo systemctl enable --now pigpiod"])
-    mon = mod.EspCamMonitor(pin, baud)
-    try:
-        if getattr(mon, "_pi", None) is None:
-            return Result(MISSING, "Demon pigpiod nie działa",
-                          hints=["sudo systemctl enable --now pigpiod"])
-        time.sleep(seconds)     # kamera raportuje co ~5 s
-        ok, rec, frames, free_mb = (list(mon.compact()) + [0, 0, 0, 0])[:4]
+        while time.time() < deadline and not status:
+            raw = ser.readline()
+            if raw.strip():
+                lines += 1
+                status = mod.EspCamMonitor.parse_line(raw)
+        return status, lines, ser.port
     finally:
-        mon.stop()
-    return ({"ok": ok, "rec": rec, "n": frames, "mb": free_mb} if ok else None), int(ok)
+        ser.close()
 
 
-def test_espcam_status(seconds: float = 8.0) -> Result:
-    pin = air("ESPCAM_STATUS_PIN", 4)
+def test_espcam_status(seconds: float = 15.0) -> Result:
     baud = air("ESPCAM_STATUS_BAUD", 115200)
-    port = ESPCAM_STATUS_PORT
+    port = air("ESPCAM_UART_PORT", "auto")
     if SIMULATE:
         return Result(OK, "Symulacja — kamera raportuje status", {
-            "Odczyt": f"{port} @ {baud} baud",
+            "Odczyt": f"USB {port} @ {baud} baud",
             "Stan": "OK, nagrywa",
             "Klatki": f"{random.randint(900, 4000)}",
             "Wolne na karcie": f"{random.randint(3000, 12000)} MB"})
 
     try:
-        if _dev_exists(port):
-            source = f"{port} @ {baud} baud"
-            try:
-                got = _espcam_uart(port, baud, seconds)
-            except ImportError as e:
-                return _missing(e, ["pip install pyserial"])
-            wire_hint = "ESP32-CAM GPIO1 (U0TX) → RPi GPIO9 (pin 21)"
-        elif is_pi5():
-            return Result(MISSING, f"Brak portu {port} — sprzętowy UART3 nie jest włączony",
-                          {"Port": port}, HINT_ESPCAM_PI5)
-        else:
-            source = f"GPIO{pin} (pigpio) @ {baud} baud"
-            got = _espcam_pigpio(pin, baud, seconds)
-            if isinstance(got, Result):
-                return got
-            wire_hint = f"ESP32-CAM GPIO1 (U0TX) → RPi GPIO{pin}"
+        mod = load_repo_module("air_espcam_monitor", "rpi-air/hardware/espcam_monitor.py")
+    except (ImportError, FileNotFoundError) as e:
+        return _missing(e, ["pip install pyserial"])
+    if not mod._SERIAL:
+        return Result(MISSING, "Brak biblioteki pyserial", hints=["pip install pyserial"])
+    try:
+        status, lines, used = _espcam_usb(mod, port, baud, seconds)
     except Exception as e:
-        return _fail(e, HINT_ESPCAM_PI5 if is_pi5() else ["sudo systemctl enable --now pigpiod"])
+        return _fail(e, HINT_ESPCAM_USB)
 
-    status, lines = got
+    source = f"{used} @ {baud} baud"
     if not status:
         return Result(FAIL, "Kamera nie przysłała statusu", {
             "Odczyt": source, "Odebrane linie": str(lines)},
-            ["Najpierw włącz zasilanie kamery (test zasilania ESP32-CAM)",
-             wire_hint,
+            ["Czy na kamerze jest wgrany firmware? cd espcam && pio run -t upload",
              f"Prędkość musi być {baud} baud (tak nadaje espcam/src/main.cpp)",
-             "Masa ESP32-CAM i RPi musi być wspólna",
              "Kamera nadaje linie z prefiksem $S co ~5 s — reszta jest ignorowana"]
             + (["Linie przychodzą, ale bez $S — zła prędkość albo kamera w trybie boot"]
-               if lines else []))
+               if lines else HINT_ESPCAM_USB))
 
-    free_mb = int(status.get("mb", 0))
+    free_mb = status["free_mb"]
     values = {
         "Odczyt": source,
-        "Stan": "OK" if status.get("ok") else "kamera zgłasza błąd",
-        "Nagrywanie": "tak" if status.get("rec") else "nie",
-        "Klatki": f"{status.get('n', 0)}",
+        "Stan": "OK" if status["ok"] else "kamera zgłasza błąd",
+        "Nagrywanie": "tak" if status["recording"] else "nie",
+        "Klatki": f"{status['frames']}",
         "Wolne na karcie": f"{free_mb} MB",
     }
-    if not status.get("ok"):
-        return Result(WARN, "Kamera odpowiada, ale zgłasza błąd (karta SD / sensor)", values,
-                      ["Dioda: 2× mignięcie = błąd SD, 3× = błąd kamery"])
-    if not status.get("rec"):
+    if not status["ok"]:
+        return Result(WARN, "Kamera odpowiada, ale zgłasza błąd sensora", values,
+                      ["Sprawdź taśmę kamery. Dioda: 2× mignięcie = brak SD, 3× = błąd kamery"])
+    if not status["recording"]:
         return Result(WARN, "Kamera odpowiada, ale nie nagrywa", values,
-                      ["Sprawdź kartę SD w ESP32-CAM"])
+                      ["Sprawdź kartę SD w ESP32-CAM (FAT32, do 32 GB)"])
     if free_mb < 500:
         return Result(WARN, "Kamera działa, ale na karcie zostało mało miejsca", values,
                       ["Zgraj nagrania i sformatuj kartę przed startem"])

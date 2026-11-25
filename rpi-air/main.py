@@ -12,6 +12,7 @@ import os
 from config import (
     BME280_ADDR, MS5611_ADDR, BNO085_ADDR,
     INA219_ADDR, INA219_SHUNT_OHMS,
+    SENSOR_SET, MPU6050_ADDR, BMP180_ADDR, INA226_ADDR, INA226_SHUNT_OHMS,
     HX711_SENSORS, HX711_REFERENCE_UNIT,
     ESPCAM_PWR_PIN, ESPCAM_UART_PORT, ESPCAM_STATUS_BAUD,
     ESP_UART_PORT, ESP_UART_BAUD, ESP_SEND_INTERVAL_S,
@@ -21,6 +22,7 @@ from config import (
 )
 from sensors import (
     Bme280Sensor, Ms5611Sensor, Bno085Sensor, Ina219Sensor, Hx711Sensor,
+    Mpu6050Sensor, Bmp180Sensor, Ina226Sensor,
     Bme280Data, Ms5611Data, Bno085Data, Ina219Data,
 )
 from hardware import PowerSignal, EspUartSender, CameraModule, SdrReceiver, EspCamPower, EspCamMonitor
@@ -88,10 +90,16 @@ def main():
     power.set_alive(True)
 
     bme    = _init("BME280", lambda: Bme280Sensor(BME280_ADDR), _MissingSensor(Bme280Data))
-    ms     = _init("MS5611", lambda: Ms5611Sensor(MS5611_ADDR), _MissingSensor(Ms5611Data))
-    imu    = _init("BNO085", Bno085Sensor, _MissingSensor(Bno085Data))
-    pwr    = _init("INA219", lambda: Ina219Sensor(INA219_SHUNT_OHMS, INA219_ADDR),
-                   _MissingSensor(Ina219Data))
+    if SENSOR_SET == "gy87":
+        ms  = _init("BMP180", lambda: Bmp180Sensor(BMP180_ADDR), _MissingSensor(Ms5611Data))
+        imu = _init("MPU-6050", lambda: Mpu6050Sensor(MPU6050_ADDR), _MissingSensor(Bno085Data))
+        pwr = _init("INA226", lambda: Ina226Sensor(INA226_SHUNT_OHMS, INA226_ADDR),
+                    _MissingSensor(Ina219Data))
+    else:
+        ms  = _init("MS5611", lambda: Ms5611Sensor(MS5611_ADDR), _MissingSensor(Ms5611Data))
+        imu = _init("BNO085", Bno085Sensor, _MissingSensor(Bno085Data))
+        pwr = _init("INA219", lambda: Ina219Sensor(INA219_SHUNT_OHMS, INA219_ADDR),
+                    _MissingSensor(Ina219Data))
     strains = [
         Hx711Sensor(s["dt"], s["sck"], HX711_REFERENCE_UNIT)
         for s in HX711_SENSORS

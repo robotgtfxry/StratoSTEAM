@@ -15,7 +15,7 @@
 smbus2
 pimoroni-bme280
 
-# GPS NEO-M8N, UART do ESP32-S3, status ESP32-CAM (UART3)
+# GPS NEO-M8N, UART do ESP32-S3, status ESP32-CAM (USB)
 pyserial
 pynmea2
 
