@@ -1,3 +1,5 @@
+# Instalacja na stacji: skopiuj do ~/Desktop (ikona) i do ~/.config/autostart (otwiera się po starcie):
+#   cp rpi-ground/stratosteam-odbior.desktop ~/Desktop/ ~/.config/autostart/
 [Desktop Entry]
 Type=Application
 Name=StratoSTEAM — odbiór danych
