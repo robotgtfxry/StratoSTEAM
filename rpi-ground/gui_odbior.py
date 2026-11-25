@@ -108,7 +108,7 @@ class Chart(tk.Canvas):
         if len(pts) < 2:
             self.create_text(w / 2, h / 2 + 8, text="brak danych", fill=DIM, font=(FONT, 10))
             return
-        left, right, top, bottom = 70, w - 14, 30, h - 14
+        left, right, top, bottom = 70, w - 14, 34, h - 18
         ys = [p[1] for p in pts]
         lo, hi = min(ys), max(ys)
         if hi - lo < 1:
@@ -122,7 +122,9 @@ class Chart(tk.Canvas):
                                           bottom - (v - lo) / (hi - lo) * (bottom - top))]
         self.create_line(*xy, fill=self._color, width=2)
         self.create_text(right, 14, anchor="e", fill=FG, font=(FONT, 10),
-                         text=f"{ys[-1]:.0f} {self._unit}   (ostatnie {ago(span)})")
+                         text=f"{ys[-1]:.0f} {self._unit}")
+        self.create_text(right, bottom + 8, anchor="e", fill=DIM, font=(FONT, 8),
+                         text=f"ostatnie {ago(span)}")
 
 
 class LiveFeed(threading.Thread):
