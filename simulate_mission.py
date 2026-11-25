@@ -107,25 +107,6 @@ def pwr_model(alt: float) -> tuple[float, float, float]:
     return voltage, current, round(voltage * current, 1)
 
 
-def strain_model(alt: float, phase: str, t: float) -> list[float]:
-    """
-    Siły liny balonu [g] dla 4 tensometrów (przód-lewy, przód-prawy, tył-lewy, tył-prawy).
-    Każdy kanał ma lekko różną wartość bazową i niezależny szum.
-    """
-    offsets = [0, 30, -20, 15]   # offsety montażowe każdego czujnika [g]
-    if phase == "PREFLIGHT":
-        base = 900.0
-    elif phase == "ASCENT":
-        base = max(150.0, 850.0 - alt * 0.02) + math.sin(t * 0.2) * 40
-    elif phase == "APOGEUM":
-        base = 60.0
-    elif phase == "DESCENT":
-        base = 350.0 + alt * 0.004
-    else:  # LANDED
-        base = 20.0
-    return [round(max(0, base + o + random.gauss(0, 18)), 1) for o in offsets]
-
-
 def hf_dbfs_model(alt: float) -> float:
     """
     Symulacja siły sygnału HF odbitego od jonosfery [dBFS].
@@ -151,7 +132,6 @@ def build_telemetry(seq: int, lat: float, lon: float, alt: float,
     temp, pres, hum = bme_model(alt)
     roll, pitch, yaw = imu_model(phase, t)
     voltage, current, power = pwr_model(alt)
-    sg = strain_model(alt, phase, t)
     spd = (ASCENT_RATE if phase == "ASCENT" else
            DESCENT_RATE if phase == "DESCENT" else 0.0) * 3.6
     rssi = int(-80 - alt / 2_000 + random.gauss(0, 3))
@@ -194,10 +174,6 @@ def build_telemetry(seq: int, lat: float, lon: float, alt: float,
             "current_ma": current,
             "power_mw":   power,
         },
-        "strain_g0": sg[0],
-        "strain_g1": sg[1],
-        "strain_g2": sg[2],
-        "strain_g3": sg[3],
     }
 
 
@@ -295,14 +271,12 @@ def main():
             ok  = post_telemetry(args.url, args.key, pkt)
 
             col  = PHASE_COLOR.get(phase, RESET)
-            sgs  = [pkt[f"strain_g{i}"] for i in range(4)]
             print(
                 f"  {col}[{phase:10s}]{RESET}"
                 f"  seq={seq:4d}"
                 f"  alt={alt:7.0f}m"
                 f"  T={pkt['bme']['temperature_c']:6.1f}°C"
                 f"  V={pkt['pwr']['voltage_v']:.3f}V"
-                f"  sg=[{sgs[0]:.0f},{sgs[1]:.0f},{sgs[2]:.0f},{sgs[3]:.0f}]g"
                 f"  RSSI={pkt['rssi']:4d}dBm"
                 f"  {'✓' if ok else RED+'✗'+RESET}"
             )

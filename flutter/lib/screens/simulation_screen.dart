@@ -13,20 +13,13 @@ class SimulationScreen extends StatelessWidget {
   static double _radiusNorm(double p) =>
       p > 0 ? math.pow(_pRef / p, 1.0 / 3.0).toDouble() : 1.0;
 
-  static double _chuteOpen(double sg2, double sg3) {
-    final sum = sg2 + sg3;
-    if (sum < 200) return 0.0;
-    if (sum > 1200) return 1.0;
-    return (sum - 200) / 1000.0;
-  }
-
   @override
   Widget build(BuildContext context) {
     final svc = context.watch<TelemetryService>();
     final t   = svc.latest;
     final pressure  = t?.msPres ?? _pRef;
     final rNorm     = _radiusNorm(pressure);
-    final chuteOpen = t == null ? 0.0 : _chuteOpen(t.strainG2, t.strainG3);
+    final chuteOpen = svc.pastApogee ? 1.0 : 0.0;
     final deployed  = chuteOpen > 0.1;
 
     return Scaffold(
@@ -58,9 +51,6 @@ class SimulationScreen extends StatelessWidget {
             _ParachutePanel(
               deployed:  deployed,
               chuteOpen: chuteOpen,
-              sg2:       t?.strainG2 ?? 0,
-              sg3:       t?.strainG3 ?? 0,
-              hasData:   t != null,
             ),
             const SizedBox(height: 6),
             _BalloonStats(
@@ -757,15 +747,11 @@ class _3DPainter extends CustomPainter {
 
 class _ParachutePanel extends StatelessWidget {
   final bool deployed;
-  final double chuteOpen, sg2, sg3;
-  final bool hasData;
+  final double chuteOpen;
 
   const _ParachutePanel({
     required this.deployed,
     required this.chuteOpen,
-    required this.sg2,
-    required this.sg3,
-    required this.hasData,
   });
 
   @override
@@ -773,7 +759,6 @@ class _ParachutePanel extends StatelessWidget {
     final color = deployed ? Colors.greenAccent : Colors.white38;
     final label = deployed ? 'OTWARTY' : 'ZŁOŻONY';
     final icon  = deployed ? Icons.paragliding : Icons.compress;
-    final pct   = (chuteOpen * 100).toStringAsFixed(0);
 
     return Container(
       width: double.infinity,
@@ -804,14 +789,8 @@ class _ParachutePanel extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            Text('sg2 (L): ${hasData ? "${sg2.toStringAsFixed(0)} g" : "--"}',
-                style: const TextStyle(color: Colors.white54, fontSize: 13)),
-            Text('$pct % otwarty',
-                style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.bold)),
-            Text('sg3 (P): ${hasData ? "${sg3.toStringAsFixed(0)} g" : "--"}',
-                style: const TextStyle(color: Colors.white54, fontSize: 13)),
-          ]),
+          const Text('szacowane z opadania (brak czujnika)',
+              style: TextStyle(color: Colors.white54, fontSize: 13)),
         ],
       ),
     );

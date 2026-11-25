@@ -85,8 +85,6 @@ struct RpiData {
     float roll, pit, yaw;     // BNO085
     float ax, ay, az;
     float vbat, imA;          // INA219
-    float sg[4] = {0, 0, 0, 0}; // HX711 tensometry [g]
-    bool  sgValid = false;
     float dsku = 0.0f;        // disk used GB
     float dskf = 0.0f;        // disk free GB
     float hfdb = -999.0f;     // SDR pomiar dBFS (-999 = brak pomiaru)
@@ -221,12 +219,6 @@ void parseRpiLine(const String& line) {
     rpi.dskf = doc["dskf"] | 0.0f;
     rpi.hfdb = doc["hfdb"] | -999.0f;
 
-    rpi.sgValid = !doc["sg0"].isNull();
-    rpi.sg[0] = doc["sg0"] | 0.0f;
-    rpi.sg[1] = doc["sg1"] | 0.0f;
-    rpi.sg[2] = doc["sg2"] | 0.0f;
-    rpi.sg[3] = doc["sg3"] | 0.0f;
-
     // Status ESP32-CAM: "ec":[ok, rec, klatki, wolne MB]
     JsonArrayConst ec = doc["ec"];
     if (!ec.isNull() && ec.size() >= 4) {
@@ -340,7 +332,7 @@ bool gpsFix() {
 // ── Beacon TX ─────────────────────────────────────────────────────────────────
 // Format kompaktowy — dekoduje go rpi-ground/beacon.py (zmieniaj oba razem!):
 //   p [lat,lon,alt,sat,fix]  e [temp,hum,pres,p2,alt2]  i [roll,pit,yaw,ax,ay,az]
-//   b [vbat,imA]  d [dsku,dskf]  h hfdb  c [ok,rec,klatki,MB]  s [sg0..3]
+//   b [vbat,imA]  d [dsku,dskf]  h hfdb  c [ok,rec,klatki,MB]
 //   x 1 = część pól pominięta, żeby zmieścić się w LORA_MAX_PAYLOAD
 static double rnd(double v, double scale) { return round(v * scale) / scale; }
 
@@ -377,15 +369,11 @@ void sendBeacon() {
             JsonArray c = doc["c"].to<JsonArray>();
             c.add(rpi.ecOk);  c.add(rpi.ecRec);  c.add(rpi.ecFrames);  c.add(rpi.ecFreeMb);
         }
-        if (rpi.sgValid) {
-            JsonArray s = doc["s"].to<JsonArray>();
-            for (float g : rpi.sg) s.add((long)lround(g));
-        }
     }
 
     // Pakiet nie może przekroczyć 255 B — ucięty JSON jest bezużyteczny.
     // Odrzucaj najmniej ważne grupy; pozycja i zasilanie zostają zawsze.
-    for (const char* key : {"d", "s", "i", "c", "h"}) {
+    for (const char* key : {"d", "i", "c", "h"}) {
         if (measureJson(doc) <= LORA_MAX_PAYLOAD) break;
         if (doc[key].isNull()) continue;
         doc.remove(key);

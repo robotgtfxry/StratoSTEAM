@@ -5,7 +5,7 @@ Beacon musi zmieścić się w 255 B (limit SX1278), więc ESP32 nadaje krótkie 
 i tablice (esp32/src/main.cpp, sendBeacon):
   p  [lat, lon, alt, sat, fix]        e  [temp, hum, pres, p2, alt2]
   i  [roll, pit, yaw, ax, ay, az]     b  [vbat, imA]
-  d  [dsku, dskf]   h  hfdb   c  [ok, rec, klatki, wolne_MB]   s  [sg0..sg3]
+  d  [dsku, dskf]   h  hfdb   c  [ok, rec, klatki, wolne_MB]
   x  1 = część pól pominięta, bo pakiet byłby za długi
 
 Stary, płaski format (lat, temp, vbat, …) jest nadal rozumiany.
@@ -18,7 +18,6 @@ _GROUPS = {
     "i": ("roll", "pit", "yaw", "ax", "ay", "az"),
     "b": ("vbat", "imA"),
     "d": ("dsku", "dskf"),
-    "s": ("sg0", "sg1", "sg2", "sg3"),
 }
 
 
@@ -66,5 +65,4 @@ def beacon_to_telemetry(flat: dict, now: float | None = None) -> dict:
                 "accel_x": num("ax"), "accel_y": num("ay"), "accel_z": num("az")},
         "pwr": {"voltage_v": volt, "current_ma": num("imA"),
                 "power_mw": round(volt * num("imA"), 2)},
-        **{f"strain_g{n}": num(f"sg{n}") for n in range(4)},
     }

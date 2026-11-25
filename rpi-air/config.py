@@ -42,16 +42,6 @@ ESPCAM_PWR_PIN = None
 ESPCAM_UART_PORT = "auto"
 ESPCAM_STATUS_BAUD = 115200  # musi zgadzać się z SERIAL_BAUD w espcam/include/config.h
 
-# HX711 — 4× czujnik siły (tensometry, zawieszenie ładunku)
-# Każdy HX711 na osobnych pinach GPIO (DT + SCK)
-HX711_SENSORS = [
-    {"dt": 16, "sck": 21},   # #0 — przód lewy  (GPIO16 pin36, GPIO21 pin40)
-    {"dt": 19, "sck": 20},   # #1 — przód prawy (GPIO19 pin35, GPIO20 pin38)
-    {"dt": 12, "sck": 13},   # #2 — tył lewy    (GPIO12 pin32, GPIO13 pin33)
-    {"dt": 24, "sck": 25},   # #3 — tył prawy   (GPIO24 pin18, GPIO25 pin22)
-]
-HX711_REFERENCE_UNIT = 1.0   # ADC units per gram — wymaga kalibracji z odważnikiem
-
 # Buzzer i RGB LED — obsługiwane przez ESP32-S3 (zawsze zasilony)
 
 # ESP32-S3 współpraca

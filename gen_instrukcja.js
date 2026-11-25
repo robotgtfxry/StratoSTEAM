@@ -227,7 +227,6 @@ const doc = new Document({
         ["MS5611",               "I2C 0x77",        "Ciśnienie barometryczne, wysokość bezwzględna"],
         ["BNO085",               "I2C 0x4A",        "IMU: roll, pitch, yaw, przyspieszenie"],
         ["INA219",               "I2C 0x40",        "Monitor baterii: napięcie, prąd, moc"],
-        ["HX711 ×4",             "GPIO 12-25",      "Tensometry siły liny balonu (4 kierunki)"],
         ["Kamera RPi (cam0)",    "CSI",             "Nagrywanie H.264 4K (3840x2160), zdjecia LoRa 160x120"],
         ["ESP32-CAM",            "GPIO17 (pwr), GPIO4 (status RX)", "Wideo MJPEG AVI 640x480 10fps na SD, status przez UART TX"],
         ["RTL-SDR",              "USB",             "Odbiornik HF 7.1 MHz (eksperyment jonosferyczny)"],
@@ -292,7 +291,6 @@ const doc = new Document({
       twoColTable([
         ["ESP_UART_PORT",      "/dev/ttyAMA0 — port UART do ESP32"],
         ["BME280_ADDR",        "0x76 — adres I2C czujnika BME280"],
-        ["HX711_SENSORS",      "Piny GPIO dla 4 tensometrów (DT + SCK)"],
         ["SDR_ENABLED",        "True jeśli podłączony RTL-SDR, False w przeciwnym razie"],
         ["CAM_RECORD_DIR",     "/home/pi/stratosteam-video — katalog nagrań"],
         ["ESPCAM_PWR_PIN",     "17 — GPIO zasilania kamery ESP32-CAM"],
@@ -308,7 +306,7 @@ const doc = new Document({
 
       h2("4.3 Co dzieje się po uruchomieniu"),
       bullet("PowerSignal ustawia pin RPI_ALIVE_PIN (GPIO26) w stan HIGH — ESP32 wie że RPi działa"),
-      bullet("Inicjalizacja wszystkich czujników (BME280, MS5611, BNO085, INA219, HX711×4)"),
+      bullet("Inicjalizacja wszystkich czujników (BME280, MS5611, BNO085, INA219)"),
       bullet("Kamera zaczyna nagrywać H.264 do CAM_RECORD_DIR"),
       bullet("Co 5 sekund: odczyt czujników, wysyłka do ESP32 przez UART"),
       bullet("ESP32 pakuje dane z GPS i wysyła pakiet LoRa do stacji naziemnej"),
@@ -492,7 +490,6 @@ const doc = new Document({
       bullet("Sprawdz karty SD: RPi = karta 64 GB (nagrywanie 4K, 8h), ESP32-CAM = karta 32 GB (MJPEG AVI, 8h)"),
       bullet("Sprawdz kabel UART statusu: GPIO1 ESP32-CAM → RPi GPIO4 (pin 7)"),
       bullet("Przetestuj polaczenie LoRa na krotkim dystansie"),
-      bullet("Skalibruj tensometry HX711 z odwaznikiem referencyjnym"),
       p(""),
 
       h2("8.2 Dzień misji — start"),
@@ -546,9 +543,8 @@ const doc = new Document({
       p(""),
 
       h2("8.4 Apogeum i otwarcie spadochronu"),
-      p("Apogeum to najwyzszy punkt lotu — balon peka i uklad przechodzi w faze opadania. Tensometry HX711 rejestruja ten moment jako gwaltowny spadek sily liny."),
+      p("Apogeum to najwyzszy punkt lotu — balon peka i uklad przechodzi w faze opadania."),
       p(""),
-      bullet("Na wykresie tensometrow zobaczysz: wysoka sila (~850g) podczas wznoszenia → bliskie zeru przy peknięciu balonu → skok do ~350g gdy spadochron sie otworzy i zalapie powietrze"),
       bullet("Przy otwarciu spadochronu roll i pitch (BNO085) gwaltownie skacza, a potem stabilizuja sie — to potwierdzenie ze platforma zwisa pionowo"),
       bullet("Predkosc opadania (speed_kmh) po otwarciu spada do ok. 20-30 km/h — jesli pozostaje powyzej 60 km/h, spadochron mogl sie nie otworzyc prawidlowo"),
       bullet("Cisnienie (MS5611) zaczyna rosnac — monitoruj altitude_m: powinna maleć jednostajnie ok. 5-8 m/s"),
@@ -607,7 +603,7 @@ const doc = new Document({
       code('{"temp":21.3,"hum":45.1,"pres":1013.2,"p2":1012.8,"alt2":120.5,'),
       code('"roll":-1.2,"pit":0.8,"yaw":145.3,"ax":0.02,"ay":-0.01,"az":9.81,'),
       code('"vbat":4.12,"imA":320.0,"dsku":1.2,"dskf":58.3,'),
-      code('"hfdb":-62.5,"sg0":820.0,"sg1":835.0,"sg2":810.0,"sg3":825.0,'),
+      code('"hfdb":-62.5,'),
       code('"ec":[1,1,1234,28500]}'),
       twoColTable([
         ["temp / hum / pres", "BME280: temperatura [C], wilgotnosc [%], cisnienie [hPa]"],
@@ -617,7 +613,6 @@ const doc = new Document({
         ["vbat / imA",        "INA219: napiecie baterii [V], prad [mA]"],
         ["dsku / dskf",       "Dysk RPi: zajete / wolne [GB]"],
         ["hfdb",              "RTL-SDR: sila sygnalu HF [dBFS] (opcjonalne)"],
-        ["sg0-sg3",           "HX711: tensometry [g] (opcjonalne)"],
         ["ec",                "ESP32-CAM status: [ok, rec, klatki, wolneMB] (opcjonalne)"],
       ]),
       p(""),
@@ -650,7 +645,6 @@ const doc = new Document({
       code('"hum":18.3,"pres":91.2,"p2":91.0,"alt2":15198.5,'),
       code('"roll":-2.1,"pit":1.4,"yaw":178.2,"ax":0.01,"ay":0.02,"az":9.80,'),
       code('"dsku":1.2,"dskf":58.3,"hfdb":-61.0,'),
-      code('"sg0":420.0,"sg1":435.0,"sg2":410.0,"sg3":425.0,'),
       code('"ec":[1,1,1234,28500]}'),
       p("Beacon GPS-only (RPi OFF):"),
       code('{"src":"esp32","seq":124,"fix":true,"lat":52.2297,"lon":21.0122,'),

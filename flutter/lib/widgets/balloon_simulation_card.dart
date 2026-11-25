@@ -14,15 +14,6 @@ class BalloonSimulationCard extends StatelessWidget {
   static double _radiusNorm(double pHpa) =>
       pHpa > 0 ? math.pow(_pRef / pHpa, 1.0 / 3.0).toDouble() : 1.0;
 
-  // sg2 (rear-left) + sg3 (rear-right) are the parachute lines.
-  // 0 = folded, 1 = fully open. Threshold: 200 g → 1200 g combined tension.
-  static double _chuteOpen(double sg2, double sg3) {
-    final sum = sg2 + sg3;
-    if (sum < 200) return 0.0;
-    if (sum > 1200) return 1.0;
-    return (sum - 200) / 1000.0;
-  }
-
   @override
   Widget build(BuildContext context) {
     final svc = context.watch<TelemetryService>();
@@ -30,10 +21,8 @@ class BalloonSimulationCard extends StatelessWidget {
     final pressure = t?.msPres ?? _pRef;
     return _BalloonView(
       radiusNorm: _radiusNorm(pressure),
-      chuteOpenFactor: t == null ? 0.0 : _chuteOpen(t.strainG2, t.strainG3),
+      chuteOpenFactor: svc.pastApogee ? 1.0 : 0.0,
       pressure: pressure,
-      sg2: t?.strainG2 ?? 0.0,
-      sg3: t?.strainG3 ?? 0.0,
       hasData: t != null,
     );
   }
@@ -56,16 +45,12 @@ class _BalloonView extends StatefulWidget {
   final double radiusNorm;
   final double chuteOpenFactor;
   final double pressure;
-  final double sg2;
-  final double sg3;
   final bool hasData;
 
   const _BalloonView({
     required this.radiusNorm,
     required this.chuteOpenFactor,
     required this.pressure,
-    required this.sg2,
-    required this.sg3,
     required this.hasData,
   });
 
@@ -179,8 +164,6 @@ class _BalloonViewState extends State<_BalloonView>
             final stats = _StatsPanel(
               pressure: widget.pressure,
               radiusNorm: widget.radiusNorm,
-              sg2: widget.sg2,
-              sg3: widget.sg3,
               deployed: deployed,
               hasData: widget.hasData,
             );
@@ -211,16 +194,12 @@ class _BalloonViewState extends State<_BalloonView>
 class _StatsPanel extends StatelessWidget {
   final double pressure;
   final double radiusNorm;
-  final double sg2;
-  final double sg3;
   final bool deployed;
   final bool hasData;
 
   const _StatsPanel({
     required this.pressure,
     required this.radiusNorm,
-    required this.sg2,
-    required this.sg3,
     required this.deployed,
     required this.hasData,
   });
@@ -267,15 +246,7 @@ class _StatsPanel extends StatelessWidget {
         _row('Promień ×', na ? '--' : '×${radiusNorm.toStringAsFixed(2)}', rColor),
         _row('Objętość ×', na ? '--' : '×${volRatio.toStringAsFixed(1)}', rColor),
         const Divider(color: Colors.white12, height: 16),
-        const _SectionLabel('Liny spadochronowe (sg2 / sg3)'),
-        _row('Naprężenie L (sg2)',
-            na ? '--' : '${sg2.toStringAsFixed(0)} g', Colors.orangeAccent),
-        _row('Naprężenie P (sg3)',
-            na ? '--' : '${sg3.toStringAsFixed(0)} g', Colors.orangeAccent),
-        _row('Suma',
-            na ? '--' : '${(sg2 + sg3).toStringAsFixed(0)} g',
-            deployed ? Colors.greenAccent : Colors.white54),
-        const Divider(color: Colors.white12, height: 16),
+        const _SectionLabel('Spadochron (szacowany z opadania)'),
         _row(
           'Status spadochronu',
           na ? '--' : (deployed ? 'OTWARTY' : 'ZŁOŻONY'),

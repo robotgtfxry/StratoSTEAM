@@ -50,10 +50,6 @@ class TelemetryIn(BaseModel):
     pwr: PwrPayload = PwrPayload()
     rssi: int = 0
     snr:  float = 0.0
-    strain_g0: float = 0.0
-    strain_g1: float = 0.0
-    strain_g2: float = 0.0
-    strain_g3: float = 0.0
 
 
 class TelemetryOut(BaseModel):
@@ -81,10 +77,6 @@ class TelemetryOut(BaseModel):
     voltage: float
     current_ma: float
     power_mw: float
-    strain_g0: float
-    strain_g1: float
-    strain_g2: float
-    strain_g3: float
 
     class Config:
         from_attributes = True

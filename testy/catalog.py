@@ -388,7 +388,7 @@ def build_devices() -> list[Device]:
                 "Cisza nie musi znaczyć awarii: ESP32 wysyła coś tylko wtedy, gdy ma komendę.",
                 "Ten sam port zajmuje usługa rpi-air — zatrzymaj ją przed testem.",
                 "Dane w stronę ESP32: temp, hum, pres, p2, alt2, roll, pit, yaw, ax, ay, az, "
-                "vbat, imA, dsku, dskf, hfdb, sg0-sg3.",
+                "vbat, imA, dsku, dskf, hfdb.",
             ],
             libs=["pyserial"],
             test=T.test_esp_uart,

@@ -6,4 +6,3 @@ from .ina219 import Ina219Sensor, Ina219Data
 from .mpu6050 import Mpu6050Sensor
 from .bmp180 import Bmp180Sensor
 from .ina226 import Ina226Sensor
-from .hx711 import Hx711Sensor, Hx711Data

@@ -11,7 +11,7 @@ import time
 import serial
 from serial.tools import list_ports
 
-from sensors import Bme280Data, Ms5611Data, Bno085Data, Ina219Data, Hx711Data
+from sensors import Bme280Data, Ms5611Data, Bno085Data, Ina219Data
 
 
 log = logging.getLogger(__name__)
@@ -82,7 +82,6 @@ class EspUartSender:
     def send(self, bme: Bme280Data, ms: Ms5611Data, imu: Bno085Data, pwr: Ina219Data,
              disk_used_gb: float = 0.0, disk_free_gb: float = 0.0,
              hf_dbfs: float | None = None,
-             strains: list[Hx711Data] | None = None,
              espcam_status: list | None = None) -> None:
         payload = {
             "temp": bme.temperature_c,
@@ -103,9 +102,6 @@ class EspUartSender:
         }
         if hf_dbfs is not None:
             payload["hfdb"] = hf_dbfs
-        if strains:
-            for i, s in enumerate(strains):
-                payload[f"sg{i}"] = s.strain_g
         # espcam_status: [ok, rec, frames, free_mb] — jedna kamera ESP32-CAM
         if espcam_status:
             payload["ec"] = espcam_status

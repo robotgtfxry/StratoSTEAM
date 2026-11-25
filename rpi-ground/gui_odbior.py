@@ -71,7 +71,7 @@ def demo_state(t0: float = time.time()) -> dict:
                  "fix": 1, "vbe": 7.41, "vbat": 7.38, "imA": 812, "temp": -38.2, "hum": 14.1,
                  "pres": 421.7, "p2": 421.2, "alt2": 6712, "roll": 4.2, "pit": -2.8, "yaw": 0,
                  "ax": 0.1, "ay": 0.7, "az": 9.8, "dsku": 17.2, "dskf": 11.4,
-                 "sg0": 212, "sg1": 198, "sg2": 205, "sg3": 221, "ec": [1, 1, 18234, 24310]},
+                 "ec": [1, 1, 18234, 24310]},
     }
 
 
@@ -300,8 +300,6 @@ class App(tk.Tk):
                                   ("p2", "Ciśnienie 2"), ("alt2", "Wys. z ciśnienia")]),
             ("imu", "Orientacja", [("roll", "Roll"), ("pit", "Pitch"), ("yaw", "Yaw"),
                                    ("g", "Przeciążenie"), ("seq", "Nr pakietu")]),
-            ("sg", "Tensometry", [("sg0", "Przód lewy"), ("sg1", "Przód prawy"), ("sg2", "Tył lewy"),
-                                  ("sg3", "Tył prawy"), ("sum", "Razem")]),
             ("cam", "Kamery i dysk", [("ok", "ESP32-CAM"), ("rec", "Nagrywanie"), ("fr", "Klatki"),
                                       ("sd", "Karta SD wolne"), ("dsk", "Dysk RPi wolne")]),
             ("stn", "Stacja", [("svc", "Usługa"), ("up", "Działa od"), ("img", "Fragmenty zdjęć"),
@@ -310,7 +308,9 @@ class App(tk.Tk):
         self._c: dict[str, Card] = {}
         for i, (key, title, rows) in enumerate(specs):
             c = Card(grid, title, rows)
-            c.grid(row=i // 4, column=i % 4, sticky="nsew", padx=4, pady=4)
+            last = i == len(specs) - 1      # ostatnia karta wypełnia resztę wiersza
+            c.grid(row=i // 4, column=i % 4, columnspan=4 - i % 4 if last else 1,
+                   sticky="nsew", padx=4, pady=4)
             self._c[key] = c
         for col in range(4):
             grid.columnconfigure(col, weight=1, uniform="k")
@@ -390,12 +390,6 @@ class App(tk.Tk):
         o.set("g", fmt(math.sqrt(sum(v * v for v in acc)) / 9.80665, "g", 2)
               if None not in acc else "—")
         o.set("seq", fmt(p.get("seq"), "", 0))
-
-        s = self._c["sg"]
-        sg = [p.get(f"sg{i}") for i in range(4)]
-        for i, v in enumerate(sg):
-            s.set(f"sg{i}", fmt(v, "g", 0))
-        s.set("sum", fmt(sum(sg), "g", 0) if None not in sg else "—")
 
         c = self._c["cam"]
         ec = p.get("ec")

@@ -25,6 +25,13 @@ class TelemetryService extends ChangeNotifier {
   double get peakAlt => _peakAlt;
 
   /// True gdy balon przekroczył apogeum i opada (peakAlt > 1000 m i climbRate < 0).
+  /// Balon wyraźnie opada: co najmniej 100 m poniżej szczytu lotu.
+  /// Z tego szacujemy otwarcie spadochronu — nie ma czujnika, który by je mierzył.
+  bool get pastApogee {
+    final alt = latest?.alt;
+    return alt != null && _peakAlt > 1000.0 && _peakAlt - alt > 100.0;
+  }
+
   bool get isDescending =>
       _peakAlt > 1000.0 && (climbRate ?? 0) < 0;
 

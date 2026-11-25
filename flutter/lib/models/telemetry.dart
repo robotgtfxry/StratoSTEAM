@@ -34,11 +34,6 @@ class Telemetry {
   final double currentMa;
   final double powerMw;
 
-  // HX711 tensometry (4×)
-  final double strainG0;
-  final double strainG1;
-  final double strainG2;
-  final double strainG3;
 
   const Telemetry({
     required this.id,
@@ -65,10 +60,6 @@ class Telemetry {
     required this.voltage,
     required this.currentMa,
     required this.powerMw,
-    required this.strainG0,
-    required this.strainG1,
-    required this.strainG2,
-    required this.strainG3,
   });
 
   factory Telemetry.fromJson(Map<String, dynamic> j) => Telemetry(
@@ -96,9 +87,5 @@ class Telemetry {
         voltage: (j['voltage'] ?? 0).toDouble(),
         currentMa: (j['current_ma'] ?? 0).toDouble(),
         powerMw: (j['power_mw'] ?? 0).toDouble(),
-        strainG0: (j['strain_g0'] ?? 0).toDouble(),
-        strainG1: (j['strain_g1'] ?? 0).toDouble(),
-        strainG2: (j['strain_g2'] ?? 0).toDouble(),
-        strainG3: (j['strain_g3'] ?? 0).toDouble(),
       );
 }
