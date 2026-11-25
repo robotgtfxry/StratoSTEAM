@@ -27,6 +27,7 @@ class MissionIn(BaseModel):
     max_alt: float | None = None
     src: str | None = Field(default=None, max_length=10)    # źródło wysokości
     auto: bool = False                  # automatyczne zdjęcia włączone
+    tcpu: float | None = None           # temperatura procesora RPi balonu
     rx_age: float | None = None         # ile sekund temu stacja odebrała pakiet
     events: list[tuple[float, str]] = Field(default=[], max_length=30)   # (T+ w s, opis)
 

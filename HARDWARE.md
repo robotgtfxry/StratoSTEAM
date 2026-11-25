@@ -257,7 +257,7 @@ Do zrobienia przed włączeniem:
 | RX komend        | GPIO15 (RXD, pin 10)| GPIO14 (TX)| ESP32 → RPi5   | /dev/ttyAMA0   |
 
 > Prędkość: 115200 baud, 8N1. RPi5 wysyła line-delimited JSON co 5 s.  
-> Dane TX: temp, hum, pres (BME280), p2, alt2 (MS5611), roll, pit, yaw, ax, ay, az (BNO085), vbat, imA (INA219), dsku, dskf (dysk), hfdb (SDR dBFS, opcjonalne), ec (status ESP32-CAM, opcjonalne).  
+> Dane TX: temp, hum, pres (BME280), p2, alt2 (MS5611), roll, pit, yaw, ax, ay, az (BNO085), vbat, imA (INA219), dsku, dskf (dysk), hfdb (SDR dBFS, opcjonalne), tcpu (temperatura procesora RPi), ec (status ESP32-CAM, opcjonalne).  
 > Dane RX: komendy JSON od ESP32 — `{"cmd":"photo"}`, `{"cmd":"cam_rec","on":true/false}`, `{"cmd":"espcam_pwr","on":true/false}`, `{"cmd":"release_line","line":0|1|-1}`, shutdown request.
 
 ---
@@ -285,7 +285,7 @@ Pakiet ma limit **255 B**, więc ESP32 nadaje krótkie klucze. Dekoduje je `rpi-
 |-------|-----------|
 | `p`   | [lat, lon, alt, satelity, fix] |
 | `vbe` | napięcie baterii z ADC ESP32 |
-| `b`   | [vbat, imA] |
+| `b`   | [vbat, imA, tcpu] |
 | `e`   | [temp, hum, pres, p2, alt2] |
 | `i`   | [roll, pit, yaw, ax, ay, az] |
 | `d`   | [dsku, dskf] |

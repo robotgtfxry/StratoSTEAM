@@ -11,6 +11,7 @@ class MissionInfo {
   final double? alt, vs, maxAlt;
   final String? src;
   final bool auto; // automatyczne zdjęcia
+  final double? tcpu; // temperatura procesora RPi balonu
   final double? rxAge; // ile sekund temu stacja odebrała pakiet z balonu
   final double age; // ile sekund temu stacja odezwała się do serwera
   final List<(double, String)> events;
@@ -24,6 +25,7 @@ class MissionInfo {
     required this.maxAlt,
     required this.src,
     required this.auto,
+    required this.tcpu,
     required this.rxAge,
     required this.age,
     required this.events,
@@ -40,6 +42,7 @@ class MissionInfo {
         maxAlt: _num(j['max_alt']),
         src: j['src'] as String?,
         auto: j['auto'] == true,
+        tcpu: _num(j['tcpu']),
         rxAge: _num(j['rx_age']),
         age: _num(j['age']) ?? 0,
         events: [

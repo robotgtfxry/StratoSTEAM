@@ -142,7 +142,7 @@ def main():
             if (auto := mission.pop_auto()) is not None:
                 feed.set_auto(auto)
             feed.mission(mission.state())
-            mission_up.update(mission.state(), feed.auto_on(), feed.last_rx)
+            mission_up.update(mission.state(), feed.auto_on(), feed.last_rx, feed.tcpu)
             feed.photo_progress(photo.state())
             feed.tick(getattr(lora, "resets", 0))
             raw, rssi, snr = lora.receive(timeout_s=1.0)

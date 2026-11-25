@@ -69,6 +69,11 @@ class LocalFeed:
     def last_rx(self) -> float | None:
         return self._state["last_rx"]
 
+    @property
+    def tcpu(self) -> float | None:
+        """Temperatura procesora RPi balonu z ostatniego pakietu."""
+        return (self._state["last"] or {}).get("tcpu")
+
     @staticmethod
     def auto_on() -> bool:
         return os.path.exists(AUTO_PATH)

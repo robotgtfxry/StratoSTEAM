@@ -90,6 +90,7 @@ struct RpiData {
     float roll, pit, yaw;     // BNO085
     float ax, ay, az;
     float vbat, imA;          // INA219
+    float tcpu = -999.0f;     // temperatura procesora RPi (-999 = brak)
     float dsku = 0.0f;        // disk used GB
     float dskf = 0.0f;        // disk free GB
     float hfdb = -999.0f;     // SDR pomiar dBFS (-999 = brak pomiaru)
@@ -266,6 +267,7 @@ void parseRpiLine(const String& line) {
     rpi.az   = doc["az"]   | 0.0f;
     rpi.vbat = doc["vbat"] | 0.0f;
     rpi.imA  = doc["imA"]  | 0.0f;
+    rpi.tcpu = doc["tcpu"] | -999.0f;
     rpi.dsku = doc["dsku"] | 0.0f;
     rpi.dskf = doc["dskf"] | 0.0f;
     rpi.hfdb = doc["hfdb"] | -999.0f;
@@ -424,7 +426,7 @@ bool gpsFix() {
 // ── Beacon TX ─────────────────────────────────────────────────────────────────
 // Format kompaktowy — dekoduje go rpi-ground/beacon.py (zmieniaj oba razem!):
 //   p [lat,lon,alt,sat,fix]  e [temp,hum,pres,p2,alt2]  i [roll,pit,yaw,ax,ay,az]
-//   b [vbat,imA]  d [dsku,dskf]  h hfdb  c [ok,rec,klatki,MB]
+//   b [vbat,imA,tcpu]  d [dsku,dskf]  h hfdb  c [ok,rec,klatki,MB]
 //   q [id, pakiety, bajty, crc] zdjęcie gotowe do odbioru
 //   g [widoczne, maxSNR, zdania ok, zdania złe]
 //   x 1 = część pól pominięta, żeby zmieścić się w LORA_MAX_PAYLOAD
@@ -456,6 +458,7 @@ void sendBeacon() {
         // pełna telemetria z RPi5
         JsonArray b = doc["b"].to<JsonArray>();
         b.add(rnd(rpi.vbat, 100));  b.add((long)lround(rpi.imA));
+        if (rpi.tcpu > -999.0f) b.add((int)lround(rpi.tcpu));
         JsonArray e = doc["e"].to<JsonArray>();
         e.add(rnd(rpi.temp, 10));   e.add(rnd(rpi.hum, 10));
         e.add(rnd(rpi.pres, 100));  e.add(rnd(rpi.p2, 100));

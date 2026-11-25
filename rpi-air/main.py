@@ -85,6 +85,15 @@ def _init(name: str, factory, fallback):
         return fallback
 
 
+def cpu_temp() -> float | None:
+    """Temperatura procesora RPi (°C)."""
+    try:
+        with open("/sys/class/thermal/thermal_zone0/temp") as f:
+            return round(int(f.read()) / 1000, 1)
+    except (OSError, ValueError):
+        return None
+
+
 def main():
     log.info("Initialising sensors…")
     power = PowerSignal()
@@ -235,7 +244,8 @@ def main():
                 esp.send(bme_d, ms_d, imu_d, pwr_d,
                          disk_used_gb=disk_used, disk_free_gb=disk_free,
                          hf_dbfs=last_hf_dbfs,
-                         espcam_status=espcam_mon.compact())
+                         espcam_status=espcam_mon.compact(),
+                         cpu_temp_c=cpu_temp())
                 log.info(
                     "→ESP32 temp=%.1f°C alt2=%.0fm vbat=%.2fV",
                     bme_d.temperature_c, ms_d.altitude_m, pwr_d.voltage_v,

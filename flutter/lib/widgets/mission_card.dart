@@ -130,6 +130,15 @@ class _MissionCardState extends State<MissionCard> {
                   color: m.auto ? Colors.greenAccent : Colors.white38,
                   fontSize: 12),
             ),
+            if (m.tcpu != null)
+              Text('Temperatura RPi balonu: ${m.tcpu!.toStringAsFixed(0)} °C',
+                  style: TextStyle(
+                      color: m.tcpu! >= 80
+                          ? Colors.redAccent
+                          : m.tcpu! >= 70
+                              ? Colors.orangeAccent
+                              : Colors.white70,
+                      fontSize: 12)),
             if (!m.stationOnline)
               Text('Stacja bez kontaktu z serwerem: ${_ago(m.stationAge)}',
                   style:

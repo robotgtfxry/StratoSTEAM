@@ -84,7 +84,8 @@ class EspUartSender:
     def send(self, bme: Bme280Data, ms: Ms5611Data, imu: Bno085Data, pwr: Ina219Data,
              disk_used_gb: float = 0.0, disk_free_gb: float = 0.0,
              hf_dbfs: float | None = None,
-             espcam_status: list | None = None) -> None:
+             espcam_status: list | None = None,
+             cpu_temp_c: float | None = None) -> None:
         payload = {
             "temp": bme.temperature_c,
             "hum":  bme.humidity_pct,
@@ -104,6 +105,8 @@ class EspUartSender:
         }
         if hf_dbfs is not None:
             payload["hfdb"] = hf_dbfs
+        if cpu_temp_c is not None:
+            payload["tcpu"] = cpu_temp_c
         # espcam_status: [ok, rec, frames, free_mb] — jedna kamera ESP32-CAM
         if espcam_status:
             payload["ec"] = espcam_status

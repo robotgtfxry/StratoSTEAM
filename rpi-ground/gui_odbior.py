@@ -72,7 +72,7 @@ def demo_state(t0: float = time.time()) -> dict:
                     "events": [[now - 1234, "START wciśnięty"], [now - 1190, "Balon się wznosi"]]},
         "lora_resets": 0, "last_rx": now - (now % 5), "rssi": -104, "snr": 5.8, "history": hist,
         "last": {"seq": 219, "lat": 52.297312, "lon": 21.113644, "alt": hist[-1][1], "sat": 11, "gview": 17, "gsnr": 43,
-                 "fix": 1, "vbe": 7.41, "vbat": 7.38, "imA": 812, "temp": -38.2, "hum": 14.1,
+                 "fix": 1, "vbe": 7.41, "vbat": 7.38, "imA": 812, "tcpu": 66, "temp": -38.2, "hum": 14.1,
                  "pres": 421.7, "p2": 421.2, "alt2": 6712, "roll": 4.2, "pit": -2.8, "yaw": 0,
                  "ax": 0.1, "ay": 0.7, "az": 9.8, "dsku": 17.2, "dskf": 11.4,
                  "ec": [1, 1, 18234, 24310]},
@@ -480,7 +480,8 @@ class App(tk.Tk):
             ("radio", "Radio LoRa", [("rssi", "RSSI"), ("snr", "SNR"), ("pk", "Pakiety/straty"),
                                      ("bad", "Uszkodzone"), ("rst", "Resety modułu")]),
             ("pwr", "Zasilanie", [("vbat", "Bateria (INA)"), ("vbe", "Bateria (ESP32)"),
-                                  ("imA", "Prąd"), ("w", "Moc"), ("rpi", "RPi na balonie")]),
+                                  ("imA", "Prąd"), ("w", "Moc"), ("rpi", "RPi na balonie"),
+                                  ("cpu", "Temperatura RPi")]),
             ("atm", "Atmosfera", [("temp", "Temperatura"), ("hum", "Wilgotność"), ("pres", "Ciśnienie"),
                                   ("p2", "Ciśnienie 2"), ("alt2", "Wys. z ciśnienia")]),
             ("imu", "Orientacja", [("roll", "Roll"), ("pit", "Pitch"), ("yaw", "Yaw"),
@@ -566,6 +567,9 @@ class App(tk.Tk):
         w.set("w", fmt(vbat * ima / 1000 if vbat is not None and ima is not None else None, "W", 2))
         rpi = "temp" in p
         w.set("rpi", ("działa" if rpi else "brak danych") if p else "—", OK if rpi else WARN)
+
+        cpu = p.get("tcpu")              # RPi 5 zwalnia od 80 °C
+        w.set("cpu", fmt(cpu, "°C", 0), FG if cpu is None else BAD if cpu >= 80 else WARN if cpu >= 70 else OK)
 
         a = self._c["atm"]
         a.set("temp", fmt(p.get("temp"), "°C"))

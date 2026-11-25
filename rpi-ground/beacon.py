@@ -4,7 +4,7 @@ Dekodowanie beacona ESP32-S3 i zamiana na format telemetrii backendu.
 Beacon musi zmieścić się w 255 B (limit SX1278), więc ESP32 nadaje krótkie klucze
 i tablice (esp32/src/main.cpp, sendBeacon):
   p  [lat, lon, alt, sat, fix]        e  [temp, hum, pres, p2, alt2]
-  i  [roll, pit, yaw, ax, ay, az]     b  [vbat, imA]
+  i  [roll, pit, yaw, ax, ay, az]     b  [vbat, imA, tcpu]
   d  [dsku, dskf]   h  hfdb   c  [ok, rec, klatki, wolne_MB]
   g  [widoczne satelity, max SNR, zdania ok, zdania złe]
   x  1 = część pól pominięta, bo pakiet byłby za długi
@@ -17,7 +17,7 @@ _GROUPS = {
     "p": ("lat", "lon", "alt", "sat", "fix"),
     "e": ("temp", "hum", "pres", "p2", "alt2"),
     "i": ("roll", "pit", "yaw", "ax", "ay", "az"),
-    "b": ("vbat", "imA"),
+    "b": ("vbat", "imA", "tcpu"),
     "d": ("dsku", "dskf"),
     "g": ("gview", "gsnr", "gok", "gbad"),
 }
