@@ -11,8 +11,8 @@ class Ina219Data:
 
 
 class Ina219Sensor:
-    def __init__(self, shunt_ohms: float = 0.1, i2c_addr: int = 0x40):
-        self._ina = _INA219(shunt_ohms, address=i2c_addr)
+    def __init__(self, shunt_ohms: float = 0.1, i2c_addr: int = 0x40, bus: int = 1):
+        self._ina = _INA219(shunt_ohms, address=i2c_addr, busnum=bus)  # RPi 5: autodetekcja magistrali nie działa
         self._ina.configure()
 
     def read(self) -> Ina219Data:
@@ -22,5 +22,5 @@ class Ina219Sensor:
                 current_ma=round(self._ina.current(), 2),
                 power_mw=round(self._ina.power(), 2),
             )
-        except DeviceRangeError:
+        except (DeviceRangeError, OSError):
             return Ina219Data()

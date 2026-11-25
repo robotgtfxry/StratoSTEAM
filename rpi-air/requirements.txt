@@ -1,9 +1,15 @@
-RPi.GPIO
+# UWAGA: adafruit-blinka dociąga RPi.GPIO, które na RPi 5 nie działa i przesłania rpi-lgpio.
+# Po każdym `pip install -r requirements.txt` wykonaj:  pip uninstall -y RPi.GPIO
+# (robi to też setup.sh)
+rpi-lgpio  # na RPi 5 (systemowo: python3-rpi-lgpio)
 spidev
 smbus2
 pyserial
 pynmea2
-bme280
+pimoroni-bme280
 pi-ina219
 adafruit-circuitpython-bno08x
 adafruit-blinka
+pyrtlsdr==0.3.0   # 0.4+ wymaga rtlsdr_set_dithering, którego nie ma w librtlsdr 2.0.2 z apt
+setuptools<81     # pyrtlsdr 0.3.0 importuje pkg_resources
+numpy

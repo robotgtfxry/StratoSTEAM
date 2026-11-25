@@ -58,57 +58,53 @@ wygodne przed startem misji.
 
 | Element | Czym jest sprawdzany |
 |---|---|
-| Magistrala I2C | skan adresów, jak `i2cdetect` |
+| Magistrala I2C | skan adresów jak `i2cdetect` + rozpoznanie układu po rejestrze ID |
 | BME280 | temperatura / wilgotność / ciśnienie + kontrola zakresu |
-| MS5611 | ciśnienie i wysokość barometryczna |
-| BNO085 | orientacja + kontrola, czy akcelerometr widzi 1 g |
-| INA219 | napięcie, prąd, moc na baterii |
-| HX711 ×4 | surowe odczyty ADC, wykrycie zerwanego mostka i szumu |
+| GY-87: MPU-6050 | akcelerometr i żyroskop, kontrola czy widzi 1 g, roll / pitch |
+| GY-87: QMC5883L / HMC5883L | pole magnetyczne, natężenie, kierunek kompasu |
+| GY-87: BMP180 | ciśnienie, temperatura, wysokość barometryczna |
+| INA226 | napięcie, prąd, moc na baterii (ID producenta 0x5449) |
 | Kamera CSI | zdjęcie próbne 640×480 + kontrola czy nie jest czarne |
 | RTL-SDR | otwarcie dongla i pomiar mocy nośnej w dBFS |
 | ESP32-CAM (zasilanie) | przełączanie MOSFET-a na GPIO17 |
-| ESP32-CAM (status) | odbiór linii JSON `$S` po UART (GPIO4) |
+| ESP32-CAM (status) | odbiór linii JSON `$S` po sprzętowym UART3 (`/dev/ttyAMA3`, RX = GPIO9) |
 | UART ↔ ESP32-S3 | nasłuch łącza + ping |
 | Sygnały GPIO ↔ ESP32-S3 | RPI_ALIVE i linia shutdown |
 | Przekaźniki ×2 | impuls zwalniający linki — **z potwierdzeniem** |
 
-**Raspberry Pi 5 — stacja naziemna**
-
-| Element | Czym jest sprawdzany |
-|---|---|
-| LoRa SX1278 | rejestr wersji przez SPI (musi być 0x12) |
-| LoRa — nasłuch | 12 s oczekiwania na pakiet, RSSI i SNR |
-| AD9833 + RD06HHF1 | ustawienie generatora — **bez kluczowania PTT** |
-
-**Moduły ESP32 — test na stole**
+**Moduły ESP32-S3 — test na stole**
 
 | Element | Czym jest sprawdzany |
 |---|---|
 | GPS NEO-M8N | zdania NMEA, liczba satelitów, fix |
 
+LoRa SX1278 siedzi na ESP32-S3, więc z Raspberry Pi nie da się jej sprawdzić bezpośrednio —
+działające łącze widać po teście UART ↔ ESP32-S3.
+
+> Magnetometr GY-87 jest podpięty za MPU-6050 i pojawia się w skanie I2C dopiero po
+> teście MPU-6050 albo magnetometru (włączają bypass I2C w MPU).
+
 ---
 
 ## Bezpieczeństwo
 
-Dwa testy wykonują fizyczne akcje i przed uruchomieniem pytają o potwierdzenie:
-
-* **Przekaźniki zwalniania linek** — przed testem zdejmij linki z mechanizmu,
-  inaczej ładunek zostanie zwolniony.
-* **Nadajnik HF** — test tylko zapisuje rejestry AD9833, PTT zostaje w stanie niskim
-  (brak emisji). Do prawdziwego nadawania potrzebne są uprawnienia krótkofalarskie
-  i podłączona antena albo sztuczne obciążenie.
-
-Oba testy są pomijane przez „Testuj wszystko” i przez tryb `--konsola`.
+Test **przekaźników zwalniania linek** wykonuje fizyczną akcję i przed uruchomieniem
+pyta o potwierdzenie — przed testem zdejmij linki z mechanizmu, inaczej ładunek zostanie
+zwolniony. Jest pomijany przez „Testuj wszystko” i przez tryb `--konsola`.
 
 ---
 
 ## Skąd tester bierze dane
 
-Nic nie jest tu przepisane „na drugą stronę”. Tester wczytuje **te same pliki, które lecą
-na balonie**:
+Tam, gdzie lotny kod ma sterownik, tester wczytuje **te same pliki, które lecą na balonie**:
 
-* sterowniki: `rpi-air/sensors/*.py`, `rpi-air/hardware/*.py`,
-* konfiguracje: `rpi-air/config.py`, `rpi-ground/config.py` (adresy I2C, piny, prędkości).
+* sterowniki: `rpi-air/sensors/bme280.py`, `rpi-air/hardware/*.py` (kamera, RTL-SDR),
+* konfiguracja: `rpi-air/config.py` (adresy I2C, piny, prędkości).
+
+GY-87 (MPU-6050, QMC5883L/HMC5883L, BMP180) i INA226 nie mają jeszcze sterowników
+w `rpi-air/` — tester czyta je bezpośrednio przez `smbus2` (`hw_tests.py`).
+Adresy i bocznik można nadpisać w `rpi-air/config.py`: `MPU6050_ADDR`, `BMP180_ADDR`,
+`INA226_ADDR`, `INA226_SHUNT_OHMS`, a port statusu kamery: `ESPCAM_STATUS_PORT`.
 
 Zmiana pinu w `config.py` od razu zmienia instrukcję podłączenia w okienku.
 Opisy podłączeń są zebrane w jednym miejscu — `testy/catalog.py`.
@@ -124,7 +120,7 @@ Opisy podłączeń są zebrane w jednym miejscu — `testy/catalog.py`.
 | `catalog.py` | katalog sprzętu: opisy, instrukcje, tabele połączeń |
 | `hw_tests.py` | same testy — każdy zwraca status, wartości i podpowiedzi |
 | `pinout.py` | mapa 40-pinowego złącza Raspberry Pi 5 |
-| `repo.py` | ładowanie sterowników i konfiguracji z reszty repozytorium |
+| `repo.py` | ładowanie sterowników i konfiguracji z `rpi-air/` |
 
 ---
 
@@ -132,8 +128,8 @@ Opisy podłączeń są zebrane w jednym miejscu — `testy/catalog.py`.
 
 * **RPi.GPIO** nie działa na RPi 5 — potrzebna podmianka:
   `sudo apt remove python3-rpi.gpio && sudo apt install python3-rpi-lgpio`.
-  Dotyczy HX711, przekaźników, zasilania ESP32-CAM i sygnałów do ESP32-S3.
-* **pigpio** nie wspiera RPi 5 — odczyt statusu ESP32-CAM (bit-bang serial) trzeba będzie
-  przepisać na `lgpio` albo na sprzętowy UART. Test to wykryje i napisze wprost.
-* Usługa `stratosteam-air` zajmuje UART i kamerę. Przed testami:
-  `sudo systemctl stop stratosteam-air`.
+  Dotyczy przekaźników, zasilania ESP32-CAM i sygnałów do ESP32-S3.
+* **pigpio** nie wspiera RPi 5 — dlatego tester czyta status ESP32-CAM sprzętowym UART3:
+  `dtoverlay=uart3-pi5` w `/boot/firmware/config.txt`, reboot, TX kamery → GPIO9 (pin 21).
+* Usługa `rpi-air` zajmuje UART i kamerę. Przed testami:
+  `sudo systemctl stop rpi-air`.

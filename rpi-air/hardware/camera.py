@@ -43,13 +43,18 @@ class CameraModule:
         if not _PICAM2:
             return
 
-        os.makedirs(record_dir, exist_ok=True)
-        self._cam = Picamera2()
-        cfg = self._cam.create_video_configuration(
-            main={"size": (3840, 2160), "format": "RGB888"},  # 4K UHD
-        )
-        self._cam.configure(cfg)
-        self._cam.start()
+        try:
+            os.makedirs(record_dir, exist_ok=True)
+            cam = Picamera2()
+            cfg = cam.create_video_configuration(
+                main={"size": (3840, 2160), "format": "RGB888"},  # 4K UHD
+            )
+            cam.configure(cfg)
+            cam.start()
+        except Exception as exc:
+            log.error("Camera init failed: %s — camera disabled", exc)
+            return
+        self._cam = cam
         log.info("Camera ready (record_dir=%s photo=%dx%d q=%d)",
                  record_dir, photo_w, photo_h, photo_quality)
 

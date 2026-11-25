@@ -40,6 +40,12 @@ class Ms5611Sensor:
         return (data[0] << 16) | (data[1] << 8) | data[2]
 
     def read(self) -> Ms5611Data:
+        try:
+            return self._read()
+        except OSError:
+            return Ms5611Data()
+
+    def _read(self) -> Ms5611Data:
         c1, c2, c3, c4, c5, c6 = self._cal
         d1 = self._read_raw(_CMD_CONVERT_D1)
         d2 = self._read_raw(_CMD_CONVERT_D2)
@@ -50,6 +56,9 @@ class Ms5611Sensor:
         off = c2 * 65536 + (c4 * dt) // 128
         sens = c1 * 32768 + (c3 * dt) // 256
         pressure = ((d1 * sens // 2097152 - off) // 32768) / 100.0
+
+        if pressure <= 0:   # błędny odczyt — potęga z liczby ujemnej wywróciłaby pętlę główną
+            return Ms5611Data()
 
         # barometric altitude (ISA model, good enough for stratosphere)
         altitude = 44330.0 * (1.0 - (pressure / 1013.25) ** 0.1903)

@@ -13,24 +13,73 @@ from config import (
     BME280_ADDR, MS5611_ADDR, BNO085_ADDR,
     INA219_ADDR, INA219_SHUNT_OHMS,
     HX711_SENSORS, HX711_REFERENCE_UNIT,
-    ESPCAM_PWR_PIN, ESPCAM_STATUS_PIN, ESPCAM_STATUS_BAUD,
+    ESPCAM_PWR_PIN, ESPCAM_UART_PORT, ESPCAM_STATUS_BAUD,
     ESP_UART_PORT, ESP_UART_BAUD, ESP_SEND_INTERVAL_S,
     CAM_RECORD_DIR, CAM_PHOTO_W, CAM_PHOTO_H, CAM_PHOTO_QUALITY, CAM_CHUNK_INTERVAL_S,
     SDR_ENABLED, SDR_TARGET_FREQ, SDR_SAMPLE_RATE, SDR_GAIN,
     SDR_FREQ_CORRECTION, SDR_MEASURE_INTERVAL_S, SDR_NUM_SAMPLES, SDR_BIN_WINDOW,
 )
-from sensors import Bme280Sensor, Ms5611Sensor, Bno085Sensor, Ina219Sensor, Hx711Sensor
+from sensors import (
+    Bme280Sensor, Ms5611Sensor, Bno085Sensor, Ina219Sensor, Hx711Sensor,
+    Bme280Data, Ms5611Data, Bno085Data, Ina219Data,
+)
 from hardware import PowerSignal, EspUartSender, CameraModule, SdrReceiver, EspCamPower, EspCamMonitor
+
+
+def _log_handlers() -> list[logging.Handler]:
+    handlers: list[logging.Handler] = [logging.StreamHandler(sys.stdout)]
+    for path in ("/var/log/stratosteam-air.log",
+                 os.path.join(os.path.dirname(os.path.abspath(__file__)), "stratosteam-air.log")):
+        try:
+            handlers.append(logging.FileHandler(path))
+            break
+        except OSError:
+            continue
+    return handlers
+
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler("/var/log/stratosteam-air.log"),
-    ],
+    handlers=_log_handlers(),
 )
 log = logging.getLogger("air")
+
+
+class _MissingSensor:
+    """Zastępuje czujnik, którego nie udało się zainicjalizować — zwraca wartości domyślne."""
+
+    def __init__(self, data_cls):
+        self._data_cls = data_cls
+
+    def read(self):
+        return self._data_cls()
+
+
+class _NullEsp:
+    """Zastępuje UART do ESP32, gdy port nie jest dostępny."""
+
+    def send(self, *args, **kwargs) -> None:
+        pass
+
+    def send_img_chunk(self, *args, **kwargs) -> None:
+        pass
+
+    def read_cmd(self) -> None:
+        return None
+
+    def close(self) -> None:
+        pass
+
+
+def _init(name: str, factory, fallback):
+    try:
+        obj = factory()
+        log.info("%s: OK", name)
+        return obj
+    except Exception as exc:
+        log.error("%s: init failed (%s) — continuing without it", name, exc)
+        return fallback
 
 
 def main():
@@ -38,17 +87,19 @@ def main():
     power = PowerSignal()
     power.set_alive(True)
 
-    bme    = Bme280Sensor(BME280_ADDR)
-    ms     = Ms5611Sensor(MS5611_ADDR)
-    imu    = Bno085Sensor()
-    pwr    = Ina219Sensor(INA219_SHUNT_OHMS, INA219_ADDR)
+    bme    = _init("BME280", lambda: Bme280Sensor(BME280_ADDR), _MissingSensor(Bme280Data))
+    ms     = _init("MS5611", lambda: Ms5611Sensor(MS5611_ADDR), _MissingSensor(Ms5611Data))
+    imu    = _init("BNO085", Bno085Sensor, _MissingSensor(Bno085Data))
+    pwr    = _init("INA219", lambda: Ina219Sensor(INA219_SHUNT_OHMS, INA219_ADDR),
+                   _MissingSensor(Ina219Data))
     strains = [
         Hx711Sensor(s["dt"], s["sck"], HX711_REFERENCE_UNIT)
         for s in HX711_SENSORS
     ]
     espcam     = EspCamPower(ESPCAM_PWR_PIN)
-    espcam_mon = EspCamMonitor(ESPCAM_STATUS_PIN, ESPCAM_STATUS_BAUD)
-    esp        = EspUartSender(ESP_UART_PORT, ESP_UART_BAUD)
+    espcam_mon = EspCamMonitor(ESPCAM_UART_PORT, ESPCAM_STATUS_BAUD)
+    esp        = _init("ESP32 UART", lambda: EspUartSender(ESP_UART_PORT, ESP_UART_BAUD),
+                       _NullEsp())
     cam  = CameraModule(CAM_RECORD_DIR, CAM_PHOTO_W, CAM_PHOTO_H, CAM_PHOTO_QUALITY)
     sdr  = SdrReceiver(
         target_freq_hz  = SDR_TARGET_FREQ,
@@ -66,6 +117,9 @@ def main():
     last_send       = 0.0
     pending_chunks: list[tuple[int, int, int, str]] = []
     last_chunk_sent = 0.0
+    esp_lora_ok = None          # ostatni stan LoRa zgłoszony przez ESP32
+    esp_last_status = time.time()
+    esp_link_warned = False
     last_sdr        = 0.0
     last_hf_dbfs: float | None = None
 
@@ -76,16 +130,29 @@ def main():
 
             # ── Sprawdź czy ESP32 prosi o shutdown ───────────────────────────
             if power.shutdown_requested:
+                # ALIVE zostaje HIGH do zamknięcia usługi — ESP32 odcina prąd dopiero
+                # RPI_HALT_DELAY_MS po jego opadnięciu.
                 log.info("Shutdown requested by ESP32 — shutting down OS")
-                power.set_alive(False)
-                os.system("sudo shutdown -h now")
+                if os.system("sudo -n /usr/sbin/shutdown -h now") != 0:
+                    log.error("shutdown nieudany — brak uprawnień? uruchom: sudo bash setup.sh")
                 break
 
             # ── Komendy z ESP32 (photo / cam_rec) ────────────────────────────
             cmd = esp.read_cmd()
             if cmd:
                 c = cmd.get("cmd", "")
-                if c == "photo" and cam.available:
+                if cmd.get("type") == "esp_status":
+                    lora = bool(cmd.get("lora", False))
+                    if lora != esp_lora_ok:
+                        if lora:
+                            log.info("ESP32: LoRa OK (ESP odebrało %s linii z RPi)", cmd.get("rx"))
+                        else:
+                            log.warning("ESP32: BRAK LoRa — telemetria NIE jest nadawana radiowo "
+                                        "(UART działa, ESP odebrało %s linii z RPi)", cmd.get("rx"))
+                        esp_lora_ok = lora
+                    esp_last_status = now
+
+                elif c == "photo" and cam.available:
                     chunks = cam.capture_photo_chunks()
                     if chunks:
                         pending_chunks.extend(chunks)
@@ -101,6 +168,14 @@ def main():
 
                 elif c == "espcam_pwr":
                     espcam.set(bool(cmd.get("on", False)))
+
+            # ── Brak statusu z ESP32 (co 5 s) → link UART ESP→RPi nie działa ──
+            if now - esp_last_status > 15 and not esp_link_warned:
+                log.warning("ESP32: brak statusu przez UART od 15 s — sprawdź ESP (zasilanie/GND/GPIO14→GPIO15)")
+                esp_link_warned = True
+            elif now - esp_last_status <= 15 and esp_link_warned:
+                log.info("ESP32: link UART przywrócony")
+                esp_link_warned = False
 
             # ── Wysyłaj chunki obrazu do ESP32 (po jednym co CAM_CHUNK_INTERVAL_S) ──
             if pending_chunks and (now - last_chunk_sent >= CAM_CHUNK_INTERVAL_S):

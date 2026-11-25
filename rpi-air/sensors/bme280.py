@@ -14,10 +14,14 @@ class Bme280Sensor:
     def __init__(self, i2c_addr: int = 0x76, bus: int = 1):
         self._bus = smbus2.SMBus(bus)
         self._sensor = _BME280(i2c_addr=i2c_addr, i2c_dev=self._bus)
+        self._sensor.setup()   # rzuca wyjątek gdy czujnik nie odpowiada
 
     def read(self) -> Bme280Data:
-        return Bme280Data(
-            temperature_c=round(self._sensor.get_temperature(), 2),
-            humidity_pct=round(self._sensor.get_humidity(), 2),
-            pressure_hpa=round(self._sensor.get_pressure(), 2),
-        )
+        try:
+            return Bme280Data(
+                temperature_c=round(self._sensor.get_temperature(), 2),
+                humidity_pct=round(self._sensor.get_humidity(), 2),
+                pressure_hpa=round(self._sensor.get_pressure(), 2),
+            )
+        except OSError:
+            return Bme280Data()

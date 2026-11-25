@@ -1,0 +1,22 @@
+# PlatformIO (ESP32 / ESP32-CAM)
+.pio/
+upload.log
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Flutter / Android
+.dart_tool/
+flutter/build/
+*.apk
+*.aab
+
+# Node
+node_modules/
+
+# Pliki systemowe
+.DS_Store
+Thumbs.db

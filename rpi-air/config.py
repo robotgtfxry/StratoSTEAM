@@ -19,13 +19,15 @@ BNO085_ADDR = 0x4A
 INA219_ADDR = 0x40
 INA219_SHUNT_OHMS = 0.1
 
-# ESP32-CAM — 1 kamera, zasilanie przełączane przez MOSFET (low-side, GPIO → gate 100Ω)
-ESPCAM_PWR_PIN = 17          # GPIO BCM (pin 11) — HIGH = kamera zasilona
+# ESP32-CAM — 1 kamera, zasilana BEZPOŚREDNIO z 5V RPi (pin 2/4), zawsze włączona.
+# None = brak przełączania. Jeśli kiedyś wróci MOSFET: numer GPIO BCM (np. 17).
+ESPCAM_PWR_PIN = None
 
-# ESP32-CAM — odczyt statusu przez UART (bit-bang pigpio)
-# ESP32-CAM GPIO1 (U0TX) → RPi GPIO poniżej
+# ESP32-CAM — status przez sprzętowy UART3 RPi 5
+# ESP32-CAM U0T (GPIO1) → RPi5 GPIO9 (pin 21) = UART3 RX
+# Wymaga w /boot/firmware/config.txt:  dtoverlay=uart3-pi5
 # Poziomy napięć zgodne: ESP32-CAM 3.3V = RPi 3.3V (bez level-shiftera)
-ESPCAM_STATUS_PIN = 4        # GPIO BCM (pin 7)
+ESPCAM_UART_PORT = "/dev/ttyAMA3"
 ESPCAM_STATUS_BAUD = 115200  # musi zgadzać się z SERIAL_BAUD w espcam/include/config.h
 
 # HX711 — 4× czujnik siły (tensometry, zawieszenie ładunku)
@@ -55,7 +57,7 @@ SDR_NUM_SAMPLES      = 256 * 1024  # próbki na pomiar (~1 s)
 SDR_BIN_WINDOW       = 15          # ±bin wokół nośnej w FFT
 
 # Camera (RPi cam0)
-CAM_RECORD_DIR     = "/home/pi/stratosteam-video"
+CAM_RECORD_DIR     = "/home/admin/stratosteam-video"
 CAM_PHOTO_W        = 160    # szerokość zdjęcia wysyłanego przez LoRa
 CAM_PHOTO_H        = 120    # wysokość
 CAM_PHOTO_QUALITY  = 25     # jakość JPEG (1-95); niższa = mniejszy plik = mniej chunków

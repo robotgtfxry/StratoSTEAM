@@ -8,7 +8,7 @@
 #define SESSION_ROOT         "/CAM"
 
 // ─── Nagrywanie MJPEG AVI ────────────────────────────────────────────────────
-// OV2640 stabilnie daje ~10 fps przy VGA
+// Czujnik na tej płytce: OV3660 (PID 0x3660). Pinout taki sam jak dla OV2640.
 // VGA (640×480) @ 10fps @ quality 10 → ~100 KB/s → ~7 GB / 8h → karta 32 GB
 #define FRAMESIZE            FRAMESIZE_VGA   // 640×480
 #define CAM_WIDTH            640
@@ -22,11 +22,17 @@
 #define FILE_SPLIT_S         300             // 5 minut na plik
 
 // ─── Status UART → RPi ───────────────────────────────────────────────────────
-// ESP32-CAM GPIO1 (U0TX) → RPi GPIO (bit-bang, 115200 baud)
+// ESP32-CAM GPIO1 (U0TX) → RPi5 GPIO9 (pin 21) = sprzętowy UART3 (/dev/ttyAMA3)
 // Linie statusu zaczynają się od "$S" — RPi ignoruje pozostałe (debug, boot)
 #define SERIAL_BAUD          115200
 #define STATUS_INTERVAL_MS   5000
 
+// ─── Zegar kamery ────────────────────────────────────────────────────────────
+#define XCLK_FREQ_HZ         20000000
+
 // ─── LED statusu ─────────────────────────────────────────────────────────────
-#define LED_PIN              4     // wbudowana lampa błyskowa AI-Thinker
-#define LED_ACTIVE           LOW   // LOW = ON
+// GPIO33 = mała czerwona dioda z tyłu płytki (LOW = świeci).
+// NIE używać GPIO4 — to jasna lampa błyskowa (HIGH = świeci, ~200 mA).
+#define LED_PIN              33
+#define LED_ACTIVE           LOW
+#define FLASH_PIN            4     // trzymana na LOW = lampa zgaszona

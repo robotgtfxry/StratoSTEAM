@@ -24,8 +24,11 @@ class Bno085Sensor:
 
     def read(self) -> Bno085Data:
         import math
-        quat = self._imu.quaternion
-        accel = self._imu.acceleration
+        try:
+            quat = self._imu.quaternion
+            accel = self._imu.acceleration
+        except Exception:
+            return Bno085Data()
 
         if quat is None:
             return Bno085Data()

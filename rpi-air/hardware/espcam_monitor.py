@@ -1,16 +1,14 @@
 """
-ESP32-CAM status monitor — odczyt przez UART (pigpio bit-bang serial).
+ESP32-CAM status monitor — odczyt przez sprzętowy UART RPi 5.
 
 Kamera wysyła co ~5 s przez UART TX (GPIO1, 115200 baud) linię JSON
 poprzedzoną prefiksem "$S":
-  $S{"ok":1,"rec":1,"n":1234,"mb":7800}
+  $S{"ok":1,"rec":1,"sd":1,"n":1234,"mb":7800,"fps":9.5}
 
 Linie bez prefiksu (debug, komunikaty bootu) są ignorowane.
-RPi odbiera na GPIO4. Nie wymaga WiFi — tylko kabel TX→GPIO.
 
-UWAGA: pigpio nie wspiera Raspberry Pi 5. Na RPi 5 ten odczyt trzeba przenieść
-na lgpio albo na sprzętowy UART — monitor zgłosi wtedy brak pigpio i zostanie
-wyłączony (reszta telemetrii działa normalnie).
+Połączenie: ESP32-CAM U0T (GPIO1) → RPi5 GPIO9 (pin 21) = UART3 RX.
+Wymaga w /boot/firmware/config.txt:  dtoverlay=uart3-pi5   →  /dev/ttyAMA3
 """
 import json
 import logging
@@ -20,130 +18,136 @@ import time
 log = logging.getLogger(__name__)
 
 try:
-    import pigpio
-    _PIGPIO = True
+    import serial
+    _SERIAL = True
 except ImportError:
-    _PIGPIO = False
-    log.warning("pigpio not available — EspCamMonitor disabled")
+    _SERIAL = False
+    log.warning("pyserial not available — EspCamMonitor disabled")
 
-READ_INTERVAL_S = 0.2   # jak często sprawdzamy bufor
-STATUS_TIMEOUT_S = 30   # po tym czasie status = nieaktywny
+STATUS_TIMEOUT_S = 30   # po tym czasie bez statusu → kamera nieosiągalna
+REOPEN_DELAY_S = 5      # ponowna próba otwarcia portu po błędzie
 
 
 class EspCamMonitor:
     """
-    Czyta status ESP32-CAM przez bit-bang serial (pigpio).
+    Czyta status ESP32-CAM z portu szeregowego.
     Wynik dostępny przez .compact() → [ok, rec, frames, free_mb]
     """
 
-    def __init__(self, pin: int, baud: int = 115200):
-        self._pin = pin
+    def __init__(self, port: str, baud: int = 115200):
+        self._port = port
         self._baud = baud
         self._status: dict = self._empty()
-        self._last_seen = 0.0
+        self._last_seen: float | None = None   # time.monotonic() ostatniego statusu
+        self._open_failed = False
         self._lock = threading.Lock()
         self._stop = threading.Event()
-        self._pi = None
-        self._rx_buf = ""
+        self._ser = None
 
-        if not _PIGPIO:
+        if not _SERIAL:
             return
-
-        self._pi = pigpio.pi()
-        if not self._pi.connected:
-            log.error("pigpio daemon not running — EspCamMonitor disabled")
-            self._pi = None
-            return
-
-        err = self._pi.bb_serial_read_open(pin, baud, 8)
-        if err != 0:
-            log.error("bb_serial_read_open failed pin=%d err=%d", pin, err)
-            self._pi = None
-            return
-        log.info("EspCamMonitor: listening on GPIO%d @ %d baud", pin, baud)
 
         self._thread = threading.Thread(target=self._run, daemon=True, name="espcam-mon")
         self._thread.start()
 
     @staticmethod
     def _empty() -> dict:
-        return {"ok": False, "recording": False,
-                "frames": 0, "free_mb": 0, "reachable": False}
+        return {"ok": False, "recording": False, "sd": False,
+                "frames": 0, "free_mb": 0, "fps": 0.0, "reachable": False}
+
+    def _open(self) -> bool:
+        try:
+            self._ser = serial.Serial(self._port, self._baud, timeout=1.0)
+            log.info("EspCamMonitor: listening on %s @ %d baud", self._port, self._baud)
+            self._open_failed = False
+            return True
+        except Exception as e:
+            # tylko raz na awarię — próby są co REOPEN_DELAY_S, nie zaśmiecaj logu przez cały lot
+            if not self._open_failed:
+                log.error("EspCamMonitor: nie mogę otworzyć %s (%s) — "
+                          "czy jest dtoverlay=uart3-pi5 w /boot/firmware/config.txt?", self._port, e)
+            self._open_failed = True
+            self._ser = None
+            return False
+
+    @staticmethod
+    def parse_line(raw: bytes) -> dict | None:
+        """Zwraca status z linii "$S{...}" albo None dla innych linii."""
+        line = raw.decode("utf-8", errors="ignore").strip()
+        idx = line.find("$S{")           # śmieci przed prefiksem (np. po resecie) są pomijane
+        if idx < 0:
+            return None
+        try:
+            j = json.loads(line[idx + 2:])
+        except json.JSONDecodeError:
+            log.debug("EspCam bad JSON: %r", line)
+            return None
+        return {
+            "ok":        bool(j.get("ok", 0)),
+            "recording": bool(j.get("rec", 0)),
+            "sd":        bool(j.get("sd", 0)),
+            "frames":    int(j.get("n", 0)),
+            "free_mb":   int(j.get("mb", 0)),
+            "fps":       float(j.get("fps", 0.0)),
+            "reachable": True,
+        }
 
     def _run(self):
         while not self._stop.is_set():
-            if self._pi is None:
-                self._stop.wait(1.0)
+            if self._ser is None and not self._open():
+                self._stop.wait(REOPEN_DELAY_S)
                 continue
 
             try:
-                count, data = self._pi.bb_serial_read(self._pin)
+                raw = self._ser.readline()          # max 1 s (timeout)
             except Exception as e:
-                log.debug("EspCam read error: %s", e)
-                count, data = 0, b""
+                log.warning("EspCam read error: %s — ponawiam otwarcie portu", e)
+                try:
+                    self._ser.close()
+                except Exception:
+                    pass
+                self._ser = None
+                continue
 
-            if count > 0:
-                self._rx_buf += data.decode("utf-8", errors="ignore")
-                # Ogranicz bufor żeby nie rósł w nieskończoność przy śmieciach
-                if len(self._rx_buf) > 2048:
-                    self._rx_buf = self._rx_buf[-512:]
-                # Parsuj tylko linie zaczynające się od "$S" (reszta = debug/boot)
-                while "\n" in self._rx_buf:
-                    line, self._rx_buf = self._rx_buf.split("\n", 1)
-                    line = line.strip()
-                    if not line.startswith("$S"):
-                        continue  # ignoruj debug i boot messages
-                    line = line[2:]  # odetnij prefix "$S"
-                    try:
-                        j = json.loads(line)
-                    except json.JSONDecodeError:
-                        log.debug("EspCam bad JSON: %r", line)
-                        continue
-                    st = {
-                        "ok":        bool(j.get("ok", 0)),
-                        "recording": bool(j.get("rec", 0)),
-                        "frames":    int(j.get("n", 0)),
-                        "free_mb":   int(j.get("mb", 0)),
-                        "reachable": True,
-                    }
-                    with self._lock:
-                        self._status = st
-                        self._last_seen = time.time()
-                    log.debug("EspCam: ok=%s rec=%s frames=%d free=%dMB",
-                              st["ok"], st["recording"], st["frames"], st["free_mb"])
+            st = self.parse_line(raw) if raw else None
+            if st:
+                with self._lock:
+                    self._status = st
+                    self._last_seen = time.monotonic()
+                log.debug("EspCam: ok=%s rec=%s sd=%s frames=%d free=%dMB fps=%.1f",
+                          st["ok"], st["recording"], st["sd"],
+                          st["frames"], st["free_mb"], st["fps"])
 
-            # Oznacz kamerę jako nieosiągalną po timeoucie
-            with self._lock:
-                if self._last_seen > 0 and time.time() - self._last_seen > STATUS_TIMEOUT_S:
-                    self._status["reachable"] = False
-
-            self._stop.wait(READ_INTERVAL_S)
+    def _reachable(self) -> bool:
+        return (self._last_seen is not None
+                and time.monotonic() - self._last_seen <= STATUS_TIMEOUT_S)
 
     def compact(self) -> list:
         """
         [ok, recording, frames, free_mb]
         Gotowe do osadzenia w pakiecie UART/LoRa jako pole "ec".
+        Gdy kamera milczy dłużej niż STATUS_TIMEOUT_S, ok i recording = 0.
         """
         with self._lock:
+            alive = self._reachable()
             return [
-                1 if self._status["ok"] else 0,
-                1 if self._status["recording"] else 0,
+                1 if alive and self._status["ok"] else 0,
+                1 if alive and self._status["recording"] else 0,
                 self._status["frames"],
                 self._status["free_mb"],
             ]
 
     def get(self) -> dict:
         with self._lock:
-            return dict(self._status)
+            return {**self._status, "reachable": self._reachable()}
 
     def stop(self):
         self._stop.set()
         if hasattr(self, "_thread"):
             self._thread.join(timeout=3)
-        if self._pi:
+        if self._ser:
             try:
-                self._pi.bb_serial_read_close(self._pin)
+                self._ser.close()
             except Exception:
                 pass
-            self._pi.stop()
         log.info("EspCamMonitor stopped")

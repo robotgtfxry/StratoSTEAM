@@ -17,9 +17,9 @@ try:
     import numpy as np
     from rtlsdr import RtlSdr as _RtlSdr
     _AVAILABLE = True
-except ImportError:
+except Exception as exc:   # nie tylko ImportError: pyrtlsdr niezgodny z librtlsdr rzuca AttributeError
     _AVAILABLE = False
-    log.warning("pyrtlsdr / numpy nie zainstalowane — SDR wyłączony")
+    log.warning("pyrtlsdr / numpy niedostępne (%s) — SDR wyłączony", exc)
 
 
 class SdrReceiver:
