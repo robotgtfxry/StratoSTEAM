@@ -1,3 +1,3 @@
-RPi.GPIO
+rpi-lgpio  # zamiennik RPi.GPIO działający na RPi 5
 spidev
 requests

@@ -41,6 +41,9 @@ class Uplink:
             if r.status_code == 201:
                 return True
             log.warning("Backend returned %d: %s", r.status_code, r.text[:200])
+            if r.status_code in (400, 422):
+                log.error("Pakiet odrzucony na stałe (seq=%s) — nie ponawiam", packet.get("seq"))
+                return True
         except requests.RequestException as e:
             log.warning("Uplink error: %s", e)
         return False

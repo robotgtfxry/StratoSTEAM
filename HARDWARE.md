@@ -97,7 +97,7 @@
 
 > RPi5 (balon). Ciągłe nagrywanie H.264 4K (3840×2160, 15 Mbps) na dysk — katalog z `CAM_RECORD_DIR` (domyślnie `/home/pi/stratosteam-video`).  
 > Na żądanie z Flutter: zdjęcie 160×120 JPEG, chunki po 140 bajtów (base64), przesyłane przez UART → LoRa → backend.  
-> Dysk monitorowany: `shutil.disk_usage()`, dane `dsku`/`dskf` w beaconie ESP32.  
+> Dysk monitorowany: `shutil.disk_usage()`, dane `dsku`/`dskf` w beaconie ESP32 (pole `d`).  
 > 15 Mbps przy 4K to ~54 GB na 8 h lotu — potrzebna karta 64 GB lub większa.
 
 ---
@@ -144,7 +144,7 @@ dtoverlay=uart3-pi5
 $S{"ok":1,"rec":1,"sd":1,"n":1234,"mb":7800,"fps":9.5}
 ```
 `ok` = kamera działa, `rec` = trwa zapis, `sd` = karta zamontowana, `n` = klatki, `mb` = wolne MB, `fps` = klatki/s.
-Linie bez `$S` (boot, debug) są ignorowane. `EspCamMonitor` (pyserial, `/dev/ttyAMA3`) dokłada `"ec": [ok, rec, klatki, wolne_MB]` do pakietu UART → ESP32-S3 → LoRa → backend → Flutter.
+Linie bez `$S` (boot, debug) są ignorowane. `EspCamMonitor` (pyserial, `/dev/ttyAMA3`) dokłada `"ec": [ok, rec, klatki, wolne_MB]` do pakietu UART → ESP32-S3 → LoRa (pole `c`) → backend → Flutter. Gdy kamera milczy > 30 s, `ok` i `rec` = 0.
 
 ---
 
@@ -221,6 +221,30 @@ w narożnikach ramy zawieszenia ładunku (przód-lewy, przód-prawy, tył-lewy, 
 
 ---
 
+> **Nadzór zasilania (ESP32):** po włączeniu RPi ESP32 czeka na pierwszy stan wysoki ALIVE bez limitu czasu.
+> Potem odcina zasilanie dopiero po 60 s ciągłego braku ALIVE (restart usługi nie gasi RPi), a po 30 min włącza je ponownie.
+> Przy zamykaniu prąd znika 10 s po opadnięciu ALIVE, najpóźniej ~30 s od prośby o shutdown.
+> `rpi-air/setup.sh` nadaje usłudze prawo do `sudo shutdown -h now` bez hasła.
+
+## Beacon LoRa (ESP32 → ziemia)
+
+Pakiet ma limit **255 B**, więc ESP32 nadaje krótkie klucze. Dekoduje je `rpi-ground/beacon.py` — zmieniaj oba pliki razem.
+
+| Klucz | Zawartość |
+|-------|-----------|
+| `p`   | [lat, lon, alt, satelity, fix] |
+| `vbe` | napięcie baterii z ADC ESP32 |
+| `b`   | [vbat, imA] |
+| `e`   | [temp, hum, pres, p2, alt2] |
+| `i`   | [roll, pit, yaw, ax, ay, az] |
+| `d`   | [dsku, dskf] |
+| `h`   | hfdb |
+| `c`   | status ESP32-CAM [ok, rec, klatki, wolne_MB] |
+| `s`   | tensometry [sg0–sg3] |
+| `x`   | 1 = część pól pominięta (kolejno d, s, i, c, h), bo pakiet był za długi |
+
+---
+
 ## Tylko ESP32 (GPIO)
 
 | Element     | ESP32 GPIO | Opis                                               |
@@ -258,7 +282,8 @@ Relay NO ───────────────────────�
 > RPi5 (balon). HIGH na GPIO = tranzystor otwarty = cewka aktywna = przekaźnik zamknięty = linka zwolniona.  
 > Polecenie JSON (RPi5 ← ESP32 przez UART): `{"cmd":"release_line","line":0}` / `{"cmd":"release_line","line":1}`.  
 > Obie linki jednocześnie: `{"cmd":"release_line","line":-1}`.  
-> Po zwolnieniu GPIO wraca do LOW — cewka nie jest trzymana w sposób ciągły.
+> Po zwolnieniu GPIO wraca do LOW — cewka nie jest trzymana w sposób ciągły.  
+> **UWAGA: `release_line` nie jest jeszcze zaimplementowane** w `rpi-air`, firmware ESP32 ani w backendzie — działa tylko test w `testy/`.
 
 ---
 
@@ -288,6 +313,8 @@ Wolne po stronie balonu: GPIO4, GPIO7, GPIO10, GPIO11, GPIO17, GPIO18, GPIO22, G
 - **RPi.GPIO nie działa na RPi 5.** Potrzebna nakładka lgpio:
   `sudo apt remove python3-rpi.gpio && sudo apt install python3-rpi-lgpio`.
   Dotyczy HX711, przekaźników i sygnałów do ESP32-S3.
+  W `rpi-air/.venv` po `pip install -r requirements.txt` zrób też `pip uninstall -y RPi.GPIO`
+  (dociąga je adafruit-blinka i przesłania rpi-lgpio).
 - Status ESP32-CAM idzie przez sprzętowy UART3 (`dtoverlay=uart3-pi5` → `/dev/ttyAMA3`),
   bez pigpio (pigpio nie wspiera RPi 5).
 - UART na RPi 5 to `/dev/ttyAMA0` (GPIO14/15) — w `raspi-config` wyłącz konsolę

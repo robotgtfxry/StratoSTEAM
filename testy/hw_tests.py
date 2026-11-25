@@ -784,7 +784,7 @@ def test_camera() -> Result:
                          "Styki taśmy w stronę radiatora/HDMI",
                          "Sprawdź: rpicam-hello --list-cameras",
                          "Jeśli kamera jest zajęta przez inny program — zatrzymaj usługę:",
-                         "   sudo systemctl stop stratosteam-air"])
+                         "   sudo systemctl stop rpi-air"])
     finally:
         if cam is not None:
             try:
@@ -811,6 +811,9 @@ def test_espcam_power() -> Result:
     if SIMULATE:
         return Result(OK, "Symulacja — kanał zasilania przełączony", {
             "Kamera": f"GPIO{pin}: włączona → wyłączona OK"})
+    if pin is None:
+        return Result(INFO, "Kamera zasilana na stałe z 5 V — nie ma czego przełączać", {},
+                      ["ESPCAM_PWR_PIN = None w rpi-air/config.py"])
     try:
         import RPi.GPIO as GPIO
     except Exception as e:
@@ -987,7 +990,7 @@ def test_esp_uart(seconds: float = 6.0) -> Result:
     try:
         ser = serial.Serial(port, baud, timeout=1)
     except Exception as e:
-        return _fail(e, ["Port zajęty przez usługę? sudo systemctl stop stratosteam-air"]
+        return _fail(e, ["Port zajęty przez usługę? sudo systemctl stop rpi-air"]
                      + HINT_UART)
     lines: list[str] = []
     try:

@@ -279,8 +279,8 @@ def build_devices() -> list[Device]:
             ],
             notes=[
                 f"Nagrania trafiają do {air('CAM_RECORD_DIR', '/home/pi/stratosteam-video')}.",
-                "Jeśli usługa stratosteam-air już działa, kamera jest zajęta — "
-                "zatrzymaj ją: sudo systemctl stop stratosteam-air",
+                "Jeśli usługa rpi-air już działa, kamera jest zajęta — "
+                "zatrzymaj ją: sudo systemctl stop rpi-air",
                 "Zdejmij folię z obiektywu przed lotem.",
             ],
             libs=["python3-picamera2 (apt)"],
@@ -319,11 +319,12 @@ def build_devices() -> list[Device]:
             id="espcam_pwr",
             name="ESP32-CAM — zasilanie przez MOSFET",
             group=GRUPA_BALON,
-            bus=f"GPIO{espcam_pwr}",
+            bus="stałe 5 V" if espcam_pwr is None else f"GPIO{espcam_pwr}",
             summary="Kamera wisi na tranzystorze po stronie masy. Stan wysoki na GPIO = "
                     "MOSFET otwarty = kamera zasilona. Dzięki temu można ją wyłączyć "
                     "w locie i oszczędzić prąd.",
-            wiring=[w_gpio("Bramka MOSFET", espcam_pwr, "przez rezystor 100 Ω"),
+            wiring=[*([] if espcam_pwr is None else
+                      [w_gpio("Bramka MOSFET", espcam_pwr, "przez rezystor 100 Ω")]),
                     w_5v("VCC kamery"), w_gnd("Masa systemowa (source)")],
             steps=[
                 "Bramka BSS138 przez 100 Ω do GPIO, plus 10 kΩ z bramki do masy.",
@@ -392,7 +393,7 @@ def build_devices() -> list[Device]:
             ],
             notes=[
                 "Cisza nie musi znaczyć awarii: ESP32 wysyła coś tylko wtedy, gdy ma komendę.",
-                "Ten sam port zajmuje usługa stratosteam-air — zatrzymaj ją przed testem.",
+                "Ten sam port zajmuje usługa rpi-air — zatrzymaj ją przed testem.",
                 "Dane w stronę ESP32: temp, hum, pres, p2, alt2, roll, pit, yaw, ax, ay, az, "
                 "vbat, imA, dsku, dskf, hfdb, sg0-sg3.",
             ],
@@ -424,6 +425,11 @@ def build_devices() -> list[Device]:
             libs=["RPi.GPIO — na RPi 5: python3-rpi-lgpio"],
             test=T.test_power_signals,
             duration="ok. 1 s",
+            confirm="Test na chwilę podnosi, a potem opuszcza RPI_ALIVE.\n\n"
+                    "Jeśli Raspberry Pi jest zasilane przez ESP32 (MOSFET), ESP32 uzna, że RPi "
+                    "przestało działać i po ok. 60 s odetnie zasilanie — chyba że wcześniej "
+                    "uruchomisz usługę rpi-air.\n\nKontynuować?",
+            live=False,
         ),
         Device(
             id="relays",

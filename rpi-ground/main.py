@@ -14,6 +14,7 @@ import requests
 
 from radio import LoRaRX
 from uplink import Uplink
+from beacon import expand_beacon, has_rpi_data, beacon_to_telemetry
 from hf_controller import HfController
 from command_store import CommandStore
 from rpi_power_store import RpiPowerStore
@@ -108,6 +109,8 @@ def main():
 
             # Determine source: ESP32 beacon or full RPi telemetry
             from_esp32 = packet.get("src") == "esp32"
+            if from_esp32:
+                packet = expand_beacon(packet)
             is_exec_result = packet.get("type") == "exec_result"
 
             # ── Jeśli to wynik exec od rpi-air — przekaż do backendu ─────────
@@ -121,7 +124,8 @@ def main():
                 log.info("Exec result rc=%s out=%r", packet.get("rc"), packet.get("out"))
                 # NIE robimy continue — otwieramy okno uplink normalnie poniżej
 
-            rpi_running = not from_esp32 and not is_exec_result
+            # beacon ESP32 z danymi czujników = RPi na balonie działa
+            rpi_running = has_rpi_data(packet) if from_esp32 else True
             rpi_power.report_status(rpi_running)
 
             if from_esp32:
@@ -130,10 +134,10 @@ def main():
                     packet.get("seq"), packet.get("lat"),
                     packet.get("lon"), packet.get("vbat"), packet.get("vbe"), rssi,
                 )
-                uplink.send(packet, rssi, snr)
+                uplink.send(beacon_to_telemetry(packet), rssi, snr)
 
                 # Disk info z beacona → backend
-                if packet.get("dsku") is not None:
+                if packet.get("dsku") is not None and packet.get("dskf") is not None:
                     camera_s.post_storage(
                         used_gb=float(packet["dsku"]),
                         free_gb=float(packet["dskf"]),
@@ -214,24 +218,32 @@ def main():
                     log.info("EspCam power cmd on=%s ok=%s", cam_on, ok)
 
             else:
-                # ESP32 beacon — możemy wysłać tylko rpi_power (ESP32 słucha)
-                pwr_cmd = rpi_power.pop()
-                if pwr_cmd is not None:
-                    pkt = build_rpi_power_command(pwr_cmd)
-                    ok = lora.send_command(pkt)
-                    log.info("RPi power cmd → ESP32 on=%s ok=%s", pwr_cmd, ok)
-                exec_s.pop()      # exec nie dotrze do ESP32 — odrzuć
-                commands.pop()    # buzzer/led też nie — odrzuć
+                # ── Okno po beaconie ESP32: jedna komenda na okno ─────────────
+                # Pozostałe czekają w swoich kolejkach na następny beacon.
+                if exec_s.pop() is not None:
+                    log.warning("exec odrzucony — ESP32 nie obsługuje tej komendy")
 
-                # ── Komendy kamery przez ESP32 beacon window ──────────────────
-                if camera_s.pop_photo():
+                if (pwr_cmd := rpi_power.pop()) is not None:
+                    ok = lora.send_command(build_rpi_power_command(pwr_cmd))
+                    log.info("RPi power cmd → ESP32 on=%s ok=%s", pwr_cmd, ok)
+                elif cmd := commands.pop():
+                    ok = lora.send_command(build_command(
+                        buzzer=bool(cmd.get("buzzer", False)),
+                        r=int(cmd.get("led_r", 0)),
+                        g=int(cmd.get("led_g", 0)),
+                        b=int(cmd.get("led_b", 0)),
+                    ))
+                    log.info("CMD → ESP32 ok=%s buzzer=%s led=(%s,%s,%s)", ok,
+                             cmd.get("buzzer"), cmd.get("led_r"), cmd.get("led_g"), cmd.get("led_b"))
+                elif camera_s.pop_photo():
                     ok = lora.send_command(build_photo_command())
                     log.info("Camera photo cmd → ESP32 ok=%s", ok)
-                else:
-                    rec = camera_s.pop_rec()
-                    if rec is not None:
-                        ok = lora.send_command(build_cam_rec_command(rec))
-                        log.info("Camera rec cmd on=%s → ESP32 ok=%s", rec, ok)
+                elif (rec := camera_s.pop_rec()) is not None:
+                    ok = lora.send_command(build_cam_rec_command(rec))
+                    log.info("Camera rec cmd on=%s → ESP32 ok=%s", rec, ok)
+                elif (cam_on := espcam_s.pop()) is not None:
+                    ok = lora.send_command(build_espcam_power_command(cam_on))
+                    log.info("EspCam power cmd on=%s → ESP32 ok=%s", cam_on, ok)
 
     except KeyboardInterrupt:
         log.info("Shutdown")

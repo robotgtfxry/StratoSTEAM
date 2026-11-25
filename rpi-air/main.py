@@ -130,9 +130,11 @@ def main():
 
             # ── Sprawdź czy ESP32 prosi o shutdown ───────────────────────────
             if power.shutdown_requested:
+                # ALIVE zostaje HIGH do zamknięcia usługi — ESP32 odcina prąd dopiero
+                # RPI_HALT_DELAY_MS po jego opadnięciu.
                 log.info("Shutdown requested by ESP32 — shutting down OS")
-                power.set_alive(False)
-                os.system("sudo shutdown -h now")
+                if os.system("sudo -n /usr/sbin/shutdown -h now") != 0:
+                    log.error("shutdown nieudany — brak uprawnień? uruchom: sudo bash setup.sh")
                 break
 
             # ── Komendy z ESP32 (photo / cam_rec) ────────────────────────────

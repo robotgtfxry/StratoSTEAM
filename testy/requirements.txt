@@ -25,7 +25,8 @@ pynmea2
 rpi-lgpio
 
 # RTL-SDR (odbiornik HF)
-pyrtlsdr
+pyrtlsdr==0.3.0
+setuptools<81
 numpy
 
 # Kamera CSI — tylko z apt, nie z pip:

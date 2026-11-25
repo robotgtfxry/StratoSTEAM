@@ -131,5 +131,5 @@ Opisy podłączeń są zebrane w jednym miejscu — `testy/catalog.py`.
   Dotyczy przekaźników, zasilania ESP32-CAM i sygnałów do ESP32-S3.
 * **pigpio** nie wspiera RPi 5 — dlatego tester czyta status ESP32-CAM sprzętowym UART3:
   `dtoverlay=uart3-pi5` w `/boot/firmware/config.txt`, reboot, TX kamery → GPIO9 (pin 21).
-* Usługa `stratosteam-air` zajmuje UART i kamerę. Przed testami:
-  `sudo systemctl stop stratosteam-air`.
+* Usługa `rpi-air` zajmuje UART i kamerę. Przed testami:
+  `sudo systemctl stop rpi-air`.

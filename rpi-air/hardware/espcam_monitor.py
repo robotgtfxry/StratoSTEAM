@@ -38,7 +38,8 @@ class EspCamMonitor:
         self._port = port
         self._baud = baud
         self._status: dict = self._empty()
-        self._last_seen = 0.0
+        self._last_seen: float | None = None   # time.monotonic() ostatniego statusu
+        self._open_failed = False
         self._lock = threading.Lock()
         self._stop = threading.Event()
         self._ser = None
@@ -58,10 +59,14 @@ class EspCamMonitor:
         try:
             self._ser = serial.Serial(self._port, self._baud, timeout=1.0)
             log.info("EspCamMonitor: listening on %s @ %d baud", self._port, self._baud)
+            self._open_failed = False
             return True
         except Exception as e:
-            log.error("EspCamMonitor: nie mogę otworzyć %s (%s) — "
-                      "czy jest dtoverlay=uart3-pi5 w /boot/firmware/config.txt?", self._port, e)
+            # tylko raz na awarię — próby są co REOPEN_DELAY_S, nie zaśmiecaj logu przez cały lot
+            if not self._open_failed:
+                log.error("EspCamMonitor: nie mogę otworzyć %s (%s) — "
+                          "czy jest dtoverlay=uart3-pi5 w /boot/firmware/config.txt?", self._port, e)
+            self._open_failed = True
             self._ser = None
             return False
 
@@ -105,32 +110,36 @@ class EspCamMonitor:
                 continue
 
             st = self.parse_line(raw) if raw else None
-            with self._lock:
-                if st:
+            if st:
+                with self._lock:
                     self._status = st
-                    self._last_seen = time.time()
-                    log.debug("EspCam: ok=%s rec=%s sd=%s frames=%d free=%dMB fps=%.1f",
-                              st["ok"], st["recording"], st["sd"],
-                              st["frames"], st["free_mb"], st["fps"])
-                elif self._last_seen > 0 and time.time() - self._last_seen > STATUS_TIMEOUT_S:
-                    self._status["reachable"] = False
+                    self._last_seen = time.monotonic()
+                log.debug("EspCam: ok=%s rec=%s sd=%s frames=%d free=%dMB fps=%.1f",
+                          st["ok"], st["recording"], st["sd"],
+                          st["frames"], st["free_mb"], st["fps"])
+
+    def _reachable(self) -> bool:
+        return (self._last_seen is not None
+                and time.monotonic() - self._last_seen <= STATUS_TIMEOUT_S)
 
     def compact(self) -> list:
         """
         [ok, recording, frames, free_mb]
         Gotowe do osadzenia w pakiecie UART/LoRa jako pole "ec".
+        Gdy kamera milczy dłużej niż STATUS_TIMEOUT_S, ok i recording = 0.
         """
         with self._lock:
+            alive = self._reachable()
             return [
-                1 if self._status["ok"] else 0,
-                1 if self._status["recording"] else 0,
+                1 if alive and self._status["ok"] else 0,
+                1 if alive and self._status["recording"] else 0,
                 self._status["frames"],
                 self._status["free_mb"],
             ]
 
     def get(self) -> dict:
         with self._lock:
-            return dict(self._status)
+            return {**self._status, "reachable": self._reachable()}
 
     def stop(self):
         self._stop.set()

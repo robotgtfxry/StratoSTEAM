@@ -57,6 +57,9 @@ class Ms5611Sensor:
         sens = c1 * 32768 + (c3 * dt) // 256
         pressure = ((d1 * sens // 2097152 - off) // 32768) / 100.0
 
+        if pressure <= 0:   # błędny odczyt — potęga z liczby ujemnej wywróciłaby pętlę główną
+            return Ms5611Data()
+
         # barometric altitude (ISA model, good enough for stratosphere)
         altitude = 44330.0 * (1.0 - (pressure / 1013.25) ** 0.1903)
 
