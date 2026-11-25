@@ -126,9 +126,9 @@ def main():
 
             if from_esp32:
                 log.info(
-                    "ESP32 beacon seq=%s lat=%s lon=%s vbat=%s RSSI=%d",
+                    "ESP32 beacon seq=%s lat=%s lon=%s vbat=%s vbe=%s RSSI=%d",
                     packet.get("seq"), packet.get("lat"),
-                    packet.get("lon"), packet.get("vbat"), rssi,
+                    packet.get("lon"), packet.get("vbat"), packet.get("vbe"), rssi,
                 )
                 uplink.send(packet, rssi, snr)
 

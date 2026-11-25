@@ -41,11 +41,6 @@
 #define LED_G_PIN      18
 #define LED_B_PIN      20
 
-// LEDC kanały PWM
-#define CH_BUZZ  0
-#define CH_R     1
-#define CH_G     2
-#define CH_B     3
 #define PWM_FREQ   5000
 #define PWM_BITS   8
 
@@ -121,20 +116,48 @@ uint32_t lastBeacon      = 0;
 uint32_t beaconSeq       = 0;
 
 // ── Battery ADC ───────────────────────────────────────────────────────────────
+// Pomiar przez ESP32 niezależnie od RPi5 (INA219). Kalibrowany odczyt eFuse
+// (analogReadMilliVolts), tłumienie 11 dB (~0–3.1 V na pinie), średnia z 16 próbek.
+// Wynik zaokrąglony do 0.01 V (krótszy pakiet LoRa).
+#define BATT_SAMPLES 16
 float readBattAdc() {
-    return (analogRead(BATT_ADC_PIN) / 4095.0f) * BATT_VREF * BATT_DIV_RATIO;
+    uint32_t mv = 0;
+    for (int i = 0; i < BATT_SAMPLES; i++) mv += analogReadMilliVolts(BATT_ADC_PIN);
+    float v = (mv / (float)BATT_SAMPLES) / 1000.0f * BATT_DIV_RATIO;
+    return roundf(v * 100.0f) / 100.0f;
 }
 
 // ── Buzzer ────────────────────────────────────────────────────────────────────
+// Arduino-ESP32 3.x: ledcAttach/ledcWrite/ledcWriteTone przyjmują NUMER PINU, nie kanał
+uint32_t buzzOffAt = 0;   // millis() automatycznego wyłączenia buzzera (0 = brak)
+
 void setBuzzer(bool on) {
-    ledcWriteTone(CH_BUZZ, on ? 2800 : 0);
+    ledcWriteTone(BUZZER_PIN, on ? 2800 : 0);
+    if (!on) buzzOffAt = 0;
 }
 
 // ── LED RGB ───────────────────────────────────────────────────────────────────
 void setLed(int r, int g, int b) {
-    ledcWrite(CH_R, r);
-    ledcWrite(CH_G, g);
-    ledcWrite(CH_B, b);
+    ledcWrite(LED_R_PIN, r);
+    ledcWrite(LED_G_PIN, g);
+    ledcWrite(LED_B_PIN, b);
+}
+
+// ── Komenda buzzer/LED: {"cmd":1,"buzzer":true,"ms":3000,"led_r":0,...} ───────
+// "ms" (opcjonalnie) — automatyczne wyłączenie buzzera po tylu milisekundach.
+// Przychodzi przez LoRa (z ziemi) albo przez UART (z RPi5).
+void applyBuzzerLed(JsonDocument& doc, const char* src) {
+    bool     buz = doc["buzzer"] | false;
+    uint32_t ms  = doc["ms"]     | 0;
+    int      r   = doc["led_r"]  | 0;
+    int      g   = doc["led_g"]  | 0;
+    int      b   = doc["led_b"]  | 0;
+    setBuzzer(buz);
+    if (buz && ms > 0) buzzOffAt = (millis() + ms) | 1;
+    setLed(r, g, b);
+    ledOverride = (r || g || b || buz);
+    Serial.printf("[ESP32] %s: buzzer=%d ms=%lu led=(%d,%d,%d)\n",
+                  src, buz, (unsigned long)ms, r, g, b);
 }
 
 // ── Parser danych z RPi5 (line-delimited JSON) ────────────────────────────────
@@ -144,6 +167,12 @@ void parseRpiLine(const String& line) {
     if (deserializeJson(doc, line) != DeserializationError::Ok) {
         rpiRxBad++;
         Serial.printf("[RPi5] zła linia (%u B): %.60s\n", line.length(), line.c_str());
+        return;
+    }
+
+    // komenda buzzer/LED z RPi5 (np. test, sygnał po lądowaniu)
+    if (doc["cmd"] == 1 || strcmp(doc["cmd"] | "", "1") == 0) {
+        applyBuzzerLed(doc, "RPi");
         return;
     }
 
@@ -230,6 +259,9 @@ void sendBeacon() {
     doc["alt"] = gps.altitude.isValid()   ? gps.altitude.meters()      : 0.0;
     doc["sat"] = gps.satellites.isValid() ? (int)gps.satellites.value(): 0;
 
+    const float vbe = readBattAdc();   // napięcie baterii mierzone przez ESP32 (zawsze)
+    doc["vbe"] = vbe;
+
     if (rpi.fresh) {
         // pełna telemetria z RPi5
         doc["vbat"] = rpi.vbat;
@@ -257,7 +289,7 @@ void sendBeacon() {
         }
     } else {
         // RPi5 nieosiągalna — tylko napięcie z ADC
-        doc["vbat"] = readBattAdc();
+        doc["vbat"] = vbe;
     }
 
     char buf[300];
@@ -270,9 +302,9 @@ void sendBeacon() {
         LoRa.receive();
     }
 
-    Serial.printf("%s seq=%lu rpi=%s rx=%lu fix=%d lat=%.5f lon=%.5f alt=%.0f\n",
+    Serial.printf("%s seq=%lu rpi=%s rx=%lu vbe=%.2fV fix=%d lat=%.5f lon=%.5f alt=%.0f\n",
                   loraOk ? "[LoRa]" : "[NO-LoRa] (nie nadano)",
-                  beaconSeq - 1, rpi.fresh ? "OK" : "—", (unsigned long)rpiRxLines,
+                  beaconSeq - 1, rpi.fresh ? "OK" : "—", (unsigned long)rpiRxLines, vbe,
                   gps.location.isValid(),
                   doc["lat"].as<float>(), doc["lon"].as<float>(),
                   doc["alt"].as<float>());
@@ -293,14 +325,7 @@ void handleIncoming() {
     const char* cmd = doc["cmd"] | "";
 
     if (strcmp(cmd, "1") == 0 || doc["cmd"] == 1) {
-        bool buz = doc["buzzer"] | false;
-        int  r   = doc["led_r"] | 0;
-        int  g   = doc["led_g"] | 0;
-        int  b   = doc["led_b"] | 0;
-        setBuzzer(buz);
-        setLed(r, g, b);
-        ledOverride = true;
-        Serial.printf("[ESP32] buzzer=%d led=(%d,%d,%d)\n", buz, r, g, b);
+        applyBuzzerLed(doc, "LoRa");
         return;
     }
 
@@ -327,7 +352,7 @@ void handleIncoming() {
         return;
     }
 
-    // Zasilanie ESP32-CAM — steruje nim RPi (MOSFET na GPIO17)
+    // Zasilanie ESP32-CAM — przekazywane do RPi (przy zasilaniu bezpośrednim z 5V RPi tylko je loguje)
     if (strcmp(cmd, "espcam_pwr") == 0) {
         bool on = doc["on"] | false;
         Serial.printf("[ESP32] espcam_pwr on=%d → RPi\n", on);
@@ -356,7 +381,7 @@ void sendImgChunk() {
 }
 
 // ── Status ESP → RPi (UART) ───────────────────────────────────────────────────
-// {"type":"esp_status","lora":false,"rx":123,"fix":false,"sat":0}
+// {"type":"esp_status","lora":false,"rx":123,"fix":false,"sat":0,"vbe":7.41}
 void sendStatusToRpi() {
     JsonDocument st;
     st["type"] = "esp_status";
@@ -366,7 +391,8 @@ void sendStatusToRpi() {
     st["bad"]  = rpiRxBad;
     st["fix"]  = gps.location.isValid();
     st["sat"]  = gps.satellites.isValid() ? (int)gps.satellites.value() : 0;
-    char buf[128];
+    st["vbe"]  = readBattAdc();
+    char buf[160];
     serializeJson(st, buf);
     rpiSerial.println(buf);
 }
@@ -435,6 +461,7 @@ void setup() {
     pinMode(RPI_SHTDN_PIN, OUTPUT);
     pinMode(RPI_ALIVE_PIN, INPUT);
     analogReadResolution(12);
+    analogSetPinAttenuation(BATT_ADC_PIN, ADC_11db);
     digitalWrite(RPI_PWR_PIN,   LOW);
     digitalWrite(RPI_SHTDN_PIN, LOW);
 
@@ -458,6 +485,7 @@ void loop() {
     uint32_t now      = millis();
 
     retryLoRa(now);
+    if (buzzOffAt && (int32_t)(now - buzzOffAt) >= 0) setBuzzer(false);
     updateNoLoraLed(now);
     if (now - lastStatus >= STATUS_INTERVAL_MS) {
         lastStatus = now;

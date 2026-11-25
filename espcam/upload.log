@@ -1,0 +1,357 @@
+Processing espcam (platform: espressif32; board: esp32cam; framework: arduino)
+--------------------------------------------------------------------------------
+Tool Manager: Installing platformio/framework-arduinoespressif32-esp32-libs @ ~3.3.12
+Downloading 0% 10% 20% 30% 40% 50% 60% 70% 80% 90% 100%
+Unpacking 0% 10% 20% 30% 40% 50% 60% 70% 80% 90% 100%
+Tool Manager: framework-arduinoespressif32-esp32-libs@3.3.12 has been installed!
+Verbose mode can be enabled via `-v, --verbose` option
+CONFIGURATION: https://docs.platformio.org/page/boards/espressif32/esp32cam.html
+PLATFORM: Espressif 32 (8.0.0) > AI Thinker ESP32-CAM
+HARDWARE: ESP32 240MHz, 320KB RAM, 4MB Flash
+DEBUG: Current (cmsis-dap) External (cmsis-dap, esp-bridge, esp-prog, iot-bus-jtag, jlink, minimodule, olimex-arm-usb-ocd, olimex-arm-usb-ocd-h, olimex-arm-usb-tiny-h, olimex-jtag-tiny, tumpa)
+PACKAGES: 
+ - framework-arduinoespressif32 @ 4.30312.261024 (3.3.12) 
+ - framework-arduinoespressif32-esp32-libs @ 3.3.12 
+ - tool-esptool @ 2.50400.0 (5.4.0) 
+ - tool-mkfatfs @ 2.0.1 
+ - tool-mklittlefs @ 1.203.210628 (2.3) 
+ - tool-mkspiffs @ 2.230.0 (2.30) 
+ - tool-riscv32-esp-elf-gdb @ 12.1.0+20221002 
+ - tool-xtensa-esp-elf-gdb @ 12.1.0+20221002 
+ - toolchain-riscv32-esp @ 14.2.0+20260121 
+ - toolchain-xtensa-esp-elf @ 14.2.0+20260121
+LDF: Library Dependency Finder -> https://bit.ly/configure-pio-ldf
+LDF Modes: Finder ~ chain, Compatibility ~ soft
+Found 44 compatible libraries
+Scanning dependencies...
+Dependency Graph
+|-- FS @ 3.3.12
+|-- SD_MMC @ 3.3.12
+Building in release mode
+Compiling .pio/build/espcam/src/main.cpp.o
+Building .pio/build/espcam/bootloader.bin
+Generating partitions .pio/build/espcam/partitions.bin
+Compiling .pio/build/espcam/lib5ba/FS/FS.cpp.o
+Compiling .pio/build/espcam/lib5ba/FS/vfs_api.cpp.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+<command-line>: note: this is the location of the previous definition
+<command-line>: note: this is the location of the previous definition
+esptool v5.4.0
+Creating ESP32 image...
+Merged 2 ELF sections.
+Successfully created ESP32 image.
+Compiling .pio/build/espcam/libf41/SD_MMC/SD_MMC.cpp.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+src/main.cpp: In function 'bool initCamera()':
+src/main.cpp:239:7: warning: 'camera_config_t::<unnamed union>::pin_sscb_sda' is deprecated: please use pin_sccb_sda instead [-Wdeprecated-declarations]
+  239 |   cfg.pin_sscb_sda = SIOD_GPIO_NUM;
+      |       ^~~~~~~~~~~~
+In file included from src/main.cpp:18:
+/home/admin/.platformio/packages/framework-arduinoespressif32-esp32-libs/include/espressif__esp32-camera/driver/include/esp_camera.h:124:13: note: declared here
+  124 |         int pin_sscb_sda __attribute__((deprecated("please use pin_sccb_sda instead")));           /*!< GPIO pin for camera SDA line (legacy name) */
+      |             ^~~~~~~~~~~~
+src/main.cpp:239:7: warning: 'camera_config_t::<unnamed union>::pin_sscb_sda' is deprecated: please use pin_sccb_sda instead [-Wdeprecated-declarations]
+  239 |   cfg.pin_sscb_sda = SIOD_GPIO_NUM;
+      |       ^~~~~~~~~~~~
+/home/admin/.platformio/packages/framework-arduinoespressif32-esp32-libs/include/espressif__esp32-camera/driver/include/esp_camera.h:124:13: note: declared here
+  124 |         int pin_sscb_sda __attribute__((deprecated("please use pin_sccb_sda instead")));           /*!< GPIO pin for camera SDA line (legacy name) */
+      |             ^~~~~~~~~~~~
+src/main.cpp:239:7: warning: 'camera_config_t::<unnamed union>::pin_sscb_sda' is deprecated: please use pin_sccb_sda instead [-Wdeprecated-declarations]
+  239 |   cfg.pin_sscb_sda = SIOD_GPIO_NUM;
+      |       ^~~~~~~~~~~~
+/home/admin/.platformio/packages/framework-arduinoespressif32-esp32-libs/include/espressif__esp32-camera/driver/include/esp_camera.h:124:13: note: declared here
+  124 |         int pin_sscb_sda __attribute__((deprecated("please use pin_sccb_sda instead")));           /*!< GPIO pin for camera SDA line (legacy name) */
+      |             ^~~~~~~~~~~~
+src/main.cpp:240:7: warning: 'camera_config_t::<unnamed union>::pin_sscb_scl' is deprecated: please use pin_sccb_scl instead [-Wdeprecated-declarations]
+  240 |   cfg.pin_sscb_scl = SIOC_GPIO_NUM;
+      |       ^~~~~~~~~~~~
+/home/admin/.platformio/packages/framework-arduinoespressif32-esp32-libs/include/espressif__esp32-camera/driver/include/esp_camera.h:128:13: note: declared here
+  128 |         int pin_sscb_scl __attribute__((deprecated("please use pin_sccb_scl instead")));           /*!< GPIO pin for camera SCL line (legacy name) */
+      |             ^~~~~~~~~~~~
+src/main.cpp:240:7: warning: 'camera_config_t::<unnamed union>::pin_sscb_scl' is deprecated: please use pin_sccb_scl instead [-Wdeprecated-declarations]
+  240 |   cfg.pin_sscb_scl = SIOC_GPIO_NUM;
+      |       ^~~~~~~~~~~~
+/home/admin/.platformio/packages/framework-arduinoespressif32-esp32-libs/include/espressif__esp32-camera/driver/include/esp_camera.h:128:13: note: declared here
+  128 |         int pin_sscb_scl __attribute__((deprecated("please use pin_sccb_scl instead")));           /*!< GPIO pin for camera SCL line (legacy name) */
+      |             ^~~~~~~~~~~~
+src/main.cpp:240:7: warning: 'camera_config_t::<unnamed union>::pin_sscb_scl' is deprecated: please use pin_sccb_scl instead [-Wdeprecated-declarations]
+  240 |   cfg.pin_sscb_scl = SIOC_GPIO_NUM;
+      |       ^~~~~~~~~~~~
+/home/admin/.platformio/packages/framework-arduinoespressif32-esp32-libs/include/espressif__esp32-camera/driver/include/esp_camera.h:128:13: note: declared here
+  128 |         int pin_sscb_scl __attribute__((deprecated("please use pin_sccb_scl instead")));           /*!< GPIO pin for camera SCL line (legacy name) */
+      |             ^~~~~~~~~~~~
+Archiving .pio/build/espcam/libf41/libSD_MMC.a
+Compiling .pio/build/espcam/FrameworkArduino/ColorFormat.c.o
+Indexing .pio/build/espcam/libf41/libSD_MMC.a
+Compiling .pio/build/espcam/FrameworkArduino/Esp.cpp.o
+Archiving .pio/build/espcam/lib5ba/libFS.a
+Indexing .pio/build/espcam/lib5ba/libFS.a
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/FirmwareMSC.cpp.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+Compiling .pio/build/espcam/FrameworkArduino/FunctionalInterrupt.cpp.o
+<command-line>: note: this is the location of the previous definition
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/HEXBuilder.cpp.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/HWCDC.cpp.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/HardwareSerial.cpp.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/HashBuilder.cpp.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/IPAddress.cpp.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/MD5Builder.cpp.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/MacAddress.cpp.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/Print.cpp.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/Stream.cpp.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/StreamString.cpp.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/StringUtils.cpp.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/Tone.cpp.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/USB.cpp.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/USBCDC.cpp.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/USBHost.cpp.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/USBMSC.cpp.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/WMath.cpp.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/WString.cpp.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/base64.cpp.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/cbuf.cpp.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/chip-debug-report.cpp.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/esp32-hal-adc.c.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/esp32-hal-bt.c.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/esp32-hal-cpu.c.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/esp32-hal-dac.c.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/esp32-hal-gpio.c.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/esp32-hal-hosted.c.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/esp32-hal-i2c-ng.c.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/esp32-hal-i2c-slave.c.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/esp32-hal-i2c.c.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/esp32-hal-ldo.c.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/esp32-hal-ledc.c.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/esp32-hal-log-wrapper.c.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/esp32-hal-matrix.c.o
+Compiling .pio/build/espcam/FrameworkArduino/esp32-hal-misc.c.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/esp32-hal-periman.c.o
+Compiling .pio/build/espcam/FrameworkArduino/esp32-hal-psram.c.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/esp32-hal-rgb-led.c.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/esp32-hal-rmt.c.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/esp32-hal-sigmadelta.c.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/esp32-hal-spi.c.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/esp32-hal-time.c.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/esp32-hal-timer.c.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/esp32-hal-tinyusb.c.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/esp32-hal-touch-ng.c.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/esp32-hal-touch.c.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/esp32-hal-uart.c.o
+Compiling .pio/build/espcam/FrameworkArduino/firmware_msc_fat.c.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/freertos_stats.cpp.o
+Compiling .pio/build/espcam/FrameworkArduino/idf_openthread_mpool_wrapper.c.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/libb64/cdecode.c.o
+Compiling .pio/build/espcam/FrameworkArduino/libb64/cencode.c.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/main.cpp.o
+Compiling .pio/build/espcam/FrameworkArduino/stdlib_noniso.c.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/wiring_pulse.c.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Compiling .pio/build/espcam/FrameworkArduino/wiring_shift.c.o
+<command-line>: warning: "CORE_DEBUG_LEVEL" redefined
+<command-line>: note: this is the location of the previous definition
+Archiving .pio/build/espcam/libFrameworkArduino.a
+Indexing .pio/build/espcam/libFrameworkArduino.a
+Linking .pio/build/espcam/firmware.elf
+Retrieving maximum program size .pio/build/espcam/firmware.elf
+Checking size .pio/build/espcam/firmware.elf
+Advanced Memory Usage is available via "PlatformIO Home > Project Inspect"
+RAM:   [=         ]  10.7% (used 34952 bytes from 327680 bytes)
+Flash: [==        ]  15.4% (used 485535 bytes from 3145728 bytes)
+Building .pio/build/espcam/firmware.bin
+esptool v5.4.0
+Creating ESP32 image...
+Merged 3 ELF sections.
+Successfully created ESP32 image.
+Configuring upload protocol...
+AVAILABLE: cmsis-dap, esp-bridge, esp-prog, espota, esptool, iot-bus-jtag, jlink, minimodule, olimex-arm-usb-ocd, olimex-arm-usb-ocd-h, olimex-arm-usb-tiny-h, olimex-jtag-tiny, tumpa
+CURRENT: upload_protocol = esptool
+Looking for upload port...
+Using manually specified: /dev/ttyUSB0
+Uploading .pio/build/espcam/firmware.bin
+esptool v5.4.0
+Serial port /dev/ttyUSB0:
+Connecting....
+Connected to ESP32 on /dev/ttyUSB0:
+Chip type:          ESP32-D0WD-V3 (revision v3.1)
+Features:           Wi-Fi, BT, Dual Core + LP Core, 240MHz, Vref calibration in eFuse, Coding Scheme None
+Crystal frequency:  40MHz
+MAC:                58:2a:bd:79:12:7c
+
+Uploading stub flasher...
+Running stub flasher...
+Stub flasher running.
+Changing baud rate to 460800...
+Changed.
+
+Configuring flash size...
+
+Writing '/home/admin/StratoSTEAM/espcam/.pio/build/espcam/bootloader.bin' at 0x00001000...
+SHA digest in image updated.
+Flash will be erased from 0x00001000 to 0x00006fff...
+Compressed 23520 bytes to 15099...
+Writing at 0x00006be0 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100.0% 14.75kB/14.75kB [0s] 
+Wrote 23520 bytes (15099 compressed) at 0x00001000 in 0.7 seconds (255.7 kbit/s).
+Verifying written data...
+Hash of data verified.
+
+Writing '/home/admin/StratoSTEAM/espcam/.pio/build/espcam/partitions.bin' at 0x00008000...
+Flash will be erased from 0x00008000 to 0x00008fff...
+Compressed 3072 bytes to 137...
+Writing at 0x00008c00 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100.0% 137B/137B [0s] 
+Wrote 3072 bytes (137 compressed) at 0x00008000 in 0.1 seconds (346.1 kbit/s).
+Verifying written data...
+Hash of data verified.
+
+Writing '/home/admin/.platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin' at 0x0000e000...
+Flash will be erased from 0x0000e000 to 0x0000ffff...
+Compressed 8192 bytes to 47...
+Writing at 0x00010000 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100.0% 47B/47B [0s] 
+Wrote 8192 bytes (47 compressed) at 0x0000e000 in 0.1 seconds (468.0 kbit/s).
+Verifying written data...
+Hash of data verified.
+
+Writing '.pio/build/espcam/firmware.bin' at 0x00010000...
+Flash will be erased from 0x00010000 to 0x00088fff...
+Compressed 493152 bytes to 277318...
+Writing at 0x0001da1a ━╸                               5.9% 16.00kB/270.82kB [0s] 
+Writing at 0x00026775 ━━━╸                            11.8% 32.00kB/270.82kB [0s] 
+Writing at 0x000305a3 ━━━━━                           17.7% 48.00kB/270.82kB [1s] 
+Writing at 0x000381e1 ━━━━━━━                         23.6% 64.00kB/270.82kB [1s] 
+Writing at 0x00040053 ━━━━━━━━╸                       29.5% 80.00kB/270.82kB [2s] 
+Writing at 0x00045268 ━━━━━━━━━━╸                     35.4% 96.00kB/270.82kB [2s] 
+Writing at 0x0004aa66 ━━━━━━━━━━━━                    41.4% 112.00kB/270.82kB [2s] 
+Writing at 0x0004fc00 ━━━━━━━━━━━━━━                  47.3% 128.00kB/270.82kB [3s] 
+Writing at 0x00055077 ━━━━━━━━━━━━━━━╸                53.2% 144.00kB/270.82kB [3s] 
+Writing at 0x0005c790 ━━━━━━━━━━━━━━━━━╸              59.1% 160.00kB/270.82kB [4s] 
+Writing at 0x00062237 ━━━━━━━━━━━━━━━━━━━             65.0% 176.00kB/270.82kB [4s] 
+Writing at 0x00068db0 ━━━━━━━━━━━━━━━━━━━━━           70.9% 192.00kB/270.82kB [4s] 
+Writing at 0x00071b6e ━━━━━━━━━━━━━━━━━━━━━━━         76.8% 208.00kB/270.82kB [5s] 
+Writing at 0x00077d09 ━━━━━━━━━━━━━━━━━━━━━━━━╸       82.7% 224.00kB/270.82kB [5s] 
+Writing at 0x0007d51b ━━━━━━━━━━━━━━━━━━━━━━━━━━╸     88.6% 240.00kB/270.82kB [6s] 
+Writing at 0x00082e3e ━━━━━━━━━━━━━━━━━━━━━━━━━━━━    94.5% 256.00kB/270.82kB [6s] 
+Writing at 0x00088660 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100.0% 270.82kB/270.82kB [6s] 
+Wrote 493152 bytes (277318 compressed) at 0x00010000 in 6.9 seconds (569.1 kbit/s).
+Verifying written data...
+Hash of data verified.
+
+Hard resetting via RTS pin...
+========================= [SUCCESS] Took 44.75 seconds =========================

@@ -5,11 +5,16 @@
  * Plik dzielony co FILE_SPLIT_S sekund — przy utracie zasilania
  * tracisz max jeden segment, poprzednie pliki są kompletne.
  *
- * Płytka: AI-Thinker ESP32-CAM (na balonie jest jedna sztuka)
+ * Płytka: AI-Thinker ESP32-CAM, czujnik OV3660 (na balonie jest jedna sztuka)
  * PlatformIO: pio run -t upload
  *
- * Status wysyłany przez GPIO1 (U0TX) co 5s, format:
- *   $S{"ok":1,"rec":1,"n":1234,"mb":7800}
+ * Bez karty SD kamera działa dalej (klatki są zliczane, nie zapisywane),
+ * a karta jest wykrywana ponownie co SD_RETRY_MS — po włożeniu nagrywanie rusza samo.
+ *
+ * Status wysyłany przez GPIO1 (U0TX) co 5s → RPi5 GPIO9 (UART3), format:
+ *   $S{"ok":1,"rec":1,"sd":1,"n":1234,"mb":7800,"fps":9.8}
+ *   ok = kamera działa, sd = karta SD zamontowana, rec = trwa zapis,
+ *   fps = średnia liczba klatek/s od poprzedniego statusu
  * RPi parsuje tylko linie zaczynające się od "$S".
  */
 
@@ -168,7 +173,7 @@ bool AviWriter::addFrame(const uint8_t *data, size_t len) {
   // Chunk 00dc = Video Data, Compressed
   _write4cc("00dc");
   _writeU32LE((uint32_t)len);
-  _f.write(data, len);
+  if (_f.write(data, len) != len) return false;   // karta wyjęta / pełna
   // Padding do parzystego rozmiaru
   if (len % 2 != 0) _f.write((uint8_t)0);
   _frames++;
@@ -203,6 +208,11 @@ static uint32_t  g_fileCount   = 0;
 static char      g_sessionDir[24] = "";
 static AviWriter g_avi;
 
+#define SD_RETRY_MS 30000   // co ile ponawiać wykrycie karty SD
+
+bool createSessionDir();
+bool openNextFile();
+
 // ─── LED ─────────────────────────────────────────────────────────────────────
 void ledBlink(int times, int onMs = 80, int offMs = 120) {
   for (int i = 0; i < times; i++) {
@@ -225,7 +235,7 @@ void heartbeat() {
 
 // ─── Kamera ──────────────────────────────────────────────────────────────────
 bool initCamera() {
-  camera_config_t cfg;
+  camera_config_t cfg = {};          // wyzeruj — pola nieustawione nie mogą być śmieciami
   cfg.ledc_channel = LEDC_CHANNEL_0;
   cfg.ledc_timer   = LEDC_TIMER_0;
   cfg.pin_d0 = Y2_GPIO_NUM; cfg.pin_d1 = Y3_GPIO_NUM;
@@ -240,11 +250,13 @@ bool initCamera() {
   cfg.pin_sscb_scl = SIOC_GPIO_NUM;
   cfg.pin_pwdn     = PWDN_GPIO_NUM;
   cfg.pin_reset    = RESET_GPIO_NUM;
-  cfg.xclk_freq_hz = 20000000;
+  cfg.xclk_freq_hz = XCLK_FREQ_HZ;
   cfg.pixel_format = PIXFORMAT_JPEG;
   cfg.frame_size   = FRAMESIZE;
   cfg.jpeg_quality = JPEG_QUALITY;
   cfg.fb_count     = 2;
+  cfg.fb_location  = psramFound() ? CAMERA_FB_IN_PSRAM : CAMERA_FB_IN_DRAM;
+  cfg.grab_mode    = CAMERA_GRAB_LATEST;   // zawsze najnowsza klatka, bez przepełnień
 
   if (esp_camera_init(&cfg) != ESP_OK) return false;
 
@@ -266,7 +278,16 @@ bool initCamera() {
 // ─── SD ──────────────────────────────────────────────────────────────────────
 bool initSD() {
   if (!SD_MMC.begin("/sdcard", true)) return false;
-  if (SD_MMC.cardType() == CARD_NONE)  return false;
+  if (SD_MMC.cardType() == CARD_NONE) { SD_MMC.end(); return false; }
+  return true;
+}
+
+// Karta OK → nowy katalog sesji + pierwszy plik AVI
+bool startRecording() {
+  if (!createSessionDir()) { Serial.println("[SD] no session slot"); return false; }
+  if (!openNextFile())     { Serial.println("[AVI] cannot create file"); return false; }
+  g_recording = true;
+  Serial.println("[REC] nagrywanie na SD");
   return true;
 }
 
@@ -295,12 +316,21 @@ bool openNextFile() {
 
 // ─── Status → RPi ────────────────────────────────────────────────────────────
 void sendStatus() {
-  uint64_t free_mb = (SD_MMC.totalBytes() - SD_MMC.usedBytes()) / (1024 * 1024);
-  Serial.printf("$S{\"ok\":%d,\"rec\":%d,\"n\":%lu,\"mb\":%llu}\n",
-    (g_cam_ok && g_sd_ok) ? 1 : 0,
+  static uint32_t      lastFrames = 0;
+  static unsigned long lastMs     = 0;
+  unsigned long now = millis();
+  float fps = lastMs ? (g_totalFrames - lastFrames) * 1000.0f / (now - lastMs) : 0.0f;
+  lastFrames = g_totalFrames;
+  lastMs     = now;
+
+  uint64_t free_mb = g_sd_ok ? (SD_MMC.totalBytes() - SD_MMC.usedBytes()) / (1024 * 1024) : 0;
+  Serial.printf("$S{\"ok\":%d,\"rec\":%d,\"sd\":%d,\"n\":%lu,\"mb\":%llu,\"fps\":%.1f}\n",
+    g_cam_ok ? 1 : 0,
     g_recording ? 1 : 0,
+    g_sd_ok ? 1 : 0,
     g_totalFrames,
-    free_mb
+    free_mb,
+    fps
   );
 }
 
@@ -311,10 +341,12 @@ void setup() {
 
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, !LED_ACTIVE);
+  pinMode(FLASH_PIN, OUTPUT);          // lampa błyskowa zawsze zgaszona
+  digitalWrite(FLASH_PIN, LOW);
 
   g_sd_ok = initSD();
   if (!g_sd_ok) {
-    Serial.println("[SD] ERROR");
+    Serial.println("[SD] brak karty — praca BEZ zapisu, ponawiam co 30 s");
     ledBlink(5, 100, 200);
   } else {
     uint64_t free_mb = (SD_MMC.totalBytes() - SD_MMC.usedBytes()) / (1024*1024);
@@ -329,24 +361,14 @@ void setup() {
     Serial.printf("[CAM] OK  %dx%d @ %dfps\n", CAM_WIDTH, CAM_HEIGHT, TARGET_FPS);
   }
 
-  if (!g_cam_ok || !g_sd_ok) {
-    Serial.println("[BOOT] fatal — stopped");
-    while (true) { ledBlink(5, 100, 100); delay(2000); }
+  if (g_cam_ok && g_sd_ok && startRecording()) {
+    ledBlink(2, 200, 100);
+    Serial.println("[BOOT] OK — recording");
+  } else if (g_cam_ok) {
+    Serial.println("[BOOT] OK — kamera działa, BEZ nagrywania (brak SD)");
+  } else {
+    Serial.println("[BOOT] kamera nie działa — wysyłam tylko status");
   }
-
-  if (!createSessionDir()) {
-    Serial.println("[SD] no session slot");
-    while (true) { ledBlink(5, 100, 100); delay(2000); }
-  }
-
-  if (!openNextFile()) {
-    Serial.println("[AVI] cannot create file");
-    while (true) { ledBlink(5, 100, 100); delay(2000); }
-  }
-
-  g_recording = true;
-  ledBlink(2, 200, 100);
-  Serial.println("[BOOT] OK — recording");
 }
 
 // ─── Loop ────────────────────────────────────────────────────────────────────
@@ -355,23 +377,44 @@ void loop() {
 
   // ── Capture klatki ──────────────────────────────────────────────────────
   static unsigned long lastCapture = 0;
+  static uint32_t      fbFail      = 0;
   if (now - lastCapture >= CAPTURE_INTERVAL_MS) {
     lastCapture = now;
 
-    camera_fb_t *fb = esp_camera_fb_get();
+    camera_fb_t *fb = g_cam_ok ? esp_camera_fb_get() : nullptr;
     if (fb) {
-      g_avi.addFrame(fb->buf, fb->len);
+      if (g_recording && !g_avi.addFrame(fb->buf, fb->len)) {
+        // zapis padł (karta wyjęta / błąd) → przejdź w tryb bez SD
+        Serial.println("[SD] błąd zapisu — przechodzę w tryb bez SD");
+        g_avi.close();
+        SD_MMC.end();
+        g_recording = false;
+        g_sd_ok     = false;
+      }
       g_totalFrames++;
       esp_camera_fb_return(fb);
+    } else if (g_cam_ok && (++fbFail % 50) == 1) {
+      Serial.printf("[CAM] brak klatki (x%lu)\n", fbFail);
     }
   }
 
   // ── Podziel plik co FILE_SPLIT_S sekund ─────────────────────────────────
-  static unsigned long fileStart = millis();
-  if (now - fileStart >= (unsigned long)FILE_SPLIT_S * 1000UL) {
+  static unsigned long fileStart = now;
+  if (g_recording && now - fileStart >= (unsigned long)FILE_SPLIT_S * 1000UL) {
     fileStart = now;
     Serial.printf("[AVI] split  frames=%lu\n", g_avi.frameCount());
     openNextFile();
+  }
+
+  // ── Ponowne wykrywanie karty SD ─────────────────────────────────────────
+  static unsigned long lastSdRetry = now;
+  if (!g_sd_ok && now - lastSdRetry >= SD_RETRY_MS) {
+    lastSdRetry = now;
+    g_sd_ok = initSD();
+    if (g_sd_ok) {
+      Serial.println("[SD] karta wykryta");
+      if (g_cam_ok && startRecording()) fileStart = now;
+    }
   }
 
   // ── Status → RPi ────────────────────────────────────────────────────────
