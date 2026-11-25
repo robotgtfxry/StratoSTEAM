@@ -21,6 +21,7 @@
 #include <SPI.h>
 #include <LoRa.h>
 #include <ArduinoJson.h>
+#include <esp_task_wdt.h>
 
 // ── Piny ──────────────────────────────────────────────────────────────────────
 #define GPS_RX_PIN     4
@@ -59,6 +60,8 @@
 #define LORA_MAX_PAYLOAD       255      // limit SX1278
 #define RPI_DATA_TIMEOUT_MS    15000    // dane starsze niż 15s = RPi5 nieosiągalna
 #define GPS_FIX_MAX_AGE_MS     10000    // starsza pozycja = brak fixa
+#define LORA_TX_TIMEOUT_MS     4000     // 255 B przy SF10 nadaje się ~2.3 s
+#define WDT_TIMEOUT_MS         20000    // zawieszona pętla → restart S3
 #define LORA_RETRY_MS          30000    // co ile ponawiać init LoRa, gdy modułu brak
 #define STATUS_INTERVAL_MS     5000     // status ESP → RPi przez UART
 #define NOLORA_BLINK_MS        2000     // okres mrugania LED gdy brak LoRa
@@ -101,6 +104,7 @@ uint32_t rpiRxBad    = 0;     // linie, których nie dało się sparsować     /
 
 // Stan LoRa — gdy moduł nie odpowiada, ESP działa dalej bez radia
 bool     loraOk        = false;
+uint32_t loraRestarts  = 0;     // ile razy moduł trzeba było podnieść
 uint32_t lastLoraRetry = 0;
 uint32_t lastStatus    = 0;
 bool     ledOverride   = false; // LED ustawiony komendą z ziemi
@@ -265,6 +269,54 @@ bool initLoRa() {
     return true;
 }
 
+// ── Nadawanie LoRa z limitem czasu ────────────────────────────────────────────
+// LoRa.endPacket() bez "async" czeka na TxDone w nieskończoność — gdy moduł zgubi zasilanie
+// w trakcie nadawania, cały S3 by się zawiesił. Tu czekamy najwyżej LORA_TX_TIMEOUT_MS
+// i w tym czasie dalej odbieramy GPS i UART.
+uint8_t loraReg(uint8_t addr) {
+    SPI.beginTransaction(SPISettings(8000000, MSBFIRST, SPI_MODE0));
+    digitalWrite(LORA_CS_PIN, LOW);
+    SPI.transfer(addr & 0x7F);
+    uint8_t v = SPI.transfer(0);
+    digitalWrite(LORA_CS_PIN, HIGH);
+    SPI.endTransaction();
+    return v;
+}
+
+// Po zaniku zasilania układ wraca do ustawień fabrycznych: FSK, 434 MHz
+bool loraAlive() {
+    const uint32_t frf  = ((uint32_t)loraReg(0x06) << 16) | ((uint32_t)loraReg(0x07) << 8) | loraReg(0x08);
+    const uint32_t want = (uint32_t)(((uint64_t)LORA_FREQ << 19) / 32000000);
+    return loraReg(0x42) == 0x12 && (loraReg(0x01) & 0x80) && frf == want;
+}
+
+void loraLost(const char* why) {
+    Serial.printf("[ESP32] LoRa: %s — inicjalizuję od nowa\n", why);
+    loraOk = initLoRa();
+    loraRestarts++;
+    lastLoraRetry = millis();
+}
+
+bool loraSend(const uint8_t* data, size_t len) {
+    if (!loraAlive()) loraLost("moduł się zresetował");
+    if (!loraOk || !LoRa.beginPacket()) return false;
+    LoRa.write(data, len);
+    LoRa.endPacket(true);
+    const uint32_t t0 = millis();
+    while (!(loraReg(0x12) & 0x08)) {                 // TxDone
+        if (millis() - t0 > LORA_TX_TIMEOUT_MS) {
+            loraLost("brak potwierdzenia nadania");
+            return false;
+        }
+        while (gpsSerial.available()) gps.encode(gpsSerial.read());
+        readRpiSerial();
+        delay(2);
+    }
+    LoRa.beginPacket();                               // biblioteka kasuje flagę TxDone
+    LoRa.receive();
+    return true;
+}
+
 // ── GPS fix ───────────────────────────────────────────────────────────────────
 // Samo isValid() po pierwszym fixie już nigdy nie wraca do false.
 bool gpsFix() {
@@ -330,17 +382,15 @@ void sendBeacon() {
     const size_t len = serializeJson(doc, buf, sizeof(buf));
 
     if (loraOk) {
-        LoRa.beginPacket();
-        LoRa.write((const uint8_t*)buf, len);
-        LoRa.endPacket();
-        LoRa.receive();
+        loraSend((const uint8_t*)buf, len);
     }
 
-    Serial.printf("%s seq=%lu len=%u rpi=%s rx=%lu rxb=%lu bad=%lu gps=%lu alive=%d vbe=%.2fV fix=%d lat=%.5f lon=%.5f alt=%ld\n",
+    Serial.printf("%s seq=%lu len=%u rpi=%s rx=%lu rxb=%lu bad=%lu gps=%lu alive=%d lr=%lu vbe=%.2fV fix=%d lat=%.5f lon=%.5f alt=%ld\n",
                   loraOk ? "[LoRa]" : "[NO-LoRa] (nie nadano)",
                   (unsigned long)(beaconSeq - 1), (unsigned)len, rpi.fresh ? "OK" : "—",
                   (unsigned long)rpiRxLines, (unsigned long)rpiRxBytes, (unsigned long)rpiRxBad,
-                  (unsigned long)gps.charsProcessed(), digitalRead(RPI_ALIVE_PIN), vbe, fix,
+                  (unsigned long)gps.charsProcessed(), digitalRead(RPI_ALIVE_PIN),
+                  (unsigned long)loraRestarts, vbe, fix,
                   p[0].as<double>(), p[1].as<double>(), p[2].as<long>());
 }
 
@@ -398,20 +448,18 @@ void handleIncoming() {
 
 // ── Chunk obrazu → LoRa (lub odrzucenie gdy brak LoRa) ────────────────────────
 void sendImgChunk() {
+    const String chunk = pendingImgLine;   // w trakcie nadawania UART może podstawić następny
+    imgChunkReady = false;
     JsonDocument dbg;
-    deserializeJson(dbg, pendingImgLine);
+    deserializeJson(dbg, chunk);
     int id = dbg["id"] | 0, seq = dbg["seq"] | 0, tot = dbg["tot"] | 0;
     if (loraOk) {
         Serial.printf("[LoRa] img id=%d seq=%d/%d\n", id, seq, tot);
-        LoRa.beginPacket();
-        LoRa.print(pendingImgLine);
-        LoRa.endPacket();
-        LoRa.receive();
+        loraSend((const uint8_t*)chunk.c_str(), chunk.length());
     } else {
         Serial.printf("[NO-LoRa] img id=%d seq=%d/%d odrzucony\n", id, seq, tot);
     }
     lastImgChunk  = millis();
-    imgChunkReady = false;
 }
 
 // ── Status ESP → RPi (UART) ───────────────────────────────────────────────────
@@ -483,6 +531,10 @@ void rpiCutPower() {
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
 void setup() {
+    // Najpierw zasilanie RPi — restart S3 ma je przerwać na jak najkrócej
+    pinMode(RPI_PWR_PIN, OUTPUT);
+    digitalWrite(RPI_PWR_PIN, HIGH);
+
     Serial.begin(115200);
     delay(500);
 
@@ -497,12 +549,10 @@ void setup() {
     ledcAttach(LED_G_PIN,  PWM_FREQ, PWM_BITS);
     ledcAttach(LED_B_PIN,  PWM_FREQ, PWM_BITS);
 
-    pinMode(RPI_PWR_PIN,   OUTPUT);
     pinMode(RPI_SHTDN_PIN, OUTPUT);
     pinMode(RPI_ALIVE_PIN, INPUT_PULLDOWN);   // niepodłączona linia nie może udawać ALIVE
     analogReadResolution(12);
     analogSetPinAttenuation(BATT_ADC_PIN, ADC_11db);
-    digitalWrite(RPI_PWR_PIN,   LOW);
     digitalWrite(RPI_SHTDN_PIN, LOW);
 
     loraOk = initLoRa();
@@ -514,6 +564,12 @@ void setup() {
     }
 
     rpiPowerOn();
+
+    esp_task_wdt_config_t wdt = {};
+    wdt.timeout_ms    = WDT_TIMEOUT_MS;
+    wdt.trigger_panic = true;
+    esp_task_wdt_reconfigure(&wdt);
+    enableLoopWDT();
 }
 
 // ── Loop ──────────────────────────────────────────────────────────────────────
