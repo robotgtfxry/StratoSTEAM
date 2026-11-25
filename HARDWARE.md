@@ -261,6 +261,11 @@ Do zrobienia przed włączeniem:
 
 ## UART RPi5 ↔ ESP32 (dwukierunkowy)
 
+> **Łącze po USB (używane):** kabel USB RPi5 → port „UART/COM” płytki ESP32-S3 (CH343) przenosi to samo co przewody
+> poniżej. Program sam wybiera USB, a gdy kabla nie ma — przewody (`ESP_USB_ENABLED` w `rpi-air/config.py`).
+> **Do lotu S3 musi mieć własne 5V**, inaczej zgaśnie razem z RPi. W kablu USB trzeba wtedy przerwać żyłę 5V
+> (czerwoną), zostawić GND, D+ i D−. Nie otwieraj tego portu innym programem, gdy działa `rpi-air`.
+
 | Sygnał           | RPi5 BCM            | ESP32 GPIO | Kierunek       | Port RPi5      |
 |------------------|---------------------|------------|----------------|----------------|
 | TX czujników     | GPIO14 (TXD, pin 8) | GPIO3 (RX) | RPi5 → ESP32   | /dev/ttyAMA0   |
