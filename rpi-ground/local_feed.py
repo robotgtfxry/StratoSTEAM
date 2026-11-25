@@ -6,6 +6,7 @@ Lokalny podgląd odbioru: usługa rpi-ground zapisuje tu stan, okno gui_odbior.p
                zostaje na karcie nawet bez internetu
 Błędy zapisu nigdy nie mogą zatrzymać odbioru.
 """
+import base64
 import json
 import logging
 import os
@@ -16,6 +17,10 @@ log = logging.getLogger(__name__)
 
 STATE_PATH = os.environ.get("STRATO_STATE_PATH", "/dev/shm/stratosteam-ground.json")
 LOG_DIR = os.path.expanduser(os.environ.get("STRATO_LOG_DIR", "~/stratosteam-odbior"))
+PHOTO_PATH = os.environ.get("STRATO_PHOTO_PATH", "/dev/shm/stratosteam-photo.jpg")
+REQUEST_PATH = os.environ.get("STRATO_REQUEST_PATH", "/dev/shm/stratosteam-photo.req")
+PHOTO_MAX_CHUNKS = 200
+PHOTO_GAP_S = 60        # ta sama nr zdjęcia po takiej przerwie = nowe zdjęcie (restart balonu)
 HISTORY = 240           # punktów na wykresach
 
 
@@ -23,11 +28,12 @@ class LocalFeed:
     def __init__(self, state_path: str = STATE_PATH, log_dir: str = LOG_DIR):
         self._path = state_path
         self._log_dir = log_dir
+        self._chunks: dict[int, bytes] = {}
         self._history: deque = deque(maxlen=HISTORY)
         self._warned = False
         self._state = {
             "started": time.time(), "packets": 0, "bad": 0, "img_chunks": 0, "lost": 0,
-            "lora_resets": 0, "last": None, "last_rx": None, "rssi": None, "snr": None,
+            "lora_resets": 0, "photo": None, "photo_req": None, "last": None, "last_rx": None, "rssi": None, "snr": None,
         }
 
     def packet(self, flat: dict, rssi: int, snr: float) -> None:
@@ -42,8 +48,55 @@ class LocalFeed:
         self._history.append([now, alt, rssi])
         self._append({"rx": round(now, 2), "rssi": rssi, "snr": snr, "pkt": flat})
 
-    def image_chunk(self) -> None:
+    def image_chunk(self, packet: dict) -> None:
+        """Składa zdjęcie. Niepełne też pokazuje — JPEG da się otworzyć od początku."""
         self._state["img_chunks"] += 1
+        try:
+            img_id, seq, total = int(packet["id"]), int(packet["seq"]), int(packet["tot"])
+            data = base64.b64decode(packet["data"], validate=True)
+        except (KeyError, TypeError, ValueError):
+            return
+        if not (0 < total <= PHOTO_MAX_CHUNKS and 0 <= seq < total):
+            return
+        now, ph = time.time(), self._state["photo"]
+        if not ph or ph["id"] != img_id or ph["total"] != total or now - ph["ts"] > PHOTO_GAP_S:
+            ph = self._state["photo"] = {"id": img_id, "total": total, "got": 0,
+                                         "done": False, "ts": now}
+            self._chunks = {}
+            self._state["photo_req"] = None
+        ph["ts"] = now
+        if ph["done"] or seq in self._chunks:
+            return
+        self._chunks[seq] = data
+        ph["got"] = len(self._chunks)
+        ph["done"] = ph["got"] == total
+        prefix = b""
+        for i in range(total):
+            if i not in self._chunks:
+                break
+            prefix += self._chunks[i]
+        if prefix:
+            self._write(PHOTO_PATH, prefix)
+        if ph["done"]:
+            self._write(os.path.join(self._log_dir, time.strftime("foto-%Y%m%d-%H%M%S.jpg")), prefix)
+
+    def pop_photo(self) -> bool:
+        """Czy w oknie kliknięto „Zrób zdjęcie”. Zużywa prośbę."""
+        try:
+            os.remove(REQUEST_PATH)
+        except OSError:
+            return False
+        self._state["photo_req"] = time.time()
+        return True
+
+    def _write(self, path: str, data: bytes) -> None:
+        try:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path + ".tmp", "wb") as f:
+                f.write(data)
+            os.replace(path + ".tmp", path)
+        except OSError as e:
+            self._warn(e)
 
     def bad(self) -> None:
         self._state["bad"] += 1

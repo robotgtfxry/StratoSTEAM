@@ -16,6 +16,9 @@ LORA_DIO0_PIN = 25
 BACKEND_URL = os.environ.get("STRATO_BACKEND_URL", "http://localhost:8000")
 BACKEND_API_KEY = os.environ.get("STRATO_API_KEY", "change-me-in-production")
 
+# Podgląd kamery balonu po sieci (działa na ziemi, gdy balon jest w Tailscale)
+PREVIEW_URL = os.environ.get("STRATO_PREVIEW_URL", "http://100.89.237.68:8081/foto.jpg")
+
 # How often to flush buffered packets when offline (seconds)
 OFFLINE_FLUSH_INTERVAL_S = 10
 

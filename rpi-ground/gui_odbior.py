@@ -8,13 +8,22 @@ więc można je otwierać i zamykać w trakcie lotu.
   python3 gui_odbior.py          normalnie
   python3 gui_odbior.py --demo   udawane dane, bez stacji
 """
+import io
 import json
 import math
+import os
 import sys
+import threading
 import time
 import tkinter as tk
+import urllib.request
 
-from local_feed import STATE_PATH
+from PIL import Image, ImageFile
+
+from config import PREVIEW_URL
+from local_feed import PHOTO_PATH, REQUEST_PATH, STATE_PATH
+
+ImageFile.LOAD_TRUNCATED_IMAGES = True      # zdjęcie w trakcie odbioru też pokaż
 
 REFRESH_MS = 500
 SERVICE_TIMEOUT_S = 10      # brak znaku życia usługi
@@ -116,10 +125,130 @@ class Chart(tk.Canvas):
                          text=f"{ys[-1]:.0f} {self._unit}   (ostatnie {ago(span)})")
 
 
+class LiveFeed(threading.Thread):
+    """Pobiera klatki z balonu po sieci w tle, żeby okno nigdy się nie zacinało."""
+
+    def __init__(self, url: str):
+        super().__init__(daemon=True)
+        self._url = url
+        self.frame: tuple[float, bytes] | None = None      # (czas, JPEG)
+        self.enabled = True
+
+    def run(self) -> None:
+        while True:
+            delay = 1.0
+            if self.enabled:
+                try:
+                    with urllib.request.urlopen(self._url, timeout=3) as r:
+                        self.frame = (time.time(), r.read(2_000_000))
+                except (OSError, ValueError):
+                    delay = 5.0
+            time.sleep(delay)
+
+
+class Photo(tk.Frame):
+    """Obraz z kamery: na żywo po sieci, a gdy jej nie ma — ostatnie zdjęcie z LoRa."""
+
+    LIVE_S = 12
+
+    def __init__(self, parent, live: LiveFeed):
+        super().__init__(parent, bg=CARD, highlightbackground=LINE, highlightthickness=1)
+        self._live = live
+        self._shown = None          # klucz ostatnio narysowanego obrazu
+        self._img = None            # referencja, inaczej Tk usunie obraz
+        self._big: tk.Toplevel | None = None
+        head = tk.Frame(self, bg=CARD)
+        head.pack(fill="x", padx=12, pady=(6, 2))
+        tk.Label(head, text="Kamera", bg=CARD, fg=BLUE, font=(FONT, 11, "bold")).pack(side="left")
+        self._btn = tk.Button(head, text="Zrób zdjęcie (LoRa)", command=self._request, bg="#21262d",
+                              fg=FG, activebackground=LINE, activeforeground=FG, relief="flat",
+                              font=(FONT, 9), padx=8, pady=1)
+        self._btn.pack(side="right")
+        self._info = tk.Label(self, text="", bg=CARD, fg=DIM, font=(FONT, 9), anchor="w")
+        self._info.pack(side="bottom", fill="x", padx=12, pady=(0, 4))
+        self._view = tk.Canvas(self, bg=BG, highlightthickness=0, width=200, height=100, cursor="hand2")
+        self._view.pack(fill="both", expand=True, padx=8, pady=2)
+        self._view.bind("<Button-1>", lambda _e: self._toggle_big())
+
+    def _request(self) -> None:
+        try:
+            with open(REQUEST_PATH, "w", encoding="utf-8") as f:
+                f.write(str(time.time()))
+        except OSError as e:
+            self._info.config(text=f"nie mogę wysłać prośby: {e}", fg=BAD)
+
+    def _toggle_big(self) -> None:
+        if self._big is not None and self._big.winfo_exists():
+            self._big.destroy()
+            self._big = None
+            return
+        self._big = tk.Toplevel(self, bg=BG)
+        self._big.title("StratoSTEAM — kamera")
+        self._big.geometry("960x560")
+        c = tk.Canvas(self._big, bg=BG, highlightthickness=0)
+        c.pack(fill="both", expand=True)
+        c.bind("<Button-1>", lambda _e: self._toggle_big())
+        self._big.canvas = c
+        self._shown = None
+
+    def refresh(self, st: dict) -> None:
+        now = time.time()
+        ph = st.get("photo")
+        frame = self._live.frame
+        if frame and now - frame[0] < self.LIVE_S:
+            jpeg, key = frame[1], ("live", frame[0])
+            text, color = f"● NA ŻYWO przez sieć ({ago(now - frame[0])} temu)", OK
+        else:
+            jpeg, key = None, None
+            try:
+                key = ("lora", os.path.getmtime(PHOTO_PATH))
+                with open(PHOTO_PATH, "rb") as f:
+                    jpeg = f.read()
+            except OSError:
+                pass
+            if ph:
+                state = "komplet" if ph["done"] else f"odbieram {ph['got']}/{ph['total']}"
+                text, color = f"zdjęcie LoRa: {state}, {ago(now - ph['ts'])} temu", \
+                    OK if ph["done"] else WARN
+            else:
+                text, color = "brak sieci i zdjęć z LoRa", DIM
+        if os.path.exists(REQUEST_PATH):
+            text, color = "prośba czeka na pakiet z balonu…", WARN
+        elif st.get("photo_req"):
+            text, color = f"prośba wysłana {ago(now - st['photo_req'])} temu, czekam na zdjęcie", WARN
+        self._info.config(text=text, fg=color)
+
+        big = self._big if self._big is not None and self._big.winfo_exists() else None
+        size = (self._view.winfo_width(), self._view.winfo_height(),
+                big.canvas.winfo_width() if big else 0, big.canvas.winfo_height() if big else 0)
+        if jpeg is None or (key, size) == self._shown:
+            return
+        try:
+            img = Image.open(io.BytesIO(jpeg)).convert("RGB")
+        except Exception:       # uszkodzony JPEG z radia nie może wywrócić okna
+            return
+        self._shown = (key, size)
+        self._img = [self._draw(c, img) for c in ([self._view] + ([big.canvas] if big else []))]
+
+    @staticmethod
+    def _draw(canvas: tk.Canvas, img: Image.Image) -> tk.PhotoImage:
+        w, h = max(canvas.winfo_width(), 32), max(canvas.winfo_height(), 18)
+        k = min(w / img.width, h / img.height)
+        fit = img.resize((max(1, int(img.width * k)), max(1, int(img.height * k))), Image.LANCZOS)
+        buf = io.BytesIO()
+        fit.save(buf, format="PPM")     # PPM, bo ImageTk bywa niezainstalowany
+        photo = tk.PhotoImage(data=buf.getvalue(), format="PPM")
+        canvas.delete("all")
+        canvas.create_image(w // 2, h // 2, image=photo)
+        return photo
+
+
 class App(tk.Tk):
     def __init__(self, source):
         super().__init__()
         self._source = source
+        self._live = LiveFeed(PREVIEW_URL)
+        self._live.start()
         self.title("StratoSTEAM — odbiór danych")
         self.configure(bg=BG)
         sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
@@ -171,8 +300,11 @@ class App(tk.Tk):
         charts.pack(fill="both", expand=True, padx=12, pady=(4, 12))
         self._alt = Chart(charts, "Wysokość GPS", "m", OK)
         self._rssi = Chart(charts, "Siła sygnału", "dBm", BLUE)
-        self._alt.pack(side="left", fill="both", expand=True, padx=(0, 4))
-        self._rssi.pack(side="left", fill="both", expand=True, padx=(4, 0))
+        self._photo = Photo(charts, self._live)
+        for col, w in enumerate((self._alt, self._rssi, self._photo)):
+            w.grid(row=0, column=col, sticky="nsew", padx=(0 if col == 0 else 4, 0 if col == 2 else 4))
+            charts.columnconfigure(col, weight=1, uniform="c")
+        charts.rowconfigure(0, weight=1)
 
     def _refresh(self) -> None:
         try:
@@ -269,6 +401,7 @@ class App(tk.Tk):
         hist = st.get("history") or []
         self._alt.draw([(h[0], h[1]) for h in hist if h[1] is not None])
         self._rssi.draw([(h[0], h[2]) for h in hist if h[2] is not None])
+        self._photo.refresh(st)
 
 
 if __name__ == "__main__":

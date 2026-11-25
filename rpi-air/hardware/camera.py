@@ -89,6 +89,24 @@ class CameraModule:
         self._recording = False
         log.info("Recording stopped")
 
+    def _grab(self):
+        """Klatka z małego strumienia jako obraz PIL."""
+        arr = self._cam.capture_array("lores")
+        # "RGB888" w picamera2 leży w pamięci jako BGR — odwróć kanały
+        return _PilImage.fromarray(arr[..., 2::-1].copy())
+
+    def snapshot_jpeg(self, quality: int = 70) -> bytes | None:
+        """Klatka 640x360 do podglądu po sieci."""
+        if not self._cam or not _PIL:
+            return None
+        try:
+            buf = io.BytesIO()
+            self._grab().save(buf, format="JPEG", quality=quality)
+            return buf.getvalue()
+        except Exception as exc:
+            log.warning("Preview failed: %s", exc)
+            return None
+
     def capture_photo_chunks(self) -> list[tuple[int, int, int, str]]:
         """
         Capture one photo, compress it, split into chunks.
@@ -102,10 +120,7 @@ class CameraModule:
 
         try:
             if _PIL:
-                arr = self._cam.capture_array("lores")
-                # "RGB888" w picamera2 leży w pamięci jako BGR — odwróć kanały
-                img = _PilImage.fromarray(arr[..., 2::-1].copy())
-                img = img.resize((self._photo_w, self._photo_h), _PilImage.LANCZOS)
+                img = self._grab().resize((self._photo_w, self._photo_h), _PilImage.LANCZOS)
                 buf = io.BytesIO()
                 img.save(buf, format="JPEG", quality=self._photo_quality, optimize=True)
                 jpeg = buf.getvalue()

@@ -112,7 +112,7 @@ def main():
             # ── Chunk obrazu z kamery — przekaż do backendu i pomiń resztę ───
             if packet.get("type") == "img":
                 camera_s.post_chunk(packet)
-                feed.image_chunk()
+                feed.image_chunk(packet)
                 log.info(
                     "IMG chunk id=%s seq=%s/%s RSSI=%d",
                     packet.get("id"), packet.get("seq"), packet.get("tot"), rssi,
@@ -248,7 +248,7 @@ def main():
                     ))
                     log.info("CMD → ESP32 ok=%s buzzer=%s led=(%s,%s,%s)", ok,
                              cmd.get("buzzer"), cmd.get("led_r"), cmd.get("led_g"), cmd.get("led_b"))
-                elif camera_s.pop_photo():
+                elif feed.pop_photo() or camera_s.pop_photo():
                     ok = lora.send_command(build_photo_command())
                     log.info("Camera photo cmd → ESP32 ok=%s", ok)
                 elif (rec := camera_s.pop_rec()) is not None:

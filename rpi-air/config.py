@@ -77,6 +77,10 @@ CAM_RECORD_H       = 1080
 CAM_RECORD_FPS     = 25
 CAM_RECORD_BITRATE = 4_000_000   # bit/s → ~1.8 GB na godzinę
 CAM_PHOTO_W        = 160    # szerokość zdjęcia wysyłanego przez LoRa
-CAM_PHOTO_H        = 120    # wysokość
+CAM_PHOTO_H        = 90     # wysokość (16:9 jak kamera)
 CAM_PHOTO_QUALITY  = 25     # jakość JPEG (1-95); niższa = mniejszy plik = mniej chunków
-CAM_CHUNK_INTERVAL_S = 3.0  # przerwa między wysłaniem kolejnych chunków do ESP32
+# Fragment i beacon zajmują radio po ~2.1 s, beacon idzie co 5 s — częściej niż co 5 s
+# fragmenty się nie mieszczą i giną.
+CAM_CHUNK_INTERVAL_S = 5.0
+CAM_CHUNK_REPEAT   = 2      # ile razy wysłać komplet fragmentów (drugi raz łata zgubione)
+PREVIEW_PORT       = 8081   # podgląd na żywo po sieci (tylko Tailscale), None = wyłączony

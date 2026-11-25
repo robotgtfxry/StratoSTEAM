@@ -17,6 +17,7 @@ from config import (
     ESPCAM_PWR_PIN, ESPCAM_UART_PORT, ESPCAM_STATUS_BAUD,
     ESP_UART_PORT, ESP_UART_BAUD, ESP_SEND_INTERVAL_S,
     CAM_RECORD_DIR, CAM_PHOTO_W, CAM_PHOTO_H, CAM_PHOTO_QUALITY, CAM_CHUNK_INTERVAL_S,
+    CAM_CHUNK_REPEAT, PREVIEW_PORT,
     CAM_RECORD_W, CAM_RECORD_H, CAM_RECORD_FPS, CAM_RECORD_BITRATE,
     SDR_ENABLED, SDR_TARGET_FREQ, SDR_SAMPLE_RATE, SDR_GAIN,
     SDR_FREQ_CORRECTION, SDR_MEASURE_INTERVAL_S, SDR_NUM_SAMPLES, SDR_BIN_WINDOW,
@@ -26,7 +27,8 @@ from sensors import (
     Mpu6050Sensor, Bmp180Sensor, Ina226Sensor,
     Bme280Data, Ms5611Data, Bno085Data, Ina219Data,
 )
-from hardware import PowerSignal, EspUartSender, CameraModule, SdrReceiver, EspCamPower, EspCamMonitor
+from hardware import PowerSignal, EspUartSender, CameraModule, SdrReceiver, EspCamPower, EspCamMonitor, \
+    start_preview_server
 
 
 def _log_handlers() -> list[logging.Handler]:
@@ -120,6 +122,9 @@ def main():
         bin_window      = SDR_BIN_WINDOW,
     ) if SDR_ENABLED else None
 
+    if cam.available and PREVIEW_PORT:
+        start_preview_server(cam, PREVIEW_PORT)
+
     # Start recording immediately on boot if camera is available
     if cam.available:
         cam.start_recording()
@@ -163,9 +168,10 @@ def main():
                     esp_last_status = now
 
                 elif c == "photo" and cam.available:
+                    # nowe zdjęcie zastępuje niewysłaną resztę poprzedniego
                     chunks = cam.capture_photo_chunks()
                     if chunks:
-                        pending_chunks.extend(chunks)
+                        pending_chunks = chunks * CAM_CHUNK_REPEAT
                         log.info("Photo queued: %d chunks pending", len(pending_chunks))
                     else:
                         log.warning("Photo capture returned no chunks")
