@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=StratoSTEAM — odbiór danych
+Comment=Dane odbierane z balonu przez LoRa
+Exec=python3 /home/admin/StratoSTEAM/rpi-ground/gui_odbior.py
+Path=/home/admin/StratoSTEAM/rpi-ground
+Icon=network-wireless
+Terminal=false
+Categories=Utility;

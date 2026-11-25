@@ -18,6 +18,7 @@ from beacon import expand_beacon, has_rpi_data, beacon_to_telemetry
 from command_store import CommandStore
 from rpi_power_store import RpiPowerStore
 from exec_store import ExecStore
+from local_feed import LocalFeed
 from camera_store import CameraStore
 from espcam_store import EspCamStore
 from packet import (
@@ -75,6 +76,7 @@ def main():
     exec_s    = ExecStore()
     camera_s  = CameraStore()
     espcam_s  = EspCamStore()
+    feed      = LocalFeed()      # okno gui_odbior.py + dziennik na karcie
 
     # TODO(HF): do zrobienia — brak filtra, nadajnik wyłączony (HF_ENABLED w config.py).
     # Import tutaj, bo HfController od razu otwiera SPI1, którego bez nadajnika nie ma.
@@ -95,6 +97,7 @@ def main():
 
     try:
         while True:
+            feed.tick(getattr(lora, "resets", 0))
             raw, rssi, snr = lora.receive(timeout_s=1.0)
             if raw is None:
                 continue
@@ -103,11 +106,13 @@ def main():
                 packet = json.loads(raw.decode())
             except (json.JSONDecodeError, UnicodeDecodeError) as e:
                 log.warning("Bad packet: %s", e)
+                feed.bad()
                 continue
 
             # ── Chunk obrazu z kamery — przekaż do backendu i pomiń resztę ───
             if packet.get("type") == "img":
                 camera_s.post_chunk(packet)
+                feed.image_chunk()
                 log.info(
                     "IMG chunk id=%s seq=%s/%s RSSI=%d",
                     packet.get("id"), packet.get("seq"), packet.get("tot"), rssi,
@@ -118,6 +123,7 @@ def main():
             from_esp32 = packet.get("src") == "esp32"
             if from_esp32:
                 packet = expand_beacon(packet)
+                feed.packet(packet, rssi, snr)
             is_exec_result = packet.get("type") == "exec_result"
 
             # ── Jeśli to wynik exec od rpi-air — przekaż do backendu ─────────
