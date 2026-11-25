@@ -135,7 +135,9 @@ print(hex(s.xfer2([0x42,0])[1]))"
 | CSI    | CAM0 (15-pin, pin 1)|
 
 > RPi5 (balon). Ciągłe nagrywanie H.264 Full HD (1920×1080, 25 kl./s, 4 Mbps) na dysk — katalog z `CAM_RECORD_DIR`. Parametry: `CAM_RECORD_*` w `rpi-air/config.py`.  
-> Na żądanie z Flutter: zdjęcie 160×120 JPEG, chunki po 140 bajtów (base64), przesyłane przez UART → LoRa → backend.  
+> Zdjęcie na żądanie (panel stacji, Flutter): WebP do 640×360, w całości do pamięci S3, potem seria pakietów LoRa.  
+> Na czas serii radio przechodzi na szybsze SF (7–10, wybiera stacja według SNR) i wraca. Braki stacja zamawia (`img_req`), komplet potwierdza (`img_ok`); obraz pokazuje dopiero po zgodnym CRC.  
+> Rozmiary: `CAM_PHOTO_BY_SF` w `rpi-air/config.py`. Komenda `flight` (START na stacji) ustawia ostrość na nieskończoność.
 > Dysk monitorowany: `shutil.disk_usage()`, dane `dsku`/`dskf` w beaconie ESP32 (pole `d`).  
 > 4 Mbps to ~1.8 GB na godzinę (~14 GB na 8 h lotu). 4K zjadało ok. 1.5 rdzenia i dawało tylko 14 kl./s.
 
