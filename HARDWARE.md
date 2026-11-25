@@ -134,10 +134,10 @@ print(hex(s.xfer2([0x42,0])[1]))"
 |--------|--------------------|
 | CSI    | CAM0 (15-pin, pin 1)|
 
-> RPi5 (balon). Ciągłe nagrywanie H.264 4K (3840×2160, 15 Mbps) na dysk — katalog z `CAM_RECORD_DIR` (domyślnie `/home/pi/stratosteam-video`).  
+> RPi5 (balon). Ciągłe nagrywanie H.264 Full HD (1920×1080, 25 kl./s, 4 Mbps) na dysk — katalog z `CAM_RECORD_DIR`. Parametry: `CAM_RECORD_*` w `rpi-air/config.py`.  
 > Na żądanie z Flutter: zdjęcie 160×120 JPEG, chunki po 140 bajtów (base64), przesyłane przez UART → LoRa → backend.  
 > Dysk monitorowany: `shutil.disk_usage()`, dane `dsku`/`dskf` w beaconie ESP32 (pole `d`).  
-> 15 Mbps przy 4K to ~54 GB na 8 h lotu — potrzebna karta 64 GB lub większa.
+> 4 Mbps to ~1.8 GB na godzinę (~14 GB na 8 h lotu). 4K zjadało ok. 1.5 rdzenia i dawało tylko 14 kl./s.
 
 ---
 

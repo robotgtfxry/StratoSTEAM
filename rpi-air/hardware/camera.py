@@ -31,11 +31,13 @@ except ImportError:
 
 class CameraModule:
     def __init__(self, record_dir: str, photo_w: int = 160, photo_h: int = 120,
-                 photo_quality: int = 25):
+                 photo_quality: int = 25, record_w: int = 1920, record_h: int = 1080,
+                 record_fps: int = 25, bitrate: int = 4_000_000):
         self._record_dir = record_dir
         self._photo_w = photo_w
         self._photo_h = photo_h
         self._photo_quality = photo_quality
+        self._bitrate = bitrate
         self._recording = False
         self._cam = None
         self._photo_id = 0
@@ -47,7 +49,11 @@ class CameraModule:
             os.makedirs(record_dir, exist_ok=True)
             cam = Picamera2()
             cfg = cam.create_video_configuration(
-                main={"size": (3840, 2160), "format": "RGB888"},  # 4K UHD
+                # YUV420 idzie do kodera bez konwersji kolorów — mniej CPU niż RGB
+                main={"size": (record_w, record_h), "format": "YUV420"},
+                # mały podgląd RGB tylko do zdjęć wysyłanych przez LoRa
+                lores={"size": (640, 360), "format": "RGB888"},
+                controls={"FrameRate": record_fps},
             )
             cam.configure(cfg)
             cam.start()
@@ -55,8 +61,8 @@ class CameraModule:
             log.error("Camera init failed: %s — camera disabled", exc)
             return
         self._cam = cam
-        log.info("Camera ready (record_dir=%s photo=%dx%d q=%d)",
-                 record_dir, photo_w, photo_h, photo_quality)
+        log.info("Camera ready (record_dir=%s video=%dx%d@%d photo=%dx%d q=%d)",
+                 record_dir, record_w, record_h, record_fps, photo_w, photo_h, photo_quality)
 
     @property
     def available(self) -> bool:
@@ -66,17 +72,14 @@ class CameraModule:
     def is_recording(self) -> bool:
         return self._recording
 
-    # Bitrate H.264: 15 Mbps = ~54 GB / 8h przy 4K — wymaga karty 64 GB+
-    _H264_BITRATE = 15_000_000
-
     def start_recording(self) -> str | None:
         if not self._cam or self._recording:
             return None
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         path = os.path.join(self._record_dir, f"rec_{ts}.h264")
-        self._cam.start_recording(H264Encoder(self._H264_BITRATE), FileOutput(path))
+        self._cam.start_recording(H264Encoder(self._bitrate), FileOutput(path))
         self._recording = True
-        log.info("Recording → %s  bitrate=%d Mbps", path, self._H264_BITRATE // 1_000_000)
+        log.info("Recording → %s  bitrate=%.1f Mbps", path, self._bitrate / 1e6)
         return path
 
     def stop_recording(self) -> None:
@@ -98,9 +101,10 @@ class CameraModule:
         img_id = self._photo_id
 
         try:
-            arr = self._cam.capture_array("main")   # RGB888, 1280x720
             if _PIL:
-                img = _PilImage.fromarray(arr)
+                arr = self._cam.capture_array("lores")
+                # "RGB888" w picamera2 leży w pamięci jako BGR — odwróć kanały
+                img = _PilImage.fromarray(arr[..., 2::-1].copy())
                 img = img.resize((self._photo_w, self._photo_h), _PilImage.LANCZOS)
                 buf = io.BytesIO()
                 img.save(buf, format="JPEG", quality=self._photo_quality, optimize=True)

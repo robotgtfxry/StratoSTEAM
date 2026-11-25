@@ -71,6 +71,11 @@ SDR_BIN_WINDOW       = 15          # ±bin wokół nośnej w FFT
 
 # Camera (RPi cam0)
 CAM_RECORD_DIR     = "/home/admin/stratosteam-video"
+# Full HD zamiast 4K — dużo mniejszy pobór mocy (RPi 5 koduje H.264 procesorem)
+CAM_RECORD_W       = 1920
+CAM_RECORD_H       = 1080
+CAM_RECORD_FPS     = 25
+CAM_RECORD_BITRATE = 4_000_000   # bit/s → ~1.8 GB na godzinę
 CAM_PHOTO_W        = 160    # szerokość zdjęcia wysyłanego przez LoRa
 CAM_PHOTO_H        = 120    # wysokość
 CAM_PHOTO_QUALITY  = 25     # jakość JPEG (1-95); niższa = mniejszy plik = mniej chunków

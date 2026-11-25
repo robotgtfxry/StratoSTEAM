@@ -32,7 +32,7 @@ flutter build apk --release
 | Orientacja | roll / pitch / yaw z BNO085 |
 | Mapa | pozycja z GPS, ślad lotu |
 | Tensometry | siła w 4 narożnikach zawieszenia (HX711) |
-| Kamera RPi | ostatnie zdjęcie 160×120 przesłane przez LoRa, żądanie nowego, start/stop nagrywania 4K |
+| Kamera RPi | ostatnie zdjęcie 160×120 przesłane przez LoRa, żądanie nowego, start/stop nagrywania |
 | ESP32-CAM | włącznik zasilania jedynej kamery + status: nagrywa / klatki / wolne MB na karcie |
 | Zasilanie RPi | włączenie i bezpieczne wyłączenie RPi na balonie (przez ESP32-S3) |
 | Nadajnik HF *(do zrobienia — wyłączone)* | start/stop i częstotliwość generatora AD9833 na stacji naziemnej |
