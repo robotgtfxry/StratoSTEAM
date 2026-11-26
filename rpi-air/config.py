@@ -63,6 +63,10 @@ SDR_BIN_WINDOW       = 15          # ±bin wokół nośnej w FFT
 
 # Camera (RPi cam0)
 CAM_RECORD_DIR     = "/home/admin/stratosteam-video"
+# Film w kawałkach — nagłe odcięcie zasilania psuje najwyżej ostatni kawałek
+CAM_SEGMENT_S      = 600
+# Poniżej tylu GB wolnego film się wstrzymuje, żeby dziennik lotu miał miejsce
+CAM_MIN_FREE_GB    = 1.0
 # Full HD zamiast 4K — dużo mniejszy pobór mocy (RPi 5 koduje H.264 procesorem)
 CAM_RECORD_W       = 1920
 CAM_RECORD_H       = 1080
@@ -79,4 +83,8 @@ CAM_PHOTO_BY_SF = {
 # Istnieje w trakcie lotu (komenda START ze stacji) → ostrość na stałe na nieskończoność.
 # Bez niego działa autofokus. Plik, żeby restart RPi w locie tego nie zmienił.
 FLIGHT_FLAG        = "/home/admin/.stratosteam-lot"
+
+# Dziennik lotu na karcie (CSV + JSONL) — wszystko, także bez łączności z ziemią
+FLIGHT_LOG_DIR     = "/home/admin/stratosteam-logi"
+LOG_INTERVAL_S     = 1
 PREVIEW_PORT       = 8081   # podgląd na żywo po sieci (tylko Tailscale), None = wyłączony

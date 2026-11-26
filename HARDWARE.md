@@ -143,6 +143,9 @@ print(hex(s.xfer2([0x42,0])[1]))"
 > Faza misji idzie ze stacji do aplikacji (`/api/mission`). Zdjęcia bez internetu czekają w `~/stratosteam-odbior/do-wyslania` i trafiają na serwer po jego powrocie.  
 > Rozmiary: `CAM_PHOTO_BY_SF` w `rpi-air/config.py`. Komenda `flight` (START na stacji) ustawia ostrość na nieskończoność.
 > Dysk monitorowany: `shutil.disk_usage()`, dane `dsku`/`dskf` w beaconie ESP32 (pole `d`).  
+> **Zapis na karcie RPi (także bez łączności):** dziennik lotu co 1 s w `~/stratosteam-logi/lot_*.csv` i `.jsonl` — wszystkie czujniki, GPS (ESP32-S3 wysyła pozycję do RPi co 1 s), napięcia, temperatura procesora, dysk, faza lotu.
+> Film w `~/stratosteam-video/rec_*.h264`, kawałki po 10 min (każdy odtwarza się sam). Przy < 1 GB wolnego film się wstrzymuje, dziennik działa dalej.
+> Przed lotem: `bash ~/StratoSTEAM/rpi-air/przed-lotem.sh` (miejsce) i `--usun` (czyszczenie starych plików).
 > 4 Mbps to ~1.8 GB na godzinę (~14 GB na 8 h lotu). 4K zjadało ok. 1.5 rdzenia i dawało tylko 14 kl./s.
 
 ---

@@ -6,6 +6,8 @@ import io
 import logging
 import os
 import shutil
+import threading
+import time
 from datetime import datetime
 
 log = logging.getLogger(__name__)
@@ -13,10 +15,18 @@ log = logging.getLogger(__name__)
 try:
     from picamera2 import Picamera2
     from picamera2.encoders import H264Encoder
-    from picamera2.outputs import FileOutput
+    from picamera2.outputs import Output
     _PICAM2 = True
 except ImportError:
     _PICAM2 = False
+
+    class Output:                   # zastępczo, gdy picamera2 brak (testy na PC)
+        def start(self):
+            pass
+
+        def stop(self):
+            pass
+
     log.warning("picamera2 not available — camera disabled")
 
 try:
@@ -26,10 +36,103 @@ except ImportError:
     _PIL = False
 
 
+def free_gb(path: str) -> float:
+    try:
+        return shutil.disk_usage(path).free / 1e9
+    except OSError:
+        return 0.0
+
+
+class SegmentOutput(Output):
+    """
+    Zapis H.264 w kawałkach po segment_s, cięty na klatce kluczowej — koder powtarza
+    nagłówki przy każdej, więc każdy plik odtwarza się sam. Gdy wolnego miejsca jest
+    mniej niż min_free_gb, zapis czeka (co 30 s sprawdza ponownie).
+    Wołane z wątku kodera: wyjątek nie może stąd wyjść, bo zatrzymałby nagrywanie.
+    """
+
+    def __init__(self, directory: str, segment_s: int, min_free_gb: float):
+        super().__init__()
+        self._dir = directory
+        self._seg_s = segment_s
+        self._min_free = min_free_gb
+        self._lock = threading.Lock()
+        self._fh = None
+        self._opened = 0.0
+        self._checked = -1e9        # ostatnia nieudana próba (brak miejsca / błąd)
+        self.path: str | None = None
+        self.full = False
+
+    @property
+    def writing(self) -> bool:
+        return self._fh is not None
+
+    def outputframe(self, frame, keyframe=True, timestamp=None, packet=None, audio=False):
+        if audio or not frame:
+            return
+        with self._lock:
+            try:
+                now = time.monotonic()
+                if keyframe and (self._fh is None or now - self._opened >= self._seg_s):
+                    # bez pliku (brak miejsca, błąd) ponawiaj najwyżej co 30 s — bez zalewu logów
+                    if self._fh is not None or now - self._checked >= 30:
+                        self._rotate(now)
+                if self._fh is not None:
+                    self._fh.write(frame)
+            except Exception as exc:
+                log.error("Film: błąd zapisu (%s) — spróbuję w następnym kawałku", exc)
+                self._close()
+                self._checked = time.monotonic()
+
+    def _rotate(self, now: float) -> None:
+        self._close()
+        self._checked = now
+        os.makedirs(self._dir, exist_ok=True)
+        if free_gb(self._dir) < self._min_free:
+            if not self.full:
+                log.warning("Film wstrzymany: mniej niż %.1f GB wolnego (dziennik lotu działa dalej)",
+                            self._min_free)
+            self.full = True
+            return
+        if self.full:
+            log.info("Film: znowu jest miejsce — nagrywam")
+        self.full = False
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        path, n = os.path.join(self._dir, f"rec_{ts}.h264"), 1
+        while os.path.exists(path):     # bez internetu zegar po restarcie może się cofnąć
+            path = os.path.join(self._dir, f"rec_{ts}_{n}.h264")
+            n += 1
+        self._fh = open(path, "wb", buffering=1 << 20)
+        self._opened = now
+        self._checked = -1e9
+        self.path = path
+        log.info("Film → %s", path)
+
+    def _close(self) -> None:
+        if self._fh is None:
+            return
+        try:
+            self._fh.flush()
+            os.fsync(self._fh.fileno())
+            self._fh.close()
+        except (OSError, ValueError):
+            pass
+        self._fh = None
+
+    def stop(self):
+        super().stop()
+        with self._lock:
+            self._close()
+
+
 class CameraModule:
     def __init__(self, record_dir: str, record_w: int = 1920, record_h: int = 1080,
-                 record_fps: int = 25, bitrate: int = 4_000_000):
+                 record_fps: int = 25, bitrate: int = 4_000_000,
+                 segment_s: int = 600, min_free_gb: float = 1.0):
         self._record_dir = record_dir
+        self._segment_s = segment_s
+        self._min_free_gb = min_free_gb
+        self._out: SegmentOutput | None = None
         self._bitrate = bitrate
         self._recording = False
         self._cam = None
@@ -64,19 +167,24 @@ class CameraModule:
     def is_recording(self) -> bool:
         return self._recording
 
-    def start_recording(self) -> str | None:
+    @property
+    def video_file(self) -> str | None:
+        """Plik, do którego teraz idzie film (None = nie nagrywa albo brak miejsca)."""
+        out = self._out
+        return out.path if out is not None and out.writing else None
+
+    def start_recording(self) -> bool:
         if not self._cam or self._recording:
-            return None
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        path = os.path.join(self._record_dir, f"rec_{ts}.h264")
-        n = 1
-        while os.path.exists(path):     # bez internetu zegar po restarcie może się cofnąć
-            path = os.path.join(self._record_dir, f"rec_{ts}_{n}.h264")
-            n += 1
-        self._cam.start_recording(H264Encoder(self._bitrate), FileOutput(path))
+            return False
+        try:        # klatka kluczowa co 2 s — tak często można ciąć film na kawałki
+            enc = H264Encoder(self._bitrate, repeat=True, iperiod=50)
+        except TypeError:
+            enc = H264Encoder(self._bitrate)
+        self._out = SegmentOutput(self._record_dir, self._segment_s, self._min_free_gb)
+        self._cam.start_recording(enc, self._out)
         self._recording = True
-        log.info("Recording → %s  bitrate=%.1f Mbps", path, self._bitrate / 1e6)
-        return path
+        log.info("Recording: kawałki po %d s, bitrate=%.1f Mbps", self._segment_s, self._bitrate / 1e6)
+        return True
 
     def stop_recording(self) -> None:
         if not self._cam or not self._recording:

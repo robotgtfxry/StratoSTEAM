@@ -17,6 +17,7 @@ from config import (
     ESP_UART_PORT, ESP_UART_BAUD, ESP_USB_ENABLED, ESP_SEND_INTERVAL_S,
     CAM_RECORD_DIR, CAM_PHOTO_BY_SF, FLIGHT_FLAG, PREVIEW_PORT,
     CAM_RECORD_W, CAM_RECORD_H, CAM_RECORD_FPS, CAM_RECORD_BITRATE,
+    CAM_SEGMENT_S, CAM_MIN_FREE_GB, FLIGHT_LOG_DIR, LOG_INTERVAL_S,
     SDR_ENABLED, SDR_TARGET_FREQ, SDR_SAMPLE_RATE, SDR_GAIN,
     SDR_FREQ_CORRECTION, SDR_MEASURE_INTERVAL_S, SDR_NUM_SAMPLES, SDR_BIN_WINDOW,
 )
@@ -25,6 +26,7 @@ from sensors import (
     Mpu6050Sensor, Bmp180Sensor, Ina226Sensor,
     Bme280Data, Ms5611Data, Bno085Data, Ina219Data,
 )
+from flight_logger import FlightLogger
 from hardware import PowerSignal, EspUartSender, CameraModule, SdrReceiver, EspCamPower, EspCamMonitor, \
     start_preview_server
 
@@ -94,6 +96,34 @@ def cpu_temp() -> float | None:
         return None
 
 
+def log_row(bme, ms, imu, pwr, gps: dict, gps_age, esp_vbe, lora, esp_age, tcpu, disk_free,
+            video_file, ec, flight: bool) -> dict:
+    """Jeden wiersz dziennika lotu (nazwy kolumn: flight_logger.FIELDS)."""
+    def r(v, d=2):
+        return None if v is None else round(v, d)
+    fresh = gps_age is not None and gps_age < 5
+    g = gps if fresh else {}
+    return {
+        "lot": int(flight),
+        "gps_fix": int(bool(g.get("fix"))) if fresh else None,
+        "lat": g.get("lat"), "lon": g.get("lon"), "alt_gps": g.get("alt"),
+        "pred_kmh": g.get("spd"), "kurs": g.get("hdg"), "sat": g.get("sat"), "hdop": g.get("hdop"),
+        "sat_widoczne": g.get("view"), "gps_snr": g.get("snr"), "gps_czas": g.get("t"),
+        "gps_wiek_s": r(gps_age, 1),
+        "temp": r(bme.temperature_c), "wilg": r(bme.humidity_pct), "cisn": r(bme.pressure_hpa),
+        "cisn2": r(ms.pressure_hpa), "alt_baro": r(ms.altitude_m, 1),
+        "roll": r(imu.roll_deg, 1), "pitch": r(imu.pitch_deg, 1), "yaw": r(imu.yaw_deg, 1),
+        "ax": r(imu.accel_x), "ay": r(imu.accel_y), "az": r(imu.accel_z),
+        "v_bat": r(pwr.voltage_v), "prad_ma": r(pwr.current_ma, 0), "v_esp": esp_vbe,
+        "temp_cpu": tcpu, "dysk_wolne_gb": r(disk_free),
+        "film": int(video_file is not None),
+        "plik_filmu": os.path.basename(video_file) if video_file else None,
+        "lora": None if lora is None else int(lora), "esp_wiek_s": r(esp_age, 1),
+        "espcam_ok": ec[0] if ec else None, "espcam_rec": ec[1] if ec else None,
+        "espcam_klatki": ec[2] if ec else None, "espcam_sd_mb": ec[3] if ec else None,
+    }
+
+
 def main():
     log.info("Initialising sensors…")
     power = PowerSignal()
@@ -114,7 +144,9 @@ def main():
     espcam_mon = EspCamMonitor(ESPCAM_UART_PORT, ESPCAM_STATUS_BAUD)
     esp        = _init("ESP32 UART", lambda: EspUartSender(ESP_UART_PORT, ESP_UART_BAUD, ESP_USB_ENABLED),
                        _NullEsp())
-    cam  = CameraModule(CAM_RECORD_DIR, CAM_RECORD_W, CAM_RECORD_H, CAM_RECORD_FPS, CAM_RECORD_BITRATE)
+    cam  = CameraModule(CAM_RECORD_DIR, CAM_RECORD_W, CAM_RECORD_H, CAM_RECORD_FPS, CAM_RECORD_BITRATE,
+                        CAM_SEGMENT_S, CAM_MIN_FREE_GB)
+    flog = FlightLogger(FLIGHT_LOG_DIR)
     sdr  = SdrReceiver(
         target_freq_hz  = SDR_TARGET_FREQ,
         sample_rate     = SDR_SAMPLE_RATE,
@@ -132,6 +164,10 @@ def main():
         cam.start_recording()
 
     last_send       = 0.0
+    last_log        = 0.0
+    gps: dict       = {}        # ostatnia pozycja z ESP32-S3 (linia "gps" co 1 s)
+    gps_rx          = 0.0
+    esp_vbe         = None
     photo_id    = int(time.time()) % 250      # po restarcie inny numer niż poprzednio
     photo_data: bytes | None = None           # zdjęcie czekające na potwierdzenie S3
     photo_tries = 0
@@ -171,6 +207,10 @@ def main():
                                         "(UART działa, ESP odebrało %s linii z RPi)", cmd.get("rx"))
                         esp_lora_ok = lora
                     esp_last_status = now
+                    esp_vbe = cmd.get("vbe")
+
+                elif cmd.get("type") == "gps":
+                    gps, gps_rx = cmd, now
 
                 elif cmd.get("type") == "imgst":
                     if photo_data is not None and cmd.get("id") == photo_id:
@@ -233,24 +273,29 @@ def main():
                     log.info("SDR: %.1f dBFS @ %.3f MHz", dbfs, SDR_TARGET_FREQ / 1e6)
                 last_sdr = now
 
-            # ── Wyślij dane czujników do ESP32 przez UART ─────────────────────
-            if now - last_send >= ESP_SEND_INTERVAL_S:
+            # ── Czujniki co sekundę: dziennik lotu, co 5 s także do ESP32 ─────
+            if now - last_log >= LOG_INTERVAL_S:
+                last_log = now
                 bme_d    = bme.read()
                 ms_d     = ms.read()
                 imu_d    = imu.read()
                 pwr_d    = pwr.read()
-
+                tcpu     = cpu_temp()
+                ec       = espcam_mon.compact()
                 disk_used, disk_free = cam.disk_usage(CAM_RECORD_DIR)
-                esp.send(bme_d, ms_d, imu_d, pwr_d,
-                         disk_used_gb=disk_used, disk_free_gb=disk_free,
-                         hf_dbfs=last_hf_dbfs,
-                         espcam_status=espcam_mon.compact(),
-                         cpu_temp_c=cpu_temp())
-                log.info(
-                    "→ESP32 temp=%.1f°C alt2=%.0fm vbat=%.2fV",
-                    bme_d.temperature_c, ms_d.altitude_m, pwr_d.voltage_v,
-                )
-                last_send = now
+                flog.log(log_row(bme_d, ms_d, imu_d, pwr_d, gps, now - gps_rx if gps_rx else None,
+                                 esp_vbe, esp_lora_ok, now - esp_last_status, tcpu, disk_free,
+                                 cam.video_file, ec, os.path.exists(FLIGHT_FLAG)))
+
+                if now - last_send >= ESP_SEND_INTERVAL_S:
+                    esp.send(bme_d, ms_d, imu_d, pwr_d,
+                             disk_used_gb=disk_used, disk_free_gb=disk_free,
+                             hf_dbfs=last_hf_dbfs, espcam_status=ec, cpu_temp_c=tcpu)
+                    log.info(
+                        "→ESP32 temp=%.1f°C alt2=%.0fm vbat=%.2fV",
+                        bme_d.temperature_c, ms_d.altitude_m, pwr_d.voltage_v,
+                    )
+                    last_send = now
 
             time.sleep(0.05)
 
@@ -258,6 +303,7 @@ def main():
         log.info("Shutdown by keyboard")
     finally:
         power.set_alive(False)
+        flog.close()
         cam.close()
         if sdr:
             sdr.close()

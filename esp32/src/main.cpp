@@ -68,6 +68,7 @@
 #define WDT_TIMEOUT_MS         40000    // zawieszona pętla → restart S3
 #define LORA_RETRY_MS          30000    // co ile ponawiać init LoRa, gdy modułu brak
 #define STATUS_INTERVAL_MS     5000     // status ESP → RPi przez UART
+#define GPS_TO_RPI_MS          1000     // pozycja GPS → RPi (dziennik lotu na karcie)
 #define NOLORA_BLINK_MS        2000     // okres mrugania LED gdy brak LoRa
 #define BATT_DIV_RATIO         2.0f
 #define BATT_VREF              3.3f
@@ -111,6 +112,7 @@ bool     loraOk        = false;
 uint32_t loraRestarts  = 0;     // ile razy moduł trzeba było podnieść
 uint32_t lastLoraRetry = 0;
 uint32_t lastStatus    = 0;
+uint32_t lastGpsToRpi  = 0;
 bool     ledOverride   = false; // LED ustawiony komendą z ziemi
 String   rpiLineBuf  = "";   // UART2
 String   usbLineBuf  = "";   // USB (Serial)
@@ -451,6 +453,34 @@ bool gpsFix() {
 //   x 1 = część pól pominięta, żeby zmieścić się w LORA_MAX_PAYLOAD
 static double rnd(double v, double scale) { return round(v * scale) / scale; }
 
+// Pozycja dla dziennika lotu na karcie RPi — zapisuje się także bez łączności z ziemią.
+// {"type":"gps","fix":true,"lat":..,"lon":..,"alt":..,"spd":..,"hdg":..,"sat":..,"hdop":..,"view":..,"snr":..,"t":"...Z"}
+void sendGpsToRpi() {
+    JsonDocument st;
+    st["type"] = "gps";
+    st["fix"]  = gpsFix();
+    if (gps.location.isValid()) {
+        st["lat"] = rnd(gps.location.lat(), 1e6);
+        st["lon"] = rnd(gps.location.lng(), 1e6);
+    }
+    if (gps.altitude.isValid()) st["alt"] = rnd(gps.altitude.meters(), 10);
+    if (gps.speed.isValid())    st["spd"] = rnd(gps.speed.kmph(), 10);
+    if (gps.course.isValid())   st["hdg"] = rnd(gps.course.deg(), 10);
+    st["sat"] = gps.satellites.isValid() ? (int)gps.satellites.value() : 0;
+    if (gps.hdop.isValid())     st["hdop"] = rnd(gps.hdop.hdop(), 10);
+    st["view"] = gpsView;
+    st["snr"]  = gpsSnrMax;
+    if (gps.date.isValid() && gps.time.isValid() && gps.date.year() > 2020) {
+        char t[24];
+        snprintf(t, sizeof(t), "%04d-%02d-%02dT%02d:%02d:%02dZ", gps.date.year(), gps.date.month(),
+                 gps.date.day(), gps.time.hour(), gps.time.minute(), gps.time.second());
+        st["t"] = t;
+    }
+    char buf[256];
+    serializeJson(st, buf, sizeof(buf));
+    sendToRpi(buf);
+}
+
 void sendBeacon() {
     JsonDocument doc;
     const float vbe = readBattAdc();   // napięcie baterii mierzone przez ESP32 (zawsze)
@@ -781,6 +811,10 @@ void loop() {
     if (now - lastStatus >= STATUS_INTERVAL_MS) {
         lastStatus = now;
         sendStatusToRpi();
+    }
+    if (now - lastGpsToRpi >= GPS_TO_RPI_MS) {
+        lastGpsToRpi = now;
+        sendGpsToRpi();
     }
 
     // ── Obsługa shutdown ──────────────────────────────────────────────────────

@@ -1,124 +1,104 @@
 """
-FlightLogger — zapisuje wszystkie odczyty czujników do pliku CSV i JSONL
-od momentu uruchomienia systemu.
+Dziennik lotu na karcie RPi balonu — działa bez łączności z ziemią.
 
-Pliki są tworzone w LOG_DIR z datą/godziną startu misji w nazwie:
-    /var/log/stratosteam/flight_20260504_143000.csv
-    /var/log/stratosteam/flight_20260504_143000.jsonl
+Co LOG_INTERVAL_S jeden wiersz ze wszystkim (czujniki, GPS z ESP32-S3, zasilanie, dysk,
+kamera, faza lotu) do dwóch plików z godziną startu programu w nazwie:
+    ~/stratosteam-logi/lot_20261126_101500.csv    — otwierasz w Excelu / LibreOffice
+    ~/stratosteam-logi/lot_20261126_101500.jsonl  — jeden JSON na wiersz (pandas itp.)
 
-Format JSONL: jeden JSON-object na linię (łatwy import do pandas/Excel).
-Format CSV:   nagłówek + wiersze, otwierany w Libre/Excel.
+Każdy wiersz trafia od razu do systemu, a co SYNC_S na kartę (fsync), więc nagłe odcięcie
+zasilania zabiera najwyżej kilka ostatnich sekund. Błąd zapisu nigdy nie zatrzymuje lotu.
 """
 import csv
 import json
 import logging
 import os
 import time
-from dataclasses import asdict
-from datetime import datetime, timezone
+from datetime import datetime
 
-from sensors import GpsData, Bme280Data, Ms5611Data, Bno085Data, Ina219Data
-
-LOG_DIR = "/var/log/stratosteam"
 log = logging.getLogger(__name__)
+
+SYNC_S = 5
+
+# Stała kolejność kolumn CSV (brakujące pola zostają puste)
+FIELDS = [
+    "czas", "ts", "od_startu_s", "lot",
+    # GPS z ESP32-S3
+    "gps_fix", "lat", "lon", "alt_gps", "pred_kmh", "kurs", "sat", "hdop",
+    "sat_widoczne", "gps_snr", "gps_czas", "gps_wiek_s",
+    # czujniki RPi
+    "temp", "wilg", "cisn", "cisn2", "alt_baro",
+    "roll", "pitch", "yaw", "ax", "ay", "az",
+    # zasilanie i stan
+    "v_bat", "prad_ma", "v_esp", "temp_cpu", "dysk_wolne_gb",
+    "film", "plik_filmu", "lora", "esp_wiek_s",
+    "espcam_ok", "espcam_rec", "espcam_klatki", "espcam_sd_mb",
+]
 
 
 class FlightLogger:
-    def __init__(self, log_dir: str = LOG_DIR):
-        os.makedirs(log_dir, exist_ok=True)
-        ts_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-        csv_path   = os.path.join(log_dir, f"flight_{ts_str}.csv")
-        jsonl_path = os.path.join(log_dir, f"flight_{ts_str}.jsonl")
+    def __init__(self, log_dir: str):
+        self._dir = log_dir
+        self._csv = self._jsonl = None
+        self._writer = None
+        self._t0 = time.monotonic()
+        self._last_sync = 0.0
+        self._last_warn = 0.0
+        self.path = None
+        self._open()
 
-        self._csv_fh   = open(csv_path,   "w", newline="", encoding="utf-8")
-        self._jsonl_fh = open(jsonl_path, "a", encoding="utf-8")
-        self._writer: csv.DictWriter | None = None
-        self._start_time = time.time()
-
-        log.info("FlightLogger started: %s / %s", csv_path, jsonl_path)
-
-    # ── public API ────────────────────────────────────────────────────────────
-
-    def log(
-        self,
-        seq: int,
-        gps: GpsData,
-        bme: Bme280Data,
-        ms:  Ms5611Data,
-        imu: Bno085Data,
-        pwr: Ina219Data,
-    ) -> None:
-        row = self._build_row(seq, gps, bme, ms, imu, pwr)
-
-        # JSONL — zawsze flush
-        self._jsonl_fh.write(json.dumps(row, ensure_ascii=False) + "\n")
-        self._jsonl_fh.flush()
-
-        # CSV — nagłówek tylko raz (pierwsza linia)
-        if self._writer is None:
-            self._writer = csv.DictWriter(
-                self._csv_fh, fieldnames=list(row.keys())
-            )
+    def _open(self) -> None:
+        try:
+            os.makedirs(self._dir, exist_ok=True)
+            base = os.path.join(self._dir, "lot_" + datetime.now().strftime("%Y%m%d_%H%M%S"))
+            n, name = 1, base
+            while os.path.exists(name + ".csv"):    # zegar bez internetu może się cofnąć
+                name = f"{base}_{n}"
+                n += 1
+            self._csv = open(name + ".csv", "w", newline="", encoding="utf-8")
+            self._jsonl = open(name + ".jsonl", "a", encoding="utf-8")
+            self._writer = csv.DictWriter(self._csv, fieldnames=FIELDS, extrasaction="ignore")
             self._writer.writeheader()
-        self._writer.writerow(row)
-        self._csv_fh.flush()
+            self.path = name
+            log.info("Dziennik lotu: %s.csv / .jsonl", name)
+        except OSError as e:
+            self._warn(e)
+            self.close()
+
+    def _warn(self, e: Exception) -> None:
+        if time.monotonic() - self._last_warn > 60:
+            log.error("Dziennik lotu: błąd zapisu (%s) — lot trwa dalej", e)
+            self._last_warn = time.monotonic()
+
+    def log(self, row: dict) -> None:
+        if self._csv is None:
+            if time.monotonic() - self._last_warn > 60:
+                self._open()                        # np. karta była pełna — spróbuj ponownie
+            if self._csv is None:
+                return
+        now = time.time()
+        row = {"czas": datetime.fromtimestamp(now).strftime("%Y-%m-%d %H:%M:%S"),
+               "ts": round(now, 1), "od_startu_s": round(time.monotonic() - self._t0, 1), **row}
+        try:
+            self._writer.writerow(row)
+            self._jsonl.write(json.dumps({k: v for k, v in row.items() if v is not None},
+                                         ensure_ascii=False) + "\n")
+            self._csv.flush()
+            self._jsonl.flush()
+            if time.monotonic() - self._last_sync >= SYNC_S:
+                os.fsync(self._csv.fileno())
+                os.fsync(self._jsonl.fileno())
+                self._last_sync = time.monotonic()
+        except (OSError, ValueError) as e:
+            self._warn(e)
 
     def close(self) -> None:
-        try:
-            self._csv_fh.close()
-            self._jsonl_fh.close()
-            log.info("FlightLogger closed")
-        except Exception as e:
-            log.warning("FlightLogger close error: %s", e)
-
-    # ── private ───────────────────────────────────────────────────────────────
-
-    def _build_row(
-        self,
-        seq: int,
-        gps: GpsData,
-        bme: Bme280Data,
-        ms:  Ms5611Data,
-        imu: Bno085Data,
-        pwr: Ina219Data,
-    ) -> dict:
-        now = time.time()
-        return {
-            # czas
-            "seq":           seq,
-            "unix_ts":       int(now),
-            "elapsed_s":     round(now - self._start_time, 1),
-            "utc_datetime":  datetime.now(timezone.utc).isoformat(timespec="seconds"),
-
-            # GPS
-            "lat":           gps.latitude,
-            "lon":           gps.longitude,
-            "alt_gps_m":     gps.altitude_m,
-            "speed_kmh":     gps.speed_kmh,
-            "heading_deg":   gps.heading,
-            "satellites":    gps.satellites,
-            "gps_fix":       gps.fix,
-
-            # BME280 — temperatura, wilgotność, ciśnienie
-            "bme_temp_c":    bme.temperature_c,
-            "bme_hum_pct":   bme.humidity_pct,
-            "bme_pres_hpa":  bme.pressure_hpa,
-
-            # MS5611 — barometr precyzyjny
-            "ms_temp_c":     ms.temperature_c,
-            "ms_pres_hpa":   ms.pressure_hpa,
-            "ms_alt_m":      ms.altitude_m,
-
-            # BNO085 — IMU
-            "roll_deg":      imu.roll_deg,
-            "pitch_deg":     imu.pitch_deg,
-            "yaw_deg":       imu.yaw_deg,
-            "accel_x_g":     imu.accel_x,
-            "accel_y_g":     imu.accel_y,
-            "accel_z_g":     imu.accel_z,
-
-            # INA219 — zasilanie
-            "voltage_v":     pwr.voltage_v,
-            "current_ma":    pwr.current_ma,
-            "power_mw":      pwr.power_mw,
-        }
+        for fh in (self._csv, self._jsonl):
+            try:
+                if fh:
+                    fh.flush()
+                    os.fsync(fh.fileno())
+                    fh.close()
+            except (OSError, ValueError):
+                pass
+        self._csv = self._jsonl = self._writer = None
