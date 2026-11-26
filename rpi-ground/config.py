@@ -11,6 +11,10 @@ LORA_SPI_BUS = 0
 LORA_SPI_CS = 0
 LORA_DIO0_PIN = 25
 
+# Znak wywoławczy stacji naziemnej — dołączany do każdej komendy nadawanej do sondy
+# (pole "z"). Znak sondy ustawia się w aplikacji (Ustawienia), domyślnie SP8DEV-1.
+STATION_CALLSIGN = os.environ.get("STRATO_CALLSIGN", "SP8DEV")
+
 # Backend server
 # Klucz API nie może być w repo: na stacji jest w /etc/stratosteam.env (czyta go usługa).
 BACKEND_URL = os.environ.get("STRATO_BACKEND_URL", "http://localhost:8000")

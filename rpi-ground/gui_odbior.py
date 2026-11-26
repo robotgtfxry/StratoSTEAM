@@ -71,7 +71,7 @@ def demo_state(t0: float = time.time()) -> dict:
                     "alt": hist[-1][1], "vs": 5.1, "src": "GPS", "manual": {},
                     "events": [[now - 1234, "START wciśnięty"], [now - 1190, "Balon się wznosi"]]},
         "lora_resets": 0, "last_rx": now - (now % 5), "rssi": -104, "snr": 5.8, "history": hist,
-        "last": {"seq": 219, "lat": 52.297312, "lon": 21.113644, "alt": hist[-1][1], "sat": 11, "gview": 17, "gsnr": 43,
+        "last": {"seq": 219, "cs": "SP8DEV-1", "lat": 52.297312, "lon": 21.113644, "alt": hist[-1][1], "sat": 11, "gview": 17, "gsnr": 43,
                  "fix": 1, "vbe": 7.41, "vbat": 7.38, "imA": 812, "tcpu": 66, "temp": -38.2, "hum": 14.1,
                  "pres": 421.7, "p2": 421.2, "alt2": 6712, "roll": 4.2, "pit": -2.8, "yaw": 0,
                  "ax": 0.1, "ay": 0.7, "az": 9.8, "dsku": 17.2, "dskf": 11.4,
@@ -478,7 +478,8 @@ class App(tk.Tk):
             ("gps", "Pozycja (GPS)", [("lat", "Szerokość"), ("lon", "Długość"), ("alt", "Wysokość"),
                                       ("sat", "Satelity"), ("snr", "Sygnał GPS"), ("fix", "Fix")]),
             ("radio", "Radio LoRa", [("rssi", "RSSI"), ("snr", "SNR"), ("pk", "Pakiety/straty"),
-                                     ("bad", "Uszkodzone"), ("rst", "Resety modułu")]),
+                                     ("bad", "Uszkodzone"), ("rst", "Resety modułu"),
+                                     ("cs", "Znak sondy")]),
             ("pwr", "Zasilanie", [("vbat", "Bateria (INA)"), ("vbe", "Bateria (ESP32)"),
                                   ("imA", "Prąd"), ("w", "Moc"), ("rpi", "RPi na balonie"),
                                   ("cpu", "Temperatura RPi")]),
@@ -558,6 +559,7 @@ class App(tk.Tk):
         r.set("pk", f"{st.get('packets', 0)} / {st.get('lost', 0)}" if st else "—")
         r.set("bad", str(st.get("bad", 0)) if st else "—", WARN if st.get("bad") else FG)
         r.set("rst", str(st.get("lora_resets", 0)) if st else "—", BAD if st.get("lora_resets") else FG)
+        r.set("cs", p.get("cs") or "—", FG if p.get("cs") else WARN)
 
         w = self._c["pwr"]
         vbat, ima = p.get("vbat"), p.get("imA")

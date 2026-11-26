@@ -4,7 +4,7 @@ import time
 import logging
 from config import (
     LORA_FREQ, LORA_SF, LORA_BW, LORA_CR, LORA_TX_POWER,
-    LORA_SPI_BUS, LORA_SPI_CS, LORA_DIO0_PIN,
+    LORA_SPI_BUS, LORA_SPI_CS, LORA_DIO0_PIN, STATION_CALLSIGN,
 )
 
 log = logging.getLogger(__name__)
@@ -137,6 +137,11 @@ class LoRaRX:
         Called immediately after receiving a telemetry packet — the balloon
         is listening for exactly UPLINK_RX_WINDOW_S seconds.
         """
+        # identyfikacja stacji w każdej komendzie (licencja krótkofalarska)
+        if data[:1] == b"{" and STATION_CALLSIGN:
+            tagged = b'{"z":"' + STATION_CALLSIGN.encode() + b'",' + data[1:]
+            if len(tagged) <= 255:
+                data = tagged
         self._ensure_alive()
         self._set_mode(_MODE_STDBY)
         self._write_reg(_REG_FIFO_ADDR_PTR, 0x00)

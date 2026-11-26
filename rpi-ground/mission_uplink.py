@@ -20,11 +20,12 @@ class MissionUplink:
     def start(self) -> None:
         threading.Thread(target=self._run, daemon=True).start()
 
-    def update(self, state: dict, auto: bool, last_rx: float | None, tcpu: float | None = None) -> None:
+    def update(self, state: dict, auto: bool, last_rx: float | None, tcpu: float | None = None,
+               cs: str | None = None) -> None:
         """Nie blokuje — wołane w każdym obiegu pętli radia."""
         with self._lock:
             changed = self._cur is None or self._cur[0]["phase"] != state["phase"] or self._cur[1] != auto
-            self._cur = (state, auto, last_rx, tcpu)
+            self._cur = (state, auto, last_rx, tcpu, cs)
         if changed:
             self._wake.set()        # zmiana fazy idzie od razu
 
@@ -32,7 +33,7 @@ class MissionUplink:
         with self._lock:
             if self._cur is None:
                 return None
-            st, auto, last_rx, tcpu = self._cur
+            st, auto, last_rx, tcpu, cs = self._cur
         now, t0 = time.time(), st.get("t0")
 
         def rnd(v):
@@ -41,7 +42,7 @@ class MissionUplink:
         return {
             "phase": st["phase"], "elapsed": rnd(now - t0) if t0 else None,
             "alt": rnd(st.get("alt")), "vs": rnd(st.get("vs")), "max_alt": rnd(st.get("max_alt")),
-            "src": st.get("src"), "auto": auto, "tcpu": tcpu, "rx_age": rnd(now - last_rx) if last_rx else None,
+            "src": st.get("src"), "auto": auto, "tcpu": tcpu, "cs": cs, "rx_age": rnd(now - last_rx) if last_rx else None,
             "events": [[rnd(t - t0), text[:160]] for t, text in st.get("events", []) if t0 and t >= t0][-8:],
         }
 

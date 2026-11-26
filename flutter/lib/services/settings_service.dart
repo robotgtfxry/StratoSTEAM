@@ -13,7 +13,7 @@ class SettingsService extends ChangeNotifier {
 
   String serverUrl  = 'http://frog02.mikr.us:21124';
   String apiKey     = 'change-me-in-production';
-  String callsign   = 'SP0STR-11';
+  String callsign   = 'SP8DEV-1';    // znak wywoławczy sondy
   double minVoltage = 3.5;
   int    minSats    = 4;
   double loraFreq   = 433.0;
@@ -29,6 +29,7 @@ class SettingsService extends ChangeNotifier {
     serverUrl  = p.getString(_keyServerUrl)  ?? serverUrl;
     apiKey     = p.getString(_keyApiKey)     ?? apiKey;
     callsign   = p.getString(_keyCallsign)   ?? callsign;
+    if (callsign == 'SP0STR-11') callsign = 'SP8DEV-1';    // stary domyślny przykład
     minVoltage = p.getDouble(_keyMinVoltage) ?? minVoltage;
     minSats    = p.getInt(_keyMinSats)       ?? minSats;
     loraFreq   = p.getDouble(_keyLoraFreq)   ?? loraFreq;
@@ -62,7 +63,7 @@ class SettingsService extends ChangeNotifier {
     await p.clear();
     serverUrl  = 'http://frog02.mikr.us:21124';
     apiKey     = 'change-me-in-production';
-    callsign   = 'SP0STR-11';
+    callsign   = 'SP8DEV-1';
     minVoltage = 3.5;
     minSats    = 4;
     loraFreq   = 433.0;

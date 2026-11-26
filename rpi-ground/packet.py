@@ -38,6 +38,11 @@ def build_buzzer_command(on: bool, ms: int = 0) -> bytes:
     return json.dumps(cmd, separators=(",", ":")).encode()
 
 
+def build_callsign_command(cs: str) -> bytes:
+    """Nowy znak wywoławczy sondy (S3 zapamiętuje go na stałe)."""
+    return json.dumps({"cmd": "cs", "v": cs}, separators=(",", ":")).encode()
+
+
 def build_flight_command(on: bool) -> bytes:
     return json.dumps({"cmd": "flight", "on": on}, separators=(",", ":")).encode()
 

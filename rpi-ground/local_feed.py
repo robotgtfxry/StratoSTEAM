@@ -70,6 +70,11 @@ class LocalFeed:
         return self._state["last_rx"]
 
     @property
+    def callsign(self) -> str | None:
+        """Znak wywoławczy z ostatniego beaconu sondy."""
+        return (self._state["last"] or {}).get("cs")
+
+    @property
     def tcpu(self) -> float | None:
         """Temperatura procesora RPi balonu z ostatniego pakietu."""
         return (self._state["last"] or {}).get("tcpu")

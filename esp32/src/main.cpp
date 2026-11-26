@@ -21,6 +21,7 @@
 #include <SPI.h>
 #include <LoRa.h>
 #include <ArduinoJson.h>
+#include <Preferences.h>
 #include <esp_task_wdt.h>
 #include <mbedtls/base64.h>
 
@@ -51,6 +52,9 @@
 #define LORA_SF                10
 #define LORA_BW                125E3
 #define LORA_TX_POWER          17
+// Znak wywoławczy sondy (licencja krótkofalarska, pasmo 70 cm) — w każdym beaconie.
+// Zmiana z ziemi komendą {"cmd":"cs","v":"..."}, zapamiętana w pamięci nieulotnej.
+#define CALLSIGN_DEFAULT       "SP8DEV-1"
 #define BEACON_INTERVAL_MS     5000     // interwał beacona (=ESP_SEND_INTERVAL_S RPi5)
 #define IMG_MAX_BYTES          16384
 #define IMG_DATA               240      // bajtów obrazu w pakiecie (+4 nagłówka)
@@ -113,6 +117,51 @@ uint32_t loraRestarts  = 0;     // ile razy moduł trzeba było podnieść
 uint32_t lastLoraRetry = 0;
 uint32_t lastStatus    = 0;
 uint32_t lastGpsToRpi  = 0;
+char     callsign[16]  = CALLSIGN_DEFAULT;
+
+// Litery, cyfry i "/", potem opcjonalnie -SSID (np. SP8DEV-1, SP8DEV/P)
+bool validCallsign(const char* s) {
+    const size_t n = strlen(s);
+    if (n < 3 || n > 13) return false;
+    const char* dash = strchr(s, '-');
+    const size_t base = dash ? (size_t)(dash - s) : n;
+    if (base < 3 || base > 10) return false;
+    for (size_t i = 0; i < base; i++)
+        if (!isupper((unsigned char)s[i]) && !isdigit((unsigned char)s[i]) && s[i] != '/') return false;
+    if (dash) {
+        const size_t ssid = n - base - 1;
+        if (ssid < 1 || ssid > 2) return false;
+        for (size_t i = base + 1; i < n; i++) if (!isdigit((unsigned char)s[i])) return false;
+    }
+    return true;
+}
+
+void loadCallsign() {
+    Preferences p;
+    p.begin("strato", true);
+    const String cs = p.getString("cs", CALLSIGN_DEFAULT);
+    p.end();
+    if (validCallsign(cs.c_str())) strlcpy(callsign, cs.c_str(), sizeof(callsign));
+    Serial.printf("[ESP32] znak wywoławczy: %s\n", callsign);
+}
+
+void setCallsign(const char* v) {
+    char up[16];
+    size_t i = 0;
+    for (; v[i] && i < sizeof(up) - 1; i++) up[i] = toupper((unsigned char)v[i]);
+    up[i] = 0;
+    if (!validCallsign(up)) {
+        Serial.printf("[ESP32] zły znak wywoławczy: %s\n", v);
+        return;
+    }
+    if (strcmp(up, callsign) == 0) return;
+    Preferences p;
+    p.begin("strato", false);
+    p.putString("cs", up);
+    p.end();
+    strlcpy(callsign, up, sizeof(callsign));
+    Serial.printf("[ESP32] nowy znak wywoławczy: %s\n", callsign);
+}
 bool     ledOverride   = false; // LED ustawiony komendą z ziemi
 String   rpiLineBuf  = "";   // UART2
 String   usbLineBuf  = "";   // USB (Serial)
@@ -487,6 +536,7 @@ void sendBeacon() {
     const bool  fix = gpsFix();
 
     doc["src"] = "esp32";
+    doc["cs"]  = callsign;               // identyfikacja stacji — nigdy nie wycinana
     doc["seq"] = beaconSeq++;
     JsonArray p = doc["p"].to<JsonArray>();
     p.add(fix ? rnd(gps.location.lat(), 1e6) : 0.0);
@@ -602,6 +652,11 @@ void handleIncoming() {
     if (strcmp(cmd, "img_ok") == 0) {
         if ((doc["id"] | -1) == imgId) { imgReady = false; memset(imgTodo, 0, sizeof(imgTodo)); }
         Serial.printf("[ESP32] zdjęcie id=%d odebrane na ziemi\n", imgId);
+        return;
+    }
+
+    if (strcmp(cmd, "cs") == 0) {
+        setCallsign(doc["v"] | "");
         return;
     }
 
@@ -762,6 +817,7 @@ void setup() {
     imgBuf = (uint8_t*)malloc(IMG_MAX_BYTES);
     Serial.begin(115200);
     delay(500);
+    loadCallsign();
 
     // Nadawanie LoRa blokuje pętlę na ~2 s — domyślne 256 B by się przepełniło
     gpsSerial.setRxBufferSize(4096);

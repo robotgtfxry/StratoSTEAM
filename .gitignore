@@ -32,6 +32,7 @@ Thumbs.db
 
 # Zdjęcia zapisane przez backend
 backend/photos/
+backend/callsign.json
 
 # Klucze prywatne (lokalna kopia, NIGDY do repo)
 klucze/

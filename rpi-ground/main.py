@@ -22,6 +22,7 @@ from exec_store import ExecStore
 from local_feed import LOG_DIR, LocalFeed
 from mission import Mission
 from mission_uplink import MissionUplink
+from callsign_store import CallsignStore
 from photo_outbox import PhotoOutbox
 from photo_rx import PKT_MAGIC, PhotoRx, airtime, choose_sf
 from camera_store import CameraStore
@@ -29,7 +30,7 @@ from espcam_store import EspCamStore
 from packet import (
     build_command, build_rpi_power_command, build_exec_command,
     build_photo_command, build_cam_rec_command, build_espcam_power_command,
-    build_buzzer_command, build_flight_command, build_raw_command,
+    build_buzzer_command, build_callsign_command, build_flight_command, build_raw_command,
 )
 from config import BACKEND_URL, BACKEND_API_KEY, HF_ENABLED, LORA_SF
 
@@ -105,6 +106,7 @@ def main():
     photo     = PhotoRx()
     mission   = Mission(os.path.join(LOG_DIR, "misja.json"))
     mission_up = MissionUplink()
+    callsign  = CallsignStore()
     outbox    = PhotoOutbox(os.path.join(LOG_DIR, "do-wyslania"))   # zdjęcia czekające na internet
     last_snr: float | None = None
     buzzer: list[tuple[bool, int]] = []      # komendy buzzera z okna
@@ -125,6 +127,7 @@ def main():
     camera_s.start()
     espcam_s.start()
     mission_up.start()
+    callsign.start()
     outbox.start()
     log.info("Ground station listening…")
 
@@ -142,7 +145,7 @@ def main():
             if (auto := mission.pop_auto()) is not None:
                 feed.set_auto(auto)
             feed.mission(mission.state())
-            mission_up.update(mission.state(), feed.auto_on(), feed.last_rx, feed.tcpu)
+            mission_up.update(mission.state(), feed.auto_on(), feed.last_rx, feed.tcpu, feed.callsign)
             feed.photo_progress(photo.state())
             feed.tick(getattr(lora, "resets", 0))
             raw, rssi, snr = lora.receive(timeout_s=1.0)
@@ -314,6 +317,9 @@ def main():
                 elif (flight := mission.pop_flight()) is not None:
                     ok = lora.send_command(build_flight_command(flight))
                     log.info("Flight cmd on=%s → ESP32 ok=%s", flight, ok)
+                elif (cs := callsign.pop(feed.callsign)) is not None:
+                    ok = lora.send_command(build_callsign_command(cs))
+                    log.info("Znak wywoławczy %s → ESP32 ok=%s (teraz nadaje jako %s)", cs, ok, feed.callsign)
                 elif (pc := photo.command(choose_sf(last_snr))) is not None:
                     ok = lora.send_command(build_raw_command(pc))
                     log.info("Zdjęcie %s → ESP32 ok=%s", pc, ok)

@@ -69,7 +69,9 @@ class _MissionCardState extends State<MissionCard> {
 
   @override
   Widget build(BuildContext context) {
-    final m = context.watch<MissionService>().info;
+    final svc = context.watch<MissionService>();
+    final m = svc.info;
+    final want = svc.desiredCallsign;
     final (text, color, icon) = _look(m?.phase);
     final tPlus = m?.tPlus;
     final pkt = m?.packetAge;
@@ -128,6 +130,13 @@ class _MissionCardState extends State<MissionCard> {
                   : 'Automatyczne zdjęcia: wyłączone',
               style: TextStyle(
                   color: m.auto ? Colors.greenAccent : Colors.white38,
+                  fontSize: 12),
+            ),
+            Text(
+              'Znak sondy: ${m.cs ?? '—'}'
+              '${want != null && want != m.cs ? '   →  $want (czeka na potwierdzenie z sondy)' : ''}',
+              style: TextStyle(
+                  color: want != null && want != m.cs ? Colors.orangeAccent : Colors.white70,
                   fontSize: 12),
             ),
             if (m.tcpu != null)

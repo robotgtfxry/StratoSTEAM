@@ -2,6 +2,7 @@
 import 'package:provider/provider.dart';
 import '../services/settings_service.dart';
 import '../services/telemetry_service.dart';
+import '../services/mission_service.dart';
 import '../widgets/pin_dialog.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -15,6 +16,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late TextEditingController _serverCtrl;
   late TextEditingController _apiKeyCtrl;
   late TextEditingController _callsignCtrl;
+  late String _callsignShown;    // znak pokazany po otwarciu — wysyłamy tylko zmieniony
   late TextEditingController _minVoltCtrl;
   late TextEditingController _loraFreqCtrl;
   late int _minSats;
@@ -28,7 +30,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final s = context.read<SettingsService>();
     _serverCtrl   = TextEditingController(text: s.serverUrl);
     _apiKeyCtrl   = TextEditingController(text: s.apiKey);
-    _callsignCtrl = TextEditingController(text: s.callsign);
+    final ms = context.read<MissionService>();
+    _callsignShown = ms.desiredCallsign ?? ms.info?.cs ?? s.callsign;
+    _callsignCtrl = TextEditingController(text: _callsignShown);
     _minVoltCtrl  = TextEditingController(text: s.minVoltage.toStringAsFixed(1));
     _loraFreqCtrl = TextEditingController(text: s.loraFreq.toStringAsFixed(1));
     _minSats = s.minSats;
@@ -58,6 +62,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
     // reconnect telemetry with new server URL
     context.read<TelemetryService>().reconnect();
+    final cs = _callsignCtrl.text.trim().toUpperCase();
+    if (cs != _callsignShown && mounted) {
+      final err = await context.read<MissionService>().setCallsign(cs);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(err ?? 'Znak $cs wysłany — sonda potwierdzi go w beaconie'),
+        backgroundColor: err == null ? Colors.green[800] : Colors.red[800],
+      ));
+      if (err == null) _callsignShown = cs;
+    }
     setState(() => _saved = true);
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) setState(() => _saved = false);
@@ -212,23 +226,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ),
               _HintText('Wyższy SF = większy zasięg, wolniejsza transmisja'),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // â”€â”€ Nośna 144 MHz â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-          _Section(
-            title: 'Nośna 144.800 MHz',
-            icon: Icons.broadcast_on_personal,
-            color: Colors.orangeAccent,
-            children: [
+              const SizedBox(height: 16),
               _Field(
-                label: 'Znak wywoławczy',
-                hint: 'SP0STR-11',
+                label: 'Znak wywoławczy sondy',
+                hint: 'SP8DEV-1',
                 controller: _callsignCtrl,
                 icon: Icons.badge,
               ),
-              _HintText('Używany do logowania eksperymentu jonosferycznego'),
+              _HintText('Nadawany w każdym beaconie. Po zapisaniu idzie przez stację do sondy'),
             ],
           ),
           const SizedBox(height: 16),
