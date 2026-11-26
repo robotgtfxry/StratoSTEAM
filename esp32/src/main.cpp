@@ -51,7 +51,9 @@
 #define LORA_FREQ              433E6
 #define LORA_SF                10
 #define LORA_BW                125E3
-#define LORA_TX_POWER          17
+// 20 dBm = maksimum SX1278 (tryb wysokiej mocy). Producent dopuszcza go przez 1% czasu,
+// beacon zajmuje ok. 34% — przy dziwnych resetach modułu wróć do 17.
+#define LORA_TX_POWER          20
 // Znak wywoławczy sondy (licencja krótkofalarska, pasmo 70 cm) — w każdym beaconie.
 // Zmiana z ziemi komendą {"cmd":"cs","v":"..."}, zapamiętana w pamięci nieulotnej.
 #define CALLSIGN_DEFAULT       "SP8DEV-1"

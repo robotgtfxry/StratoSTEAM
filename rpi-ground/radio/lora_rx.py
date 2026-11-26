@@ -85,7 +85,7 @@ class LoRaRX:
         cr_bits = (LORA_CR - 4) << 1
         self._write_reg(_REG_MODEM_CONFIG1, bw_bits | cr_bits)  # explicit header (musi zgadzać się z rpi-air)
         self._write_sf()
-        self._write_reg(0x09, 0x80 | (LORA_TX_POWER - 2))  # PA_BOOST, moc TX uplink
+        self._write_tx_power(LORA_TX_POWER)
         self._write_reg(_REG_SYNC_WORD, 0x12)
         self._write_reg(_REG_FIFO_RX_BASE_ADDR, 0x00)
         self._write_reg(_REG_DIO_MAPPING1, 0x00)  # DIO0 = RxDone
@@ -94,6 +94,18 @@ class LoRaRX:
         time.sleep(0.01)
         self._set_mode(_MODE_RX_CONT)
         time.sleep(0.01)
+
+    def _write_tx_power(self, dbm: int):
+        """PA_BOOST 2–17 dBm; 18–20 dBm włącza tryb wysokiej mocy (PA_DAC) i limit prądu 140 mA."""
+        dbm = max(2, min(20, int(dbm)))
+        if dbm > 17:
+            self._write_reg(0x4D, 0x87)                 # RegPaDac: +20 dBm
+            self._write_reg(0x0B, 0x20 | 17)            # RegOcp: 140 mA
+            self._write_reg(0x09, 0x80 | (dbm - 5))     # 18–20 → 13–15
+        else:
+            self._write_reg(0x4D, 0x84)
+            self._write_reg(0x0B, 0x20 | 11)            # 100 mA
+            self._write_reg(0x09, 0x80 | (dbm - 2))
 
     def _write_sf(self):
         ldro = 0x08 if self._sf >= 11 else 0x00

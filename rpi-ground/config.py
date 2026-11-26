@@ -6,7 +6,9 @@ LORA_FREQ = 433.0
 LORA_SF = 10
 LORA_BW = 125000
 LORA_CR = 5
-LORA_TX_POWER = 17     # dBm — moc uplink do balonu
+# dBm — moc uplink do balonu. 20 = maksimum SX1278 (PA_BOOST + PA_DAC); stacja nadaje
+# rzadko (tylko komendy), więc mieści się w limicie 1% czasu dla 20 dBm.
+LORA_TX_POWER = 20
 LORA_SPI_BUS = 0
 LORA_SPI_CS = 0
 LORA_DIO0_PIN = 25
